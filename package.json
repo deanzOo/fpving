@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "dup": "jscpd",
     "knip": "knip",
-    "ci": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm dup && pnpm knip",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm dup && pnpm knip",
     "prepare": "lefthook install"
   },
   "devDependencies": {
@@ -32,8 +32,10 @@
     "jscpd": "5.4.1",
     "knip": "6.41.0",
     "lefthook": "2.2.1",
+    "license-checker-rseidelsohn": "5.0.1",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
-    "vitest": "5.0.4"
+    "vitest": "5.0.4",
+    "yaml": "2.9.1"
   }
 }
