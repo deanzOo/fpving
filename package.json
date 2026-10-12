@@ -1,0 +1,42 @@
+{
+  "name": "fpving-root",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "dup": "jscpd",
+    "knip": "knip",
+    "licenses:check": "license-checker-rseidelsohn --excludePrivatePackages --onlyAllow \"MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;Python-2.0;CC-BY-4.0;CC-BY-3.0;MPL-2.0;(MIT AND CC-BY-3.0)\"",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build && pnpm dup && pnpm knip && pnpm licenses:check",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/lint": "21.2.3",
+    "@commitlint/load": "21.2.3",
+    "@commitlint/types": "21.2.3",
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.4",
+    "eslint": "10.12.0",
+    "jiti": "2.7.0",
+    "jscpd": "5.4.1",
+    "knip": "6.41.0",
+    "lefthook": "2.2.1",
+    "license-checker-rseidelsohn": "5.0.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.4",
+    "yaml": "2.9.1"
+  }
+}
