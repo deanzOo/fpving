@@ -14,8 +14,7 @@ export const maxOneLineComment: Rule.RuleModule = {
       Program() {
         let previousLine: number | undefined;
         for (const comment of context.sourceCode.getAllComments()) {
-          const loc = comment.loc;
-          if (!loc) continue;
+          const loc = context.sourceCode.getLoc(comment);
           if (comment.type === "Block") {
             if (!comment.value.startsWith("*")) context.report({ loc, messageId: "block" });
             previousLine = undefined;
