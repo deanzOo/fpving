@@ -55,3 +55,9 @@ Pull requests are squash merged, so the PR title becomes the commit on `main`. `
 Labels are applied automatically from changed paths. Pull requests from forks do not get labels, because the labeler runs on `pull_request` and fork tokens are read-only.
 
 Do not commit process notes or design drafts. Product docs and ADRs are public.
+
+## Maintainers
+
+Release PRs opened by release-please with the default `GITHUB_TOKEN` do not trigger CI. Add a `RELEASE_PLEASE_TOKEN` repository secret (a fine-grained PAT with contents and pull requests write) so release PRs run checks. Without it, release PRs need an owner bypass to merge.
+
+Dependabot PRs skip the commit message check because its bodies exceed the line limit; the PR title check still gates the squash commit.

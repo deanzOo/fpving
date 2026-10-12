@@ -15,7 +15,9 @@ updates:
       - dependency-name: typescript
         versions: [">=6.1.0"]
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/setup
     schedule:
       interval: weekly
     cooldown:
