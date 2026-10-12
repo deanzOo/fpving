@@ -1,17 +1,33 @@
+import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const fixture = (name: string): string => `${root}tests/tooling/fixtures/${name}`;
+const FIXTURES = `${root}tests/tooling/fixtures/`;
+const COLD_PROGRAM_TIMEOUT_MS = 60_000;
 
-const lint = async (name: string): Promise<string[]> => {
-  const eslint = new ESLint({ cwd: root, ignore: false });
-  const [result] = await eslint.lintFiles([fixture(name)]);
-  return (result?.messages ?? []).map((m) => m.ruleId ?? `fatal:${m.message}`);
+const results = new Map<string, string[]>();
+
+const lint = (name: string): string[] => {
+  const ruleIds = results.get(name);
+  if (ruleIds === undefined) {
+    throw new Error(`fixture not linted: ${name}`);
+  }
+  return ruleIds;
 };
 
 describe("lint rules", () => {
+  beforeAll(async () => {
+    const eslint = new ESLint({ cwd: root, ignore: false });
+    for (const result of await eslint.lintFiles([`${FIXTURES}*.ts`])) {
+      results.set(
+        basename(result.filePath),
+        result.messages.map((m) => m.ruleId ?? `fatal:${m.message}`),
+      );
+    }
+  }, COLD_PROGRAM_TIMEOUT_MS);
+
   it.each([
     ["no-any.ts", "@typescript-eslint/no-explicit-any"],
     ["no-as.ts", "@typescript-eslint/consistent-type-assertions"],
@@ -25,11 +41,11 @@ describe("lint rules", () => {
     ["ts-expect-error.ts", "@typescript-eslint/ban-ts-comment"],
     ["ts-nocheck.ts", "@typescript-eslint/ban-ts-comment"],
     ["eslint-disable.ts", "@eslint-community/eslint-comments/no-use"],
-  ])("reports %s as %s", async (name, ruleId) => {
-    expect(await lint(name)).toContain(ruleId);
+  ])("reports %s as %s", (name, ruleId) => {
+    expect(lint(name)).toContain(ruleId);
   });
 
-  it("allows as const assertions", async () => {
-    expect(await lint("as-const-ok.ts")).toEqual([]);
+  it("allows as const assertions", () => {
+    expect(lint("as-const-ok.ts")).toEqual([]);
   });
 });
