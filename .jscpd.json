@@ -1,0 +1,8 @@
+{
+  "threshold": 0,
+  "minTokens": 50,
+  "path": ["."],
+  "gitignore": true,
+  "ignore": ["**/node_modules/**", "**/dist/**", "**/coverage/**", "**/reports/**", "**/tests/**/fixtures/**", "pnpm-lock.yaml"],
+  "reporters": ["console"]
+}

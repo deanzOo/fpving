@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "test fixtures"
+paths = ['''tests/.*/fixtures/.*''']
