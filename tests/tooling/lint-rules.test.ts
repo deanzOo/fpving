@@ -20,6 +20,10 @@ describe("lint rules", () => {
     ["magic-number.ts", "@typescript-eslint/no-magic-numbers"],
     ["multi-line-comment.ts", "local/max-one-line-comment"],
     ["block-comment.ts", "local/max-one-line-comment"],
+    ["todo-comment.ts", "no-warning-comments"],
+    ["prefer-as-const.ts", "@typescript-eslint/prefer-as-const"],
+    ["ts-expect-error.ts", "@typescript-eslint/ban-ts-comment"],
+    ["ts-nocheck.ts", "@typescript-eslint/ban-ts-comment"],
     ["eslint-disable.ts", "@eslint-community/eslint-comments/no-use"],
   ])("reports %s as %s", async (name, ruleId) => {
     expect(await lint(name)).toContain(ruleId);

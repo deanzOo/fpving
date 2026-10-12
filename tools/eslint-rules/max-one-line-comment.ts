@@ -21,7 +21,10 @@ export const maxOneLineComment: Rule.RuleModule = {
             previousLine = undefined;
             continue;
           }
-          if (previousLine !== undefined && loc.start.line === previousLine + 1) context.report({ loc, messageId: "multi" });
+          const trailing = context.sourceCode.getTokenBefore(comment)?.loc.end.line === loc.start.line;
+          if (!trailing && previousLine !== undefined && loc.start.line === previousLine + 1) {
+            context.report({ loc, messageId: "multi" });
+          }
           previousLine = loc.end.line;
         }
       },

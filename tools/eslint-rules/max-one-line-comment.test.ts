@@ -13,6 +13,8 @@ describe("max-one-line-comment", () => {
       "/** doc */\nexport const a = 1;",
       "/**\n * doc\n * more\n */\nexport const a = 1;",
       "const a = 1; // trailing",
+      "const a = 1; // x\nconst b = 2; // y",
+      "// standalone\nconst a = 1; // trailing",
     ],
     invalid: [
       { code: "// one\n// two\nconst a = 1;", errors: [{ messageId: "multi" }] },
