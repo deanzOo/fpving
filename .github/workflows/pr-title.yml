@@ -1,0 +1,50 @@
+name: pr-title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-title:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            test
+            docs
+            build
+            ci
+            chore
+            revert
+          scopes: |
+            core
+            plugin-sdk
+            plugins
+            matcher
+            pricing
+            alerts
+            scheduler
+            db
+            ui
+            api
+            ci
+            deps
+          requireScope: false
+          subjectPattern: ^(?!.*\.$)[a-z0-9].{0,71}$
+          subjectPatternError: The subject must start lowercase, have no trailing period and be at most 72 characters.
