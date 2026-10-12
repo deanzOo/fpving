@@ -15,6 +15,8 @@ describe("max-one-line-comment", () => {
       "const a = 1; // trailing",
       "const a = 1; // x\nconst b = 2; // y",
       "// standalone\nconst a = 1; // trailing",
+      "/** doc */\nexport function f() {}",
+      "/** doc */\nexport default 1;",
     ],
     invalid: [
       { code: "// one\n// two\nconst a = 1;", errors: [{ messageId: "multi" }] },
@@ -22,6 +24,10 @@ describe("max-one-line-comment", () => {
       { code: "/* block */\nconst a = 1;", errors: [{ messageId: "block" }] },
       { code: "/*\n multi\n*/\nconst a = 1;", errors: [{ messageId: "block" }] },
       { code: "const a = 1; // x\n// y\nconst b = 2;", errors: [{ messageId: "multi" }] },
+      { code: "/** doc */\nconst a = 1;", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** doc */\nfunction f() {}\nexport { f };", errors: [{ messageId: "jsdoc" }] },
+      { code: "const a = 1;\n/** floating */", errors: [{ messageId: "jsdoc" }] },
+      { code: "/** floating */\n\n// note\nconst a = 1;", errors: [{ messageId: "jsdoc" }] },
     ],
   });
 });

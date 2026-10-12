@@ -5,7 +5,8 @@ export const maxOneLineComment: Rule.RuleModule = {
     type: "suggestion",
     schema: [],
     messages: {
-      block: "Block comments are not allowed; use a single // line or JSDoc.",
+      block: "Block comments are not allowed; use a single // line or JSDoc on an export.",
+      jsdoc: "JSDoc blocks are allowed only directly before an export.",
       multi: "Comments must be a single line.",
     },
   },
@@ -16,7 +17,11 @@ export const maxOneLineComment: Rule.RuleModule = {
         for (const comment of context.sourceCode.getAllComments()) {
           const loc = context.sourceCode.getLoc(comment);
           if (comment.type === "Block") {
-            if (!comment.value.startsWith("*")) context.report({ loc, messageId: "block" });
+            if (!comment.value.startsWith("*")) {
+              context.report({ loc, messageId: "block" });
+            } else if (context.sourceCode.getTokenAfter(comment)?.value !== "export") {
+              context.report({ loc, messageId: "jsdoc" });
+            }
             previousLine = undefined;
             continue;
           }
