@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
+import jsdoc from "eslint-plugin-jsdoc";
+import tsdoc from "eslint-plugin-tsdoc";
 import tseslint from "typescript-eslint";
 import { maxOneLineComment } from "./tools/eslint-rules/max-one-line-comment.ts";
 
@@ -62,6 +64,36 @@ export default defineConfig(
       "no-warning-comments": ["error", { terms: ["todo", "fixme", "hack", "xxx"], location: "anywhere" }],
       "multiline-comment-style": ["error", "separate-lines"],
       "local/max-one-line-comment": "error",
+    },
+  },
+  {
+    files: ["**/*.ts"],
+    plugins: { tsdoc },
+    rules: { "tsdoc/syntax": "error" },
+  },
+  {
+    files: [
+      "packages/plugin-sdk/src/**/*.ts",
+      "packages/core/src/**/*.ts",
+      "tests/tooling/fixtures/public-api/**/*.ts",
+    ],
+    plugins: { jsdoc },
+    rules: {
+      "jsdoc/require-jsdoc": [
+        "error",
+        {
+          publicOnly: true,
+          require: {
+            FunctionDeclaration: true,
+            ClassDeclaration: true,
+            ArrowFunctionExpression: true,
+            FunctionExpression: true,
+            MethodDefinition: false,
+          },
+          contexts: ["TSInterfaceDeclaration", "TSTypeAliasDeclaration", "TSEnumDeclaration", "VariableDeclaration"],
+        },
+      ],
+      "jsdoc/require-description": "error",
     },
   },
 );

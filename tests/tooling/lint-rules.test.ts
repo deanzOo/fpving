@@ -20,7 +20,7 @@ const lint = (name: string): string[] => {
 describe("lint rules", () => {
   beforeAll(async () => {
     const eslint = new ESLint({ cwd: root, ignore: false });
-    for (const result of await eslint.lintFiles([`${FIXTURES}*.ts`])) {
+    for (const result of await eslint.lintFiles([`${FIXTURES}**/*.ts`])) {
       results.set(
         basename(result.filePath),
         result.messages.map((m) => m.ruleId ?? `fatal:${m.message}`),
@@ -43,6 +43,23 @@ describe("lint rules", () => {
     ["eslint-disable.ts", "@eslint-community/eslint-comments/no-use"],
   ])("reports %s as %s", (name, ruleId) => {
     expect(lint(name)).toContain(ruleId);
+  });
+
+  it.each([
+    ["undocumented-function.ts", "jsdoc/require-jsdoc"],
+    ["undocumented-const.ts", "jsdoc/require-jsdoc"],
+    ["undocumented-type.ts", "jsdoc/require-jsdoc"],
+    ["undocumented-interface.ts", "jsdoc/require-jsdoc"],
+    ["undocumented-class.ts", "jsdoc/require-jsdoc"],
+    ["undocumented-const-object.ts", "jsdoc/require-jsdoc"],
+    ["bad-tsdoc-syntax.ts", "tsdoc/syntax"],
+    ["unexported-jsdoc.ts", "local/max-one-line-comment"],
+  ])("reports public-api %s as %s", (name, ruleId) => {
+    expect(lint(name)).toContain(ruleId);
+  });
+
+  it("accepts documented public exports", () => {
+    expect(lint("documented.ts")).toEqual([]);
   });
 
   it("allows as const assertions", () => {
