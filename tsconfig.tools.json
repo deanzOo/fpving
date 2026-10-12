@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "rootDir": ".", "outDir": "dist/tools", "noEmit": false, "allowImportingTsExtensions": false, "types": ["node"] },
+  "include": ["eslint.config.ts", "vitest.config.ts", "tools/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["tests/tooling/fixtures/**"]
+}
