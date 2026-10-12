@@ -6,3 +6,4 @@ coverage
 reports
 graphify-out
 *.tsbuildinfo
+apps/docs/src/content/docs/reference/behaviour-spec.md
