@@ -39,14 +39,20 @@ describe("commit rules", () => {
     expect((await check("feat(foo): x")).valid).toBe(false);
   });
 
-  it("rejects a subject longer than the maximum", async () => {
-    const subject = "x".repeat(SUBJECT_MAX + 1 - "feat: ".length);
-    expect((await check(`feat: ${subject}`)).valid).toBe(false);
+  it("rejects a subject longer than the maximum even with a scoped prefix", async () => {
+    expect((await check(`feat(core): ${"x".repeat(SUBJECT_MAX + 1)}`)).valid).toBe(false);
   });
 
-  it("accepts a subject exactly at the maximum", async () => {
-    const subject = "x".repeat(SUBJECT_MAX - "feat: ".length);
-    expect((await check(`feat: ${subject}`)).valid).toBe(true);
+  it("accepts a subject exactly at the maximum behind a scoped prefix", async () => {
+    expect((await check(`feat(core): ${"x".repeat(SUBJECT_MAX)}`)).valid).toBe(true);
+  });
+
+  it("rejects a body not separated by a blank line", async () => {
+    expect((await check("feat: add thing\nbody text")).valid).toBe(false);
+  });
+
+  it("rejects a footer not separated by a blank line", async () => {
+    expect((await check("feat: add thing\n\nbody text\nRefs: #1")).valid).toBe(false);
   });
 
   it("rejects a subject with a trailing period", async () => {
