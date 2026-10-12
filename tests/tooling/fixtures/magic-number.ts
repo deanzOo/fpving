@@ -1,1 +1,1 @@
-export const delay = 5000;
+export const later = (): number => Date.now() + 5000;
