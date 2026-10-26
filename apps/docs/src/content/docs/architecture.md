@@ -4,7 +4,7 @@ description: Components, ports and adapters, the plugin system and the data flow
 ---
 
 :::note
-This is the target design. The workspace and the public plugin SDK contract (types, schemas, error taxonomy and contract test kit) exist; the host app and domain logic are still being built.
+This is the target design. The workspace, the public plugin SDK contract (types, schemas, error taxonomy and contract test kit), core pricing, and the core entities and ports exist; the host app, the adapters and the rest of the domain logic are still being built.
 :::
 
 ## Shape
@@ -49,8 +49,12 @@ Every runtime or integration dependency sits behind an interface the domain defi
 | `Clock` | System clock |
 | `Scheduler` | In-process timer |
 | `Logger` | Structured logger |
+| `IdGenerator` | Random UUIDs |
+| `DebugSink` | Files under `.data/debug/<plugin>/` |
 
-`BrowserDriver`, `HttpClient`, `Clock` and `Logger` already exist in `@fpving/plugin-sdk` as the capabilities the host will hand to plugins. The other ports and every default adapter are not built yet.
+`BrowserDriver`, `HttpClient`, `Clock` and `Logger` are defined in `@fpving/plugin-sdk` as the capabilities the host hands to plugins; `@fpving/core` re-exports `Clock` and `Logger`. `LlmJudge`, `CurrencyRates`, `Notifier`, `Repository`, `Scheduler`, `IdGenerator` and `DebugSink` are defined in `@fpving/core`. No default adapter is built yet. `IdGenerator` and `DebugSink` are explained in [ADR 0013](../adr/0013-id-generator-and-debug-sink-ports/).
+
+`Repository` groups one repository per aggregate: products, listings, price snapshots, match candidates, the LLM verdict cache, alerts, scan runs, exchange rates, plugin health and settings. Expected refusals, such as a url that is already tracked, resolve to a `Result`. Every implementation must pass the shared repository contract suite in `packages/core/test/repository-contract.ts`; core runs it against an in-memory fake.
 
 Zod, React, Fastify and dev tooling are not wrapped: they are framework or type-system level and swapping them has no value.
 
