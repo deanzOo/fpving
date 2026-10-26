@@ -97,9 +97,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
+  docs:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+
   ci-ok:
     if: ${{ !cancelled() }}
-    needs: [check, dup, knip, licenses, gitleaks, osv-scanner, commitlint]
+    needs: [check, dup, knip, licenses, gitleaks, osv-scanner, commitlint, docs]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every job passed or was skipped
