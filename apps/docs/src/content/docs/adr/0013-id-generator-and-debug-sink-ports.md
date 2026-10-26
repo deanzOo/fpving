@@ -17,7 +17,7 @@ description: IdGenerator and DebugSink ports.
 
 ## Decision outcome
 
-Core defines `IdGenerator` (`next(): string`, parsed with the matching branded id schema) and `DebugSink` (`savePage(pluginId, url, html)`). The domain creates entities with their ids before handing them to the `Repository`, so every adapter stores ids it is given. Default adapters come with the host app.
+Core defines `IdGenerator` (`next(): string`, parsed with the matching branded id schema) and `DebugSink` (`savePage(pluginId, url, html)`). The domain creates entities with their ids before handing them to the `Repository`, so every adapter stores ids it is given. Every instant the domain passes to the `Repository` is a UTC `Date`, persisted as integer epoch milliseconds, so it round-trips to the millisecond; the order of rows with equal instants is unspecified. Default adapters come with the host app.
 
 ## Consequences
 

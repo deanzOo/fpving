@@ -17,22 +17,25 @@ import type {
 const notFound = err({ kind: RepositoryErrorKind.NotFound });
 const duplicateUrl = err({ kind: RepositoryErrorKind.DuplicateUrl });
 const done = ok(undefined);
+const copy = structuredClone;
 
-const newestFirst = <T>(rows: T[], at: (row: T) => Date): T[] =>
-  rows.toSorted((a, b) => at(b).getTime() - at(a).getTime());
+const bug = async (message: string): Promise<never> => Promise.reject(new Error(message));
 
-/** A {@link Repository} held in memory, for tests. */
+const newestFirst = <T>(rows: Iterable<T>, at: (row: T) => Date): T[] =>
+  [...rows].toSorted((a, b) => at(b).getTime() - at(a).getTime());
+
+/** A {@link Repository} held in memory that enforces references and unique ids the way a database would, for tests. */
 export const inMemoryRepository = (): Repository => {
   const products = new Map<string, Product>();
   const listings = new Map<string, Listing>();
-  const snapshots: PriceSnapshot[] = [];
+  const snapshots = new Map<string, PriceSnapshot>();
   const candidates = new Map<string, MatchCandidate>();
   const verdicts = new Map<string, CachedVerdict>();
   const alerts = new Map<string, Alert>();
-  const scanRuns: ScanRun[] = [];
+  const scanRuns = new Map<string, ScanRun>();
   const health = new Map<string, PluginHealth>();
   let fxTable: FxTable | null = null;
-  let settings: Settings = DEFAULT_SETTINGS;
+  let settings: Settings = copy(DEFAULT_SETTINGS);
 
   const urlTracked = (url: string): boolean => [...listings.values()].some((row) => row.url === url);
   const suggested = (row: Pick<MatchCandidate, "productId" | "url">, pool: Iterable<MatchCandidate>): boolean =>
@@ -40,32 +43,44 @@ export const inMemoryRepository = (): Repository => {
 
   return {
     products: {
-      add: async (product, firstListing) => {
+      add: async (product, firstListing, firstSnapshot) => {
+        if (firstListing.productId !== product.id || firstSnapshot.listingId !== firstListing.id) {
+          return bug("first listing or snapshot belongs to another row");
+        }
+        if (products.has(product.id) || listings.has(firstListing.id) || snapshots.has(firstSnapshot.id)) {
+          return bug("duplicate id");
+        }
         if (urlTracked(firstListing.url)) {
           return Promise.resolve(duplicateUrl);
         }
-        products.set(product.id, product);
-        listings.set(firstListing.id, firstListing);
+        products.set(product.id, copy(product));
+        listings.set(firstListing.id, copy(firstListing));
+        snapshots.set(firstSnapshot.id, copy(firstSnapshot));
         return Promise.resolve(done);
       },
     },
     listings: {
       add: async (listing) => {
+        if (listings.has(listing.id)) {
+          return bug("duplicate listing id");
+        }
         if (!products.has(listing.productId)) {
           return Promise.resolve(notFound);
         }
         if (urlTracked(listing.url)) {
           return Promise.resolve(duplicateUrl);
         }
-        listings.set(listing.id, listing);
+        listings.set(listing.id, copy(listing));
         return Promise.resolve(done);
       },
-      findByUrl: async (url) => Promise.resolve([...listings.values()].find((row) => row.url === url) ?? null),
+      findByUrl: async (url) => Promise.resolve(copy([...listings.values()].find((row) => row.url === url) ?? null)),
       listByProduct: async (productId) =>
         Promise.resolve(
-          [...listings.values()]
-            .filter((row) => row.productId === productId)
-            .toSorted((a, b) => a.addedAt.getTime() - b.addedAt.getTime()),
+          copy(
+            [...listings.values()]
+              .filter((row) => row.productId === productId)
+              .toSorted((a, b) => a.addedAt.getTime() - b.addedAt.getTime()),
+          ),
         ),
       updateStatus: async (id, update) => {
         const row = listings.get(id);
@@ -78,30 +93,41 @@ export const inMemoryRepository = (): Repository => {
     },
     snapshots: {
       append: async (snapshot) => {
+        if (snapshots.has(snapshot.id)) {
+          return bug("duplicate snapshot id");
+        }
         if (!listings.has(snapshot.listingId)) {
           return Promise.resolve(notFound);
         }
-        snapshots.push(snapshot);
+        snapshots.set(snapshot.id, copy(snapshot));
         return Promise.resolve(done);
       },
       listSince: async (listingId, since) =>
         Promise.resolve(
-          snapshots
-            .filter((row) => row.listingId === listingId && row.observedAt >= since)
-            .toSorted((a, b) => a.observedAt.getTime() - b.observedAt.getTime()),
+          copy(
+            [...snapshots.values()]
+              .filter((row) => row.listingId === listingId && row.observedAt >= since)
+              .toSorted((a, b) => a.observedAt.getTime() - b.observedAt.getTime()),
+          ),
         ),
       latestPerListing: async (productId) => {
         const latest = new Map<string, PriceSnapshot>();
-        for (const row of newestFirst(snapshots, (s) => s.observedAt)) {
+        for (const row of newestFirst(snapshots.values(), (s) => s.observedAt)) {
           if (listings.get(row.listingId)?.productId === productId && !latest.has(row.listingId)) {
             latest.set(row.listingId, row);
           }
         }
-        return Promise.resolve([...latest.values()]);
+        return Promise.resolve(copy([...latest.values()]));
       },
     },
     matchCandidates: {
       save: async (batch) => {
+        if (batch.some((row) => !products.has(row.productId))) {
+          return bug("candidate for a missing product");
+        }
+        if (batch.some((row, index) => candidates.has(row.id) || batch.findIndex((o) => o.id === row.id) !== index)) {
+          return bug("duplicate candidate id");
+        }
         const accepted: MatchCandidate[] = [];
         for (const row of batch) {
           if (suggested(row, candidates.values()) || suggested(row, accepted)) {
@@ -110,22 +136,42 @@ export const inMemoryRepository = (): Repository => {
           accepted.push(row);
         }
         for (const row of accepted) {
-          candidates.set(row.id, row);
+          candidates.set(row.id, copy(row));
         }
         return Promise.resolve(done);
       },
       listPending: async () =>
         Promise.resolve(
-          [...candidates.values()]
-            .filter((row) => row.status === CandidateStatus.Pending)
-            .toSorted((a, b) => b.similarityScore - a.similarityScore),
+          copy(
+            [...candidates.values()]
+              .filter((row) => row.status === CandidateStatus.Pending)
+              .toSorted((a, b) => b.similarityScore - a.similarityScore),
+          ),
         ),
-      setStatus: async (id, status) => {
+      accept: async (id, listing) => {
         const row = candidates.get(id);
         if (row === undefined) {
           return Promise.resolve(notFound);
         }
-        candidates.set(id, { ...row, status });
+        if (listing.productId !== row.productId) {
+          return bug("listing is not for the candidate's product");
+        }
+        if (listings.has(listing.id)) {
+          return bug("duplicate listing id");
+        }
+        if (urlTracked(listing.url)) {
+          return Promise.resolve(duplicateUrl);
+        }
+        listings.set(listing.id, copy(listing));
+        candidates.set(id, { ...row, status: CandidateStatus.Accepted });
+        return Promise.resolve(done);
+      },
+      reject: async (id) => {
+        const row = candidates.get(id);
+        if (row === undefined) {
+          return Promise.resolve(notFound);
+        }
+        candidates.set(id, { ...row, status: CandidateStatus.Rejected });
         return Promise.resolve(done);
       },
       isKnownUrl: async (productId, url) =>
@@ -133,61 +179,77 @@ export const inMemoryRepository = (): Repository => {
     },
     verdictCache: {
       get: async (sourceUrl, candidateUrl) =>
-        Promise.resolve(verdicts.get(JSON.stringify([sourceUrl, candidateUrl])) ?? null),
+        Promise.resolve(copy(verdicts.get(JSON.stringify([sourceUrl, candidateUrl])) ?? null)),
       put: async (entry) => {
-        verdicts.set(JSON.stringify([entry.sourceUrl, entry.candidateUrl]), entry);
+        verdicts.set(JSON.stringify([entry.sourceUrl, entry.candidateUrl]), copy(entry));
         return Promise.resolve();
       },
     },
     alerts: {
       save: async (alert) => {
-        alerts.set(alert.id, alert);
+        const referenced = [alert.afterSnapshotId, alert.beforeSnapshotId ?? alert.afterSnapshotId];
+        if (
+          !products.has(alert.productId)
+          || !listings.has(alert.listingId)
+          || referenced.some((id) => !snapshots.has(id))
+        ) {
+          return bug("alert references a missing row");
+        }
+        if (alerts.has(alert.id)) {
+          return bug("duplicate alert id");
+        }
+        alerts.set(alert.id, copy(alert));
         return Promise.resolve();
       },
       list: async ({ unreadOnly }) =>
         Promise.resolve(
-          newestFirst([...alerts.values()], (row) => row.createdAt).filter((row) => !unreadOnly || row.readAt === null),
+          copy(newestFirst(alerts.values(), (row) => row.createdAt).filter((row) => !(unreadOnly && row.readAt))),
         ),
       markRead: async (id, at) => {
         const row = alerts.get(id);
         if (row === undefined) {
           return Promise.resolve(notFound);
         }
-        alerts.set(id, { ...row, readAt: at });
+        alerts.set(id, { ...row, readAt: copy(at) });
         return Promise.resolve(done);
       },
     },
     scanRuns: {
       record: async (run) => {
-        scanRuns.push(run);
+        if (scanRuns.has(run.id)) {
+          return bug("duplicate scan run id");
+        }
+        scanRuns.set(run.id, copy(run));
         return Promise.resolve();
       },
       latest: async (pluginId) =>
         Promise.resolve(
-          newestFirst(scanRuns, (row) => row.startedAt).find(
-            (row) => pluginId === undefined || row.pluginId === pluginId,
-          ) ?? null,
+          copy(
+            newestFirst(scanRuns.values(), (row) => row.startedAt).find(
+              (row) => pluginId === undefined || row.pluginId === pluginId,
+            ) ?? null,
+          ),
         ),
     },
     fxRates: {
       save: async (table) => {
-        fxTable = table;
+        fxTable = copy(table);
         return Promise.resolve();
       },
-      latest: async () => Promise.resolve(fxTable),
+      latest: async () => Promise.resolve(copy(fxTable)),
     },
     pluginHealth: {
       get: async (pluginId) =>
-        Promise.resolve(health.get(pluginId) ?? { pluginId, consecutiveBlocks: 0, backoffUntil: null }),
+        Promise.resolve(copy(health.get(pluginId) ?? { pluginId, consecutiveBlocks: 0, backoffUntil: null })),
       upsert: async (row) => {
-        health.set(row.pluginId, row);
+        health.set(row.pluginId, copy(row));
         return Promise.resolve();
       },
     },
     settings: {
-      get: async () => Promise.resolve(settings),
+      get: async () => Promise.resolve(copy(settings)),
       save: async (next) => {
-        settings = next;
+        settings = copy(next);
         return Promise.resolve();
       },
     },

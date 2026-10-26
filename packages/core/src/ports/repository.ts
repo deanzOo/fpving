@@ -2,7 +2,6 @@ import type { Result } from "@fpving/plugin-sdk";
 import type {
   Alert,
   CachedVerdict,
-  CandidateStatus,
   Listing,
   MatchCandidate,
   PluginHealth,
@@ -32,8 +31,11 @@ export interface DuplicateUrl {
 
 /** Stores products. */
 export interface ProductRepository {
-  /** Stores a product with its first listing, or neither when the listing url is already tracked. */
-  add(product: Product, firstListing: Listing): Promise<Result<void, DuplicateUrl>>;
+  /**
+   * Stores a product with its first listing and first snapshot, or none of them when the listing url is already
+   * tracked. Rejects when the listing is not the product's or the snapshot not the listing's.
+   */
+  add(product: Product, firstListing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, DuplicateUrl>>;
 }
 
 /** The fields of a listing that a fetch outcome changes. */
@@ -67,8 +69,13 @@ export interface MatchCandidateRepository {
   save(candidates: readonly MatchCandidate[]): Promise<Result<void, DuplicateUrl>>;
   /** Every pending candidate, highest similarity first. */
   listPending(): Promise<MatchCandidate[]>;
-  /** Records the review decision for a candidate. */
-  setStatus(id: MatchCandidateId, status: CandidateStatus): Promise<Result<void, NotFound>>;
+  /**
+   * Marks a candidate accepted and adds its listing in one step, or does neither. Rejects when the listing is not
+   * for the candidate's product.
+   */
+  accept(id: MatchCandidateId, listing: Listing): Promise<Result<void, NotFound | DuplicateUrl>>;
+  /** Marks a candidate rejected, so its url is never suggested for the product again. */
+  reject(id: MatchCandidateId): Promise<Result<void, NotFound>>;
   /** Whether `url` was already suggested for the product, whatever its status, or is tracked by any listing. */
   isKnownUrl(productId: ProductId, url: string): Promise<boolean>;
 }
@@ -124,8 +131,17 @@ export interface SettingsRepository {
 }
 
 /**
- * Persistence, one repository per aggregate. Expected refusals resolve to a `Result`; a rejected promise means a
- * bug or a broken store. Every implementation must pass the core repository contract suite.
+ * Persistence, one repository per aggregate. Every implementation must pass the core repository contract suite.
+ *
+ * @remarks
+ * - Each method is atomic: it stores everything it was given or nothing.
+ * - Expected refusals resolve to a `Result`: `duplicate_url`, and `not_found` for an id the caller may hold after
+ *   it was removed or never existed (a listing's product, a snapshot's listing, a candidate to decide, a row to
+ *   update).
+ * - Every other broken reference, such as an alert naming a missing snapshot or a candidate for a missing product,
+ *   and an id that is already stored are bugs: the promise rejects.
+ * - Instants are UTC `Date`s, stored as integer epoch milliseconds, so they round-trip to the millisecond. The
+ *   order of rows with equal instants is unspecified.
  */
 export interface Repository {
   /** Products. */
