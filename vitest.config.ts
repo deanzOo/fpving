@@ -22,6 +22,7 @@ export default defineConfig({
         "**/fixtures/**",
         "packages/*/src/index.ts",
         "packages/plugin-sdk/src/contract/index.ts",
+        "packages/plugin-sdk/src/contract/check.ts",
         "apps/*/src/index.ts",
         "tools/*-cli.ts",
         "apps/docs/**",

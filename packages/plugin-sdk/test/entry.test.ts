@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import * as check from "../src/contract/check.ts";
 import * as contract from "../src/contract/index.ts";
 import * as sdk from "../src/index.ts";
 
@@ -43,12 +44,17 @@ describe("plugin-sdk entry points", () => {
     ]);
   });
 
-  it("keeps vitest out of everything the main entry imports and confines it to the contract entry", () => {
+  it("keeps vitest out of everything the main and check entries import and confines it to the contract entry", () => {
     expect([...importsReachableFrom(new URL("../src/index.ts", import.meta.url))]).not.toContain("vitest");
+    expect([...importsReachableFrom(new URL("../src/contract/check.ts", import.meta.url))]).not.toContain("vitest");
     expect([...importsReachableFrom(new URL("../src/contract/index.ts", import.meta.url))]).toContain("vitest");
   });
 
-  it("exports the contract test kit from the contract entry", () => {
-    expect(Object.keys(contract).sort()).toEqual(["checkStorePluginContract", "runStorePluginContract"]);
+  it("exports the Vitest suite from the contract entry", () => {
+    expect(Object.keys(contract)).toEqual(["runStorePluginContract"]);
+  });
+
+  it("exports the runner-free contract check from the check entry", () => {
+    expect(Object.keys(check)).toEqual(["checkStorePluginContract"]);
   });
 });

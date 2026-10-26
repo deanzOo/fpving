@@ -14,6 +14,11 @@
       "@fpving/source": "./src/contract/index.ts",
       "types": "./dist/contract/index.d.ts",
       "import": "./dist/contract/index.js"
+    },
+    "./contract/check": {
+      "@fpving/source": "./src/contract/check.ts",
+      "types": "./dist/contract/check.d.ts",
+      "import": "./dist/contract/check.js"
     }
   },
   "types": "./dist/index.d.ts",

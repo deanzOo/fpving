@@ -168,8 +168,9 @@ export const storePluginContractChecks = (plugin: StorePlugin, fixtures: Contrac
   contractChecks(plugin, fixtures).map((check) => ({ name: check.name, run: () => attempt(check.run) }));
 
 /**
- * Runs the store plugin contract without a test runner and resolves to the failed checks, empty when the plugin
- * passes. `runStorePluginContract` wraps the same checks as a Vitest suite.
+ * Runs the store plugin contract and resolves to the failed checks, empty when the plugin passes. It needs no test
+ * runner: import it from `@fpving/plugin-sdk/contract/check`, whose module graph never loads Vitest.
+ * `runStorePluginContract` in `@fpving/plugin-sdk/contract` wraps the same checks as a Vitest suite.
  */
 export const checkStorePluginContract = async (
   plugin: StorePlugin,

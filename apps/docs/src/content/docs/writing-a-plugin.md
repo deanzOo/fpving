@@ -7,7 +7,7 @@ description: The plugin contract, the context the host provides, and the contrac
 The SDK contract below exists in `@fpving/plugin-sdk` and is covered by tests, but nothing is released yet and it may still change. The host that loads plugins, isolates them in worker threads and schedules them is planned, not built.
 :::
 
-Plugins are for personal use. Respect each site's terms of service. Plugins are designed to run in worker threads for crash containment, not as a security sandbox (not built yet): install only plugins you trust.
+Plugins are for personal use. Respect each site's terms of service. Plugins are designed to run in worker threads (not built yet) for crash containment, not as a security sandbox: install only plugins you trust.
 
 ## Contract
 
@@ -167,7 +167,7 @@ Each check creates a fresh store over a fake context whose `http` and `browser` 
 - when the host times out, the store returns `timeout`;
 - when the manifest declares `search`, `searchQuery` gives at least one schema-valid candidate. Add the search results page to `pages`.
 
-A store that throws fails the check with the thrown error. To run the same checks without Vitest, `checkStorePluginContract(plugin, fixtures)` resolves to the list of failed checks.
+A store that throws fails the check with the thrown error. To run the same checks without Vitest, import `checkStorePluginContract` from `@fpving/plugin-sdk/contract/check`: it resolves to the list of failed checks, and nothing it imports loads Vitest.
 
 ## Distribution
 

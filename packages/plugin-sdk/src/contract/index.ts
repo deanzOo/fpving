@@ -1,10 +1,8 @@
 /**
- * The contract test kit, imported from `@fpving/plugin-sdk/contract`. Vitest is an optional peer dependency needed
- * only by this entry.
+ * The Vitest contract suite, imported from `@fpving/plugin-sdk/contract`. Vitest is an optional peer dependency needed
+ * only by this entry; to run the contract without it, use `@fpving/plugin-sdk/contract/check`.
  *
  * @module contract
  */
-export { checkStorePluginContract } from "./check-contract.js";
-export type { ContractFailure } from "./check-contract.js";
 export type { ContractFixtures, FixturePage } from "./fixtures.js";
 export { runStorePluginContract } from "./run-contract.js";
