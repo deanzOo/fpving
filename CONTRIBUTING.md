@@ -7,7 +7,7 @@ Thanks for helping. Be kind: see the [Code of Conduct](CODE_OF_CONDUCT.md).
 1. Install Node 24 (`nvm install` reads `.nvmrc`).
 2. Enable pnpm through corepack: `corepack enable`. The pinned version comes from `packageManager`.
 3. `pnpm install`
-4. `pnpm verify` runs typecheck, lint, tests with the 100% coverage gate, duplication and unused-code checks.
+4. `pnpm verify` runs typecheck, lint, tests with the 100% coverage gate, build, the docs build, duplication, unused-code and license checks.
 
 Run the full gate before every push. Commit hooks (lefthook) run eslint and gitleaks on staged files and commitlint on the message.
 
@@ -39,6 +39,15 @@ Each worktree gets its own port, SQLite file and Playwright profile so parallel 
 - No `any`, no `as` assertions (except `as const`), no non-null `!`, no `@ts-ignore` or `@ts-expect-error`, no `eslint-disable`, no magic numbers or strings.
 - Derive types from Zod schemas at boundaries. Enums are `as const` objects. Money is integer minor units plus a currency code.
 - Domain errors are `Result` values. Do not swallow exceptions.
+
+## Docs and decision records
+
+The docs site lives in `apps/docs` (Starlight). Run `pnpm test` once, then `pnpm docs:dev` to preview it; `pnpm docs:build` builds it and `pnpm verify` includes that build.
+
+- Behaviour changes update the relevant guide.
+- Public exports of `packages/core` and `packages/plugin-sdk` need TSDoc. Lint enforces it and the API reference is generated from it. A JSDoc block is allowed only directly before an `export`.
+- The behaviour specification page is generated from test names. Do not edit it.
+- An ADR is required for a new dependency, a new port, or a cross-cutting decision. Add it to `apps/docs/src/content/docs/adr/` in MADR format with the next number. Supersede an accepted ADR with a new one instead of rewriting it.
 
 ## Commits and pull requests
 

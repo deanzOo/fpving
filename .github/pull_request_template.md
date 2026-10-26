@@ -13,4 +13,4 @@ Closes #
 - [ ] PR title is a Conventional Commit (`type(scope): lowercase subject`, no trailing period)
 - [ ] Tests were written first and failed before the change
 - [ ] Coverage is still 100%
-- [ ] Docs updated, or N/A
+- [ ] Docs updated (guide / ADR / TSDoc) or N/A

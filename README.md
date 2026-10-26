@@ -21,6 +21,10 @@ Store support comes exclusively from plugins. A plugin is an npm package or loca
 
 Plugins are for personal use. Respect each site's terms of service. Plugins run in worker threads for crash containment, not as a security sandbox, so install only plugins you trust.
 
+## Documentation
+
+Guides, architecture, decision records and the API reference: <https://deanzoo.github.io/fpving/>.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports go through [SECURITY.md](SECURITY.md).
