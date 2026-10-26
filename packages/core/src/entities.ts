@@ -129,7 +129,7 @@ export type Verdict = z.infer<typeof verdictSchema>;
 
 /**
  * A search result that may be the product, waiting for review. `similarityScore` ranks candidates from 0 to 1;
- * `llmReason` is null while `llmVerdict` is `unjudged`.
+ * `llmReason` is null exactly while `llmVerdict` is `unjudged`.
  */
 export const matchCandidateSchema = z.object({
   id: matchCandidateIdSchema,
@@ -141,6 +141,8 @@ export const matchCandidateSchema = z.object({
   llmVerdict: z.enum(LlmVerdict),
   llmReason: textSchema.nullable(),
   status: z.enum(CandidateStatus),
+}).refine((row) => (row.llmVerdict === LlmVerdict.Unjudged) === (row.llmReason === null), {
+  message: "llmReason must be null exactly when llmVerdict is unjudged",
 });
 
 /** A match candidate as {@link matchCandidateSchema} accepts it. */
@@ -171,7 +173,7 @@ export const alertSchema = z.object({
 /** An alert as {@link alertSchema} accepts it. */
 export type Alert = z.infer<typeof alertSchema>;
 
-/** One plugin's part of a scan. `errorKind` is the store error that ended it, null when it ended `ok`. */
+/** One plugin's part of a scan. `errorKind` is the store error that ended it, null exactly when it ended `ok`. */
 export const scanRunSchema = z.object({
   id: scanRunIdSchema,
   pluginId: pluginIdSchema,
@@ -179,6 +181,8 @@ export const scanRunSchema = z.object({
   finishedAt: z.date(),
   outcome: z.enum(ScanOutcome),
   errorKind: z.enum(StoreErrorKind).nullable(),
+}).refine((run) => (run.outcome === ScanOutcome.Ok) === (run.errorKind === null), {
+  message: "errorKind must be null exactly when the outcome is ok",
 });
 
 /** A scan run as {@link scanRunSchema} accepts it. */
@@ -212,11 +216,16 @@ export const settingsSchema = z.object({
 /** Settings as {@link settingsSchema} accepts them. */
 export type Settings = z.infer<typeof settingsSchema>;
 
-/** The settings used until the user saves their own: Israel, shown in ILS, scanned every 12 hours, 5% drops. */
-export const DEFAULT_SETTINGS: Settings = {
+const { importTax } = COUNTRY_PRESETS.IL;
+
+/**
+ * The settings used until the user saves their own: Israel, shown in ILS, scanned every 12 hours, 5% drops. Frozen
+ * down to the import tax threshold; copy it before changing anything.
+ */
+export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   displayCurrency: "ILS",
   shipToCountry: "IL",
-  importTax: COUNTRY_PRESETS.IL.importTax,
+  importTax: Object.freeze({ ...importTax, dutyFreeThreshold: Object.freeze({ ...importTax.dutyFreeThreshold }) }),
   scanIntervalHours: 12,
   priceDropMinBasisPoints: 500,
-};
+});
