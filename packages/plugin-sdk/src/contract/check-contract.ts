@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { PluginContext, TransportError } from "../context.js";
 import { StoreErrorKind } from "../errors.js";
 import type { StoreResult } from "../errors.js";
-import { fetchedListingSchema, searchCandidateSchema } from "../listing.js";
+import { fetchedListingSchema, httpUrlSchema, searchCandidateSchema } from "../listing.js";
 import type { FetchedListing } from "../listing.js";
 import { manifestSchema, PluginCapability } from "../manifest.js";
 import type { StorePlugin } from "../plugin.js";
@@ -66,7 +66,25 @@ const fixtureContext = (fixtures: ContractFixtures, transport: Transport): Plugi
 const outcome = (result: StoreResult<unknown>): string =>
   result.ok ? "a successful result" : `${result.error.kind}: ${result.error.detail}`;
 
+const malformedFixtureUrls = (fixtures: ContractFixtures): string[] =>
+  [
+    ...Object.keys(fixtures.pages).map((url) => ({ where: "pages key", url })),
+    ...Object.entries(fixtures.listings).map(([name, url]) => ({ where: `listings.${name}`, url })),
+  ]
+    .filter(({ url }) => !httpUrlSchema.safeParse(url).success)
+    .map(({ where, url }) => `${where} ${JSON.stringify(url)}`);
+
 const contractChecks = (plugin: StorePlugin, fixtures: ContractFixtures): ContractCheck[] => {
+  const badUrls = malformedFixtureUrls(fixtures);
+  const fixtureCheck: ContractCheck = {
+    name: "uses well-formed contract fixtures",
+    run: () => Promise.resolve(
+      badUrls.length === 0 ? undefined : `fixture error: not an absolute http(s) url: ${badUrls.join(", ")}`,
+    ),
+  };
+  if (badUrls.length > 0) return [fixtureCheck];
+  const parsedManifest = manifestSchema.safeParse(plugin.manifest);
+
   const fetchListing = (url: string, transport = serve(fixtures)): Promise<StoreResult<FetchedListing>> =>
     plugin.createStore(fixtureContext(fixtures, transport)).fetchListing(url);
 
@@ -108,13 +126,13 @@ const contractChecks = (plugin: StorePlugin, fixtures: ContractFixtures): Contra
     return parsed.success ? undefined : `returned invalid candidates:\n${z.prettifyError(parsed.error)}`;
   };
 
-  const manifest: CheckRun = () => {
-    const parsed = manifestSchema.safeParse(plugin.manifest);
-    return Promise.resolve(parsed.success ? undefined : `invalid manifest:\n${z.prettifyError(parsed.error)}`);
-  };
+  const manifest: CheckRun = () => Promise.resolve(
+    parsedManifest.success ? undefined : `invalid manifest:\n${z.prettifyError(parsedManifest.error)}`,
+  );
 
   const { listings } = fixtures;
   const checks: ContractCheck[] = [
+    fixtureCheck,
     { name: "declares a schema-valid manifest", run: manifest },
     {
       name: "parses the in-stock fixture into a schema-valid listing that is in stock",
@@ -129,7 +147,7 @@ const contractChecks = (plugin: StorePlugin, fixtures: ContractFixtures): Contra
       run: failsWith(StoreErrorKind.Timeout, listings.inStock, timeOut),
     },
   ];
-  return plugin.manifest.capabilities.includes(PluginCapability.Search)
+  return parsedManifest.success && parsedManifest.data.capabilities.includes(PluginCapability.Search)
     ? [...checks, { name: "returns schema-valid candidates for the search fixture", run: search }]
     : checks;
 };

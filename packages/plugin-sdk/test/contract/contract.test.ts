@@ -101,6 +101,28 @@ describe("store plugin contract kit", () => {
     expect(await failedChecks(plugin)).toEqual(["declares a schema-valid manifest"]);
   });
 
+  it("fails the manifest check instead of throwing when the manifest is malformed at runtime", async () => {
+    const malformed = { ...manifest };
+    Reflect.deleteProperty(malformed, "capabilities");
+    const plugin = { manifest: malformed, createStore: goodPlugin.createStore.bind(goodPlugin) };
+    const failures = await checkStorePluginContract(plugin, fixtures);
+    expect(failures.map((failure) => failure.check)).toEqual(["declares a schema-valid manifest"]);
+    expect(failures[0]?.message).toContain("capabilities");
+  });
+
+  it("reports a malformed fixture url as a fixture error and runs no plugin checks", async () => {
+    const broken: ContractFixtures = {
+      ...fixtures,
+      pages: { ...fixtures.pages, "shop.example.com/p/relative": { status: HTTP_OK, body: "" } },
+      listings: { ...fixtures.listings, inStock: "not a url" },
+    };
+    expect(await checkStorePluginContract(goodPlugin, broken)).toEqual([{
+      check: "uses well-formed contract fixtures",
+      message: "fixture error: not an absolute http(s) url: pages key \"shop.example.com/p/relative\", "
+        + "listings.inStock \"not a url\"",
+    }]);
+  });
+
   it("fails a listing of the wrong shape and explains why", async () => {
     const plugin = withStore((ctx) => ({
       fetchListing: async (url) => {

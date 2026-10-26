@@ -4,9 +4,10 @@ import { storePluginContractChecks } from "./check-contract.js";
 import type { ContractFixtures } from "./fixtures.js";
 
 /**
- * Registers the store plugin contract as a Vitest suite named after the plugin id, one `it` per check: a valid
- * manifest, the in-stock and out-of-stock fixtures parse to schema-valid listings, the 404 fixture gives `not_found`,
- * the captcha fixture gives `blocked`, the garbage fixture gives `parse_failed` with `rawPage`, a host timeout gives
+ * Registers the store plugin contract as a Vitest suite named after the plugin id, one `it` per check: well-formed
+ * fixture URLs (when one is malformed only this check runs, so the plugin is not blamed for it), a valid manifest,
+ * the in-stock and out-of-stock fixtures parse to schema-valid listings, the 404 fixture gives `not_found`, the
+ * captcha fixture gives `blocked`, the garbage fixture gives `parse_failed` with `rawPage`, a host timeout gives
  * `timeout`, and, when the manifest declares `search`, the search fixture gives schema-valid candidates.
  *
  * @example

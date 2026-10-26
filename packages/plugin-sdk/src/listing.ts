@@ -19,7 +19,8 @@ export const shippingSchema = z.discriminatedUnion("kind", [
 /** Shipping as {@link shippingSchema} accepts it. */
 export type Shipping = z.infer<typeof shippingSchema>;
 
-const httpUrlSchema = z.url({ protocol: /^https?$/ });
+/** An absolute http or https URL string, the form every URL takes across the host and plugin boundary. */
+export const httpUrlSchema = z.url({ protocol: /^https?$/ });
 
 /**
  * What {@link Store.fetchListing} returns for one product page. The host parses every listing with this schema
