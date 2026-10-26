@@ -1,24 +1,8 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as check from "../src/contract/check.ts";
 import * as contract from "../src/contract/index.ts";
 import * as sdk from "../src/index.ts";
-
-const IMPORT = /^(?:import|export)\b[^;]*from "([^"]+)";$/gm;
-
-const importsReachableFrom = (file: URL, seen = new Set<string>()): Set<string> => {
-  for (const [, specifier = ""] of readFileSync(file, "utf8").matchAll(IMPORT)) {
-    if (!specifier.startsWith(".")) {
-      seen.add(specifier);
-      continue;
-    }
-    const next = new URL(specifier.replace(/\.js$/, ".ts"), file);
-    if (seen.has(next.href)) continue;
-    seen.add(next.href);
-    importsReachableFrom(next, seen);
-  }
-  return seen;
-};
+import { importsReachableFrom } from "../../../tools/imports-reachable.ts";
 
 describe("plugin-sdk entry points", () => {
   it("exports the plugin contract from the main entry", () => {

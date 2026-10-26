@@ -1,4 +1,4 @@
+import { describeRepositoryContract } from "../src/testing/index.ts";
 import { inMemoryRepository } from "./fakes/in-memory-repository.ts";
-import { describeRepositoryContract } from "./repository-contract.ts";
 
-describeRepositoryContract("In-memory", async () => Promise.resolve(inMemoryRepository()));
+describeRepositoryContract(async () => Promise.resolve(inMemoryRepository()));

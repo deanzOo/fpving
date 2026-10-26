@@ -16,7 +16,7 @@ import {
   ScanOutcome,
   scanRunIdSchema,
   snapshotIdSchema,
-} from "../src/index.ts";
+} from "../index.js";
 import type {
   Alert,
   CachedVerdict,
@@ -32,7 +32,7 @@ import type {
   ScanRun,
   Settings,
   SnapshotId,
-} from "../src/index.ts";
+} from "../index.js";
 
 const PRICE = 1999;
 const SHIPPING = 500;
@@ -120,11 +120,19 @@ const scanRun = (id: string, pluginId: PluginId, startedAt: Date): ScanRun => ({
 const url = (path: string): string => `https://shop.example/${path}`;
 
 /**
- * Registers the behaviour every {@link Repository} implementation must have. Each test gets a fresh, empty
- * repository from `makeRepository`.
+ * Registers the behaviour every {@link Repository} implementation must have, as a Vitest suite named "Repository
+ * contract". Each test gets a fresh, empty repository from `makeRepository`.
+ *
+ * @example
+ * ```ts
+ * import { describeRepositoryContract } from "@fpving/core/testing";
+ * import { sqliteRepository } from "../src/index.js";
+ *
+ * describeRepositoryContract(async () => sqliteRepository(":memory:"));
+ * ```
  */
-export const describeRepositoryContract = (name: string, makeRepository: () => Promise<Repository>): void => {
-  describe(`${name} repository contract`, () => {
+export const describeRepositoryContract = (makeRepository: () => Promise<Repository>): void => {
+  describe("Repository contract", () => {
     let repo: Repository;
     const p1 = product("p1");
     const p2 = product("p2");

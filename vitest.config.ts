@@ -23,6 +23,7 @@ export default defineConfig({
         "packages/*/src/index.ts",
         "packages/plugin-sdk/src/contract/index.ts",
         "packages/plugin-sdk/src/contract/check.ts",
+        "packages/core/src/testing/index.ts",
         "apps/*/src/index.ts",
         "tools/*-cli.ts",
         "apps/docs/**",

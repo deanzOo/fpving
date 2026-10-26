@@ -54,7 +54,7 @@ Every runtime or integration dependency sits behind an interface the domain defi
 
 `BrowserDriver`, `HttpClient`, `Clock` and `Logger` are defined in `@fpving/plugin-sdk` as the capabilities the host hands to plugins; `@fpving/core` re-exports `Clock` and `Logger`. `LlmJudge`, `CurrencyRates`, `Notifier`, `Repository`, `Scheduler`, `IdGenerator` and `DebugSink` are defined in `@fpving/core`. No default adapter is built yet. `IdGenerator` and `DebugSink` are explained in [ADR 0013](../adr/0013-id-generator-and-debug-sink-ports/).
 
-`Repository` groups one repository per aggregate: products, listings, price snapshots, match candidates, the LLM verdict cache, alerts, scan runs, exchange rates, plugin health and settings. Expected refusals, such as a url that is already tracked, resolve to a `Result`. Every implementation must pass the shared repository contract suite in `packages/core/test/repository-contract.ts`; core runs it against an in-memory fake.
+`Repository` groups one repository per aggregate: products, listings, price snapshots, match candidates, the LLM verdict cache, alerts, scan runs, exchange rates, plugin health and settings. Expected refusals, such as a url that is already tracked, resolve to a `Result`. Every implementation must pass the shared repository contract suite, `describeRepositoryContract` from `@fpving/core/testing`, which an adapter runs against its own repository; core runs it against an in-memory fake. Vitest is an optional peer dependency needed only by that entry, as it is for `@fpving/plugin-sdk/contract`.
 
 Zod, React, Fastify and dev tooling are not wrapped: they are framework or type-system level and swapping them has no value.
 
