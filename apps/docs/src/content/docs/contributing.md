@@ -9,15 +9,16 @@ The full guide is [CONTRIBUTING.md](https://github.com/deanzoo/fpving/blob/main/
 
 1. Install Node 24 (`nvm install` reads `.nvmrc`) and enable corepack.
 2. `pnpm install`
-3. `pnpm verify` runs typecheck, lint, tests with the coverage gate, build, the docs build, duplication, unused-code and license checks.
+3. `pnpm verify` is the local gate: it runs the build (which typechecks), lint, tests with the coverage gate, the docs build, duplication, unused-code and license checks. CI also runs gitleaks, osv-scanner, commitlint and the lychee link check.
 4. `pnpm docs:dev` serves this site locally. Run `pnpm test` once first so the behaviour spec page can be generated.
 
 ## Rules in brief
 
 - Write a failing test before the implementation. Test names read as requirements.
 - Coverage is a hard 100% gate on lines, branches, functions and statements.
+- Formatting is ESLint-enforced (`@stylistic`), with no Prettier.
 - Strict TypeScript: no `any`, no `as` except `as const`, no `!`, no `@ts-*`, no `eslint-disable`.
-- No narrative comments. Public exports of `@fpving/core` and `@fpving/plugin-sdk` carry TSDoc, which lint enforces.
+- No narrative comments. Every exported symbol in `packages/core/src` and `packages/plugin-sdk/src` carries TSDoc, which lint enforces.
 - Conventional Commits, squash merged through pull requests.
 
 ## Docs
