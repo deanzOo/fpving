@@ -1,3 +1,4 @@
+import type { CountryCode } from "@fpving/plugin-sdk";
 import { ThresholdBasis } from "./import-tax.js";
 import type { ImportTaxRule } from "./import-tax.js";
 
@@ -30,4 +31,4 @@ export const COUNTRY_PRESETS = {
       retrievedOn: "2026-10-27",
     },
   },
-} as const satisfies Record<string, CountryPreset>;
+} as const satisfies Partial<Record<CountryCode, CountryPreset>>;
