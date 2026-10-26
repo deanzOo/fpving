@@ -152,7 +152,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       repo = await makeRepository();
     });
 
-    describe("products", () => {
+    describe("Products", () => {
       it("stores a product with its first listing and first snapshot", async () => {
         expect(await repo.products.add(p1, l1, s1)).toEqual(ok);
         expect(await repo.listings.findByUrl(l1.url)).toEqual(l1);
@@ -179,7 +179,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("listings", () => {
+    describe("Listings", () => {
       beforeEach(seed);
 
       it("finds no listing for a url that is not tracked", async () => {
@@ -225,7 +225,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("price snapshots", () => {
+    describe("Price snapshots", () => {
       beforeEach(seed);
 
       it("returns a listing's snapshots observed at or after an instant to the millisecond, oldest first", async () => {
@@ -259,7 +259,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("match candidates", () => {
+    describe("Match candidates", () => {
       beforeEach(seed);
 
       it("lists pending candidates highest similarity first and leaves out decided ones", async () => {
@@ -331,7 +331,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("llm verdict cache", () => {
+    describe("LLM verdict cache", () => {
       const entry: CachedVerdict = {
         sourceUrl: url("source"),
         candidateUrl: url("candidate"),
@@ -353,7 +353,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("alerts", () => {
+    describe("Alerts", () => {
       beforeEach(seed);
 
       it("lists alerts newest first to the millisecond, or only the unread ones when asked", async () => {
@@ -385,7 +385,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("scan runs", () => {
+    describe("Scan runs", () => {
       it("has no latest scan run before any scan ran", async () => {
         expect(await repo.scanRuns.latest()).toBeNull();
         expect(await repo.scanRuns.latest(PLUGIN)).toBeNull();
@@ -410,7 +410,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("fx rates", () => {
+    describe("FX rates", () => {
       const table = (fetchedOn: string): FxTable => ({ base: "USD", ratesPerBase: { ILS: ILS_PER_USD }, fetchedOn });
 
       it("has no rates before any were saved", async () => {
@@ -424,7 +424,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("plugin health", () => {
+    describe("Plugin health", () => {
       it("reports a plugin without a record as healthy: no blocks and no backoff", async () => {
         expect(await repo.pluginHealth.get(PLUGIN)).toEqual({
           pluginId: PLUGIN,
@@ -445,7 +445,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
-    describe("settings", () => {
+    describe("Settings", () => {
       it("returns the default settings until settings are saved", async () => {
         expect(await repo.settings.get()).toEqual(DEFAULT_SETTINGS);
       });

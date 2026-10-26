@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { storeErrorSchema, StoreErrorKind } from "../src/errors.ts";
 
-describe("store errors", () => {
+describe("Store errors", () => {
   it("names the six error kinds of the plugin taxonomy", () => {
     expect(Object.values(StoreErrorKind)).toEqual([
       "not_found",
@@ -13,7 +13,7 @@ describe("store errors", () => {
     ]);
   });
 
-  it.each(Object.values(StoreErrorKind))("accepts a %s error with a detail", (kind) => {
+  it.each(Object.values(StoreErrorKind))("accepts an error of the kind %s with a detail", (kind) => {
     expect(storeErrorSchema.parse({ kind, detail: "why" })).toEqual({ kind, detail: "why" });
   });
 

@@ -43,7 +43,7 @@ const context = (http: PluginContext["http"]): PluginContext => ({
   currencyPreference: "ILS",
 });
 
-describe("store plugin", () => {
+describe("Store plugin", () => {
   it("builds a store from the host context and reads pages through the host http client", async () => {
     const page = { status: HTTP_OK, body: "Frame", headers: {} };
     const store = plugin.createStore(context({ get: () => Promise.resolve(ok(page)) }));

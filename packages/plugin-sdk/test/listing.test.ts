@@ -17,7 +17,7 @@ const listing = {
 const rejects = (override: Record<string, unknown>): boolean =>
   !fetchedListingSchema.safeParse({ ...listing, ...override }).success;
 
-describe("fetched listing", () => {
+describe("Fetched listing", () => {
   it("accepts a listing with known shipping", () => {
     expect(fetchedListingSchema.parse(listing)).toEqual(listing);
   });
@@ -59,7 +59,7 @@ describe("fetched listing", () => {
   });
 });
 
-describe("search candidate", () => {
+describe("Search candidate", () => {
   it("accepts a candidate with and without an item price", () => {
     const candidate = { url: "https://example.com/p/1", title: "Example frame" };
     expect(searchCandidateSchema.parse(candidate)).toEqual(candidate);

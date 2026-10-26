@@ -64,7 +64,7 @@ describe("Price drop alert", () => {
     expect(kinds(dropInput(priced("s1", HUNDRED), []))).toEqual([]);
   });
 
-  it("fires when the item price is a new 30-day low at least 5% below the previous low", () => {
+  it("fires when the item price is a new 30-day low at least the default 5% threshold below the previous low", () => {
     const history = [
       priced("s0", HIGHER, { observedAt: daysAgo(AGE.ten) }),
       priced("s1", HUNDRED, { observedAt: daysAgo(AGE.five) }),
@@ -83,16 +83,16 @@ describe("Price drop alert", () => {
     ]);
   });
 
-  it("fires when the drop is exactly 5% below the previous low", () => {
+  it("fires when the drop is exactly the default 5% threshold below the previous low", () => {
     const input = dropInput(arriving("s2", EXACTLY_FIVE_PERCENT), [priced("s1", HUNDRED)]);
     expect(kinds(input)).toEqual([AlertKind.PriceDrop]);
   });
 
-  it("does not fire when the drop is just under 5% below the previous low", () => {
+  it("does not fire when the drop is just under the default 5% threshold below the previous low", () => {
     expect(kinds(dropInput(arriving("s2", JUST_UNDER_FIVE_PERCENT), [priced("s1", HUNDRED)]))).toEqual([]);
   });
 
-  it("does not fire when the new low is less than 5% below the previous low", () => {
+  it("does not fire when the new low is less than the default 5% threshold below the previous low", () => {
     expect(kinds(dropInput(arriving("s2", TWO_PERCENT), [priced("s1", HUNDRED)]))).toEqual([]);
   });
 
@@ -104,7 +104,7 @@ describe("Price drop alert", () => {
     expect(kinds(dropInput(arriving("s2", EXACTLY_FIVE_PERCENT), history))).toEqual([]);
   });
 
-  describe("comparing against the lowest price in the window", () => {
+  describe("Comparing against the lowest price in the window", () => {
     const older = priced("s0", HIGHER, { observedAt: daysAgo(AGE.twenty) });
     const lowest = priced("s1", HUNDRED, { observedAt: daysAgo(AGE.ten) });
 

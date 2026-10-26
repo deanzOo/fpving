@@ -5,7 +5,7 @@ const PRICE = 1999;
 const NEGATIVE = -100;
 const FRACTIONAL = 19.99;
 
-describe("money", () => {
+describe("Money", () => {
   it("accepts a positive integer amount in minor units with a known currency", () => {
     expect(moneySchema.parse({ amountMinor: PRICE, currency: "USD" })).toEqual({ amountMinor: PRICE, currency: "USD" });
   });
@@ -24,7 +24,7 @@ describe("money", () => {
   });
 });
 
-describe("amount", () => {
+describe("Amount", () => {
   it("accepts zero because free shipping and exempt tax are real amounts", () => {
     expect(amountSchema.parse({ amountMinor: 0, currency: "EUR" })).toEqual({ amountMinor: 0, currency: "EUR" });
   });

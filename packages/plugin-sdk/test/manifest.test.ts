@@ -13,21 +13,31 @@ const valid = {
 const rejects = (override: Record<string, unknown>): boolean =>
   !manifestSchema.safeParse({ ...valid, ...override }).success;
 
-describe("plugin manifest", () => {
+describe("Plugin manifest", () => {
   it("accepts a valid manifest", () => {
     expect(manifestSchema.parse(valid)).toEqual(valid);
   });
 
-  it.each(["a", "example-shop-2", "x".repeat(MAX_ID_LENGTH)])("accepts the id %j", (id) => {
+  it.each([
+    ["a single letter", "a"],
+    ["words joined by a hyphen, with a digit", "example-shop-2"],
+    ["the longest allowed length", "x".repeat(MAX_ID_LENGTH)],
+  ])("accepts an id of %s", (_description, id) => {
     expect(rejects({ id })).toBe(false);
   });
 
-  it.each(["Example-Shop", "example_shop", "", "-", "--x", "a-", "a--b", "x".repeat(MAX_ID_LENGTH + 1)])(
-    "rejects the id %j",
-    (id) => {
-      expect(rejects({ id })).toBe(true);
-    },
-  );
+  it.each([
+    ["uppercase letters", "Example-Shop"],
+    ["an underscore", "example_shop"],
+    ["nothing", ""],
+    ["only a hyphen", "-"],
+    ["a leading double hyphen", "--x"],
+    ["a trailing hyphen", "a-"],
+    ["a double hyphen between words", "a--b"],
+    ["one character more than the longest allowed length", "x".repeat(MAX_ID_LENGTH + 1)],
+  ])("rejects an id of %s", (_description, id) => {
+    expect(rejects({ id })).toBe(true);
+  });
 
   it("rejects an empty display name", () => {
     expect(rejects({ displayName: "" })).toBe(true);

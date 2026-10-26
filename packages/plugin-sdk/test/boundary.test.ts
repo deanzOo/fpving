@@ -23,7 +23,7 @@ const browserPage: BrowserPage = { status: HTTP_OK, html: "<html></html>", final
 const httpResponse: HttpResponse = { status: HTTP_OK, body: "{}", headers: { "content-type": "application/json" } };
 const candidate: SearchCandidate = { url: PAGE_URL, title: "Example frame", itemPrice: listing.itemPrice };
 
-describe("host and plugin boundary values", () => {
+describe("Host and plugin boundary values", () => {
   it.each<[string, unknown]>([
     ["a fetched listing", listing],
     ["a store error", error],

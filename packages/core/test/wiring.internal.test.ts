@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { err, ok } from "../src/index.ts";
 import type { BrowserDriver, Clock, CountryCode, CurrencyCode, HttpClient, Logger, Result } from "../src/index.ts";
 
-describe("cross-package wiring", () => {
+describe("Cross-package wiring", () => {
   it("re-exports the plugin-sdk Result helpers from core without a prior build", () => {
     expect(ok(1)).toEqual({ ok: true, value: 1 });
     expect(err("boom")).toEqual({ ok: false, error: "boom" });

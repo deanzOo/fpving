@@ -4,7 +4,7 @@ import * as contract from "../src/contract/index.ts";
 import * as sdk from "../src/index.ts";
 import { importsReachableFrom } from "../../../tools/imports-reachable.ts";
 
-describe("plugin-sdk entry points", () => {
+describe("Plugin SDK entry points", () => {
   it("exports the plugin contract from the main entry", () => {
     expect(Object.keys(sdk).sort()).toEqual([
       "COUNTRY_CODES",

@@ -91,7 +91,7 @@ const SEARCH_CHECK = "returns schema-valid candidates for the search fixture";
 
 runStorePluginContract(goodPlugin, fixtures);
 
-describe("store plugin contract kit", () => {
+describe("Store plugin contract kit", () => {
   it("passes a plugin that honours the contract", async () => {
     expect(await checkStorePluginContract(goodPlugin, fixtures)).toEqual([]);
   });
