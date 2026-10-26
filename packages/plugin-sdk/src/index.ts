@@ -1,3 +1,9 @@
+/**
+ * The store plugin contract: plugin types, the schemas the host validates plugin output with, the store error
+ * taxonomy, ISO currency and country codes, and `Result`.
+ *
+ * @module plugin-sdk
+ */
 export type {
   BrowserDriver,
   BrowserPage,

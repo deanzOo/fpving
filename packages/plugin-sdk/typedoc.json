@@ -1,0 +1,3 @@
+{
+  "entryPoints": ["src/index.ts", "src/contract/index.ts"]
+}

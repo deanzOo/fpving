@@ -23,7 +23,7 @@ export interface ContractFixtures {
    * error naming the missing URL.
    */
   readonly pages: Readonly<Record<string, FixturePage>>;
-  /** The product URLs passed to {@link Store.fetchListing}, one per scenario. */
+  /** The product URLs passed to `Store.fetchListing`, one per scenario. */
   readonly listings: {
     /** A product page that is in stock. */
     readonly inStock: string;
@@ -36,6 +36,6 @@ export interface ContractFixtures {
     /** A page the plugin cannot parse, such as a redesigned layout. */
     readonly garbage: string;
   };
-  /** The query passed to {@link Store.search}. Required when the manifest declares `search`. */
+  /** The query passed to `Store.search`. Required when the manifest declares `search`. */
   readonly searchQuery?: SearchQuery;
 }
