@@ -134,4 +134,18 @@ describe("Landed cost", () => {
       ),
     ).toEqual(err({ kind: "amount_out_of_range" }));
   });
+
+  it("reports a missing rate for the threshold currency", () => {
+    const gbpThreshold: PricingSettings = {
+      ...settingsIn("USD"),
+      importTax: { ...settingsIn("USD").importTax, dutyFreeThreshold: { amountMinor: THRESHOLD_USD, currency: "GBP" } },
+    };
+    expect(
+      landedCost(
+        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: ShippingKind.Known, ...usd(SHIPPING) } },
+        gbpThreshold,
+        rates,
+      ),
+    ).toEqual(err({ kind: "missing_rate", currency: "GBP" }));
+  });
 });
