@@ -18,7 +18,7 @@ export type {
 } from "./context.js";
 export { StoreErrorKind, storeErrorSchema } from "./errors.js";
 export type { StoreError, StoreResult } from "./errors.js";
-export { COUNTRY_CODES, CURRENCY_CODES, countryCodeSchema, currencyCodeSchema } from "./iso.js";
+export { COUNTRY_CODES, CURRENCY_CODES, CURRENCY_MINOR_UNITS, countryCodeSchema, currencyCodeSchema } from "./iso.js";
 export type { CountryCode, CurrencyCode } from "./iso.js";
 export {
   fetchedListingSchema,

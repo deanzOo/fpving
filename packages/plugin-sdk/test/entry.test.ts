@@ -24,6 +24,7 @@ describe("plugin-sdk entry points", () => {
     expect(Object.keys(sdk).sort()).toEqual([
       "COUNTRY_CODES",
       "CURRENCY_CODES",
+      "CURRENCY_MINOR_UNITS",
       "PluginCapability",
       "ShippingKind",
       "ShippingUnknown",
