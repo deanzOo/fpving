@@ -30,8 +30,9 @@ const HOSTNAME = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a
  * - `id`: stable identifier of lowercase letters and digits in hyphen-separated words, such as `example-shop`, at
  *   most {@link MAX_ID_LENGTH} characters.
  * - `version`: the plugin's own canonical semver version, such as `1.2.3` or `1.2.3+build.1`.
- * - `sdkVersion`: the semver range of this SDK the plugin was tested against, such as `>=0.0.0 <1.0.0`. Unbounded
- *   ranges (`*`, `x`, `>=0.0.0`) are rejected.
+ * - `sdkVersion`: the semver range of this SDK the plugin was tested against, such as `>=0.0.0 <1.0.0`. Every `||`
+ *   alternative must have an upper bound, so `^0.1.0`, `0.1.x` and `1.2.3` pass and `*`, `>=0.0.0`, `>0.0.0` and
+ *   `>=1.0.0` are rejected.
  * - `domains`: lowercase hostnames the plugin handles, matched against `URL.hostname`; no scheme, port, path or
  *   wildcard.
  * - `capabilities`: at least one {@link PluginCapability}.
@@ -40,7 +41,7 @@ export const manifestSchema = z.object({
   id: z.string().max(MAX_ID_LENGTH).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   displayName: z.string().min(1),
   version: z.string().refine(isSemverVersion, "must be a canonical semver version such as 1.2.3"),
-  sdkVersion: z.string().refine(isSemverRange, "must be a bounded semver range such as >=0.0.0 <1.0.0"),
+  sdkVersion: z.string().refine(isSemverRange, "must be a semver range with an upper bound such as >=0.0.0 <1.0.0"),
   domains: z.array(z.string().regex(HOSTNAME, "must be a lowercase hostname without scheme, port or path")).nonempty(),
   capabilities: z.array(z.enum(PluginCapability)).nonempty(),
 });

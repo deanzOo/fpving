@@ -17,7 +17,7 @@ A plugin is an npm package or local folder that exports a `StorePlugin`:
   - `id`: lowercase letters and digits in hyphen-separated words, such as `example-shop`, at most 64 characters.
   - `displayName`: not empty.
   - `version`: the plugin's canonical semver version, such as `1.2.3` or `1.2.3+build.1`. No `v` prefix.
-  - `sdkVersion`: the semver range of `@fpving/plugin-sdk` the plugin was tested against, such as `>=0.0.0 <1.0.0`. Unbounded ranges (`*`, `x`, `>=0.0.0`) are rejected.
+  - `sdkVersion`: the semver range of `@fpving/plugin-sdk` the plugin was tested against, such as `>=0.0.0 <1.0.0`. Every `||` alternative must have an upper bound, so `^0.1.0`, `0.1.x`, `1.2.3` and `>=0.0.0 <1.0.0` pass while `*`, `x`, `>=0.0.0`, `>0.0.0` and `>=1.0.0` are rejected.
   - `domains`: at least one lowercase hostname, such as `shop.example.com`. No scheme, port, path or wildcard.
   - `capabilities`: at least one `PluginCapability`: `fetchListing`, `search`, `shippingToCountry`.
 - `createStore(ctx)`: returns a `Store` bound to the host context.

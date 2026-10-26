@@ -18,7 +18,7 @@ A plugin manifest carries its own `version` and the `sdkVersion` range of `@fpvi
 
 ## Decision outcome
 
-`@fpving/plugin-sdk` depends on `semver`. It is called only from the internal module `packages/plugin-sdk/src/semver.ts`, which exposes `isSemverVersion` and `isSemverRange`, so swapping the library touches one file. It is a pure function library with no I/O, so it gets a thin internal wrapper rather than a domain port. `version` must be canonical: it must equal its parsed version plus any build metadata, so `1.2.3+build.1` passes and `v1.2.3` does not. `sdkVersion` must be a valid range that does not normalize to `*`, which rejects `*`, `x`, `>=0.0.0` and the empty string (`semver` reads it as `*`); a plugin declares the range it was tested against, such as `>=0.0.0 <1.0.0`.
+`@fpving/plugin-sdk` depends on `semver`. It is called only from the internal module `packages/plugin-sdk/src/semver.ts`, which exposes `isSemverVersion` and `isSemverRange`, so swapping the library touches one file. It is a pure function library with no I/O, so it gets a thin internal wrapper rather than a domain port. `version` must be canonical: it must equal its parsed version plus any build metadata, so `1.2.3+build.1` passes and `v1.2.3` does not. `sdkVersion` must be a valid range in which every `||` alternative has an upper bound, found by inspecting the comparator sets `semver` expands a range into: a `<` or `<=` comparator, or an exact version, caret, tilde or x-range, which `semver` expands to one. That rejects `*`, `x`, `>=0.0.0`, `>0.0.0`, `>=1.0.0` and the empty string (`semver` reads it as `*`), because a plugin tested against one SDK release cannot vouch for every later one, and accepts `>=0.0.0 <1.0.0`, `^0.1.0`, `0.1.x` and `1.2.3`.
 
 ## Consequences
 

@@ -43,13 +43,16 @@ describe("plugin manifest", () => {
     expect(rejects({ version })).toBe(true);
   });
 
-  const ranges = [">=0.0.0 <1.0.0", "0.1.x", "^0.1.0 || ^1.0.0", ">=0.2.0"];
+  const ranges = [">=0.0.0 <1.0.0", "^0.1.0", "~1.2.0", "0.1.x", "1.2.3", "^0.1.0 || ^1.0.0", "<1.0.0", "<=1.0.0"];
   it.each(ranges)("accepts the sdk version range %j", (sdkVersion) => {
     expect(rejects({ sdkVersion })).toBe(false);
   });
 
-  const badRanges = ["", " ", "latest", "*", "x", ">=0.0.0", "0.x || *"];
-  it.each(badRanges)("rejects the blank, invalid or unbounded sdk version range %j", (sdkVersion) => {
+  const badRanges = [
+    ...["", " ", "latest", "*", "x", ">=0.0.0", ">0.0.0", ">=0.2.0", ">=1.0.0"],
+    ...["0.x || *", "^0.1.0 || >=2.0.0"],
+  ];
+  it.each(badRanges)("rejects the blank, invalid or upper-unbounded sdk version range %j", (sdkVersion) => {
     expect(rejects({ sdkVersion })).toBe(true);
   });
 
