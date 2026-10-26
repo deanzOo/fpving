@@ -13,7 +13,7 @@ import {
   settingsSchema,
   verdictSchema,
 } from "../src/index.ts";
-import type { PluginId } from "../src/index.ts";
+import type { CurrencyCode, PluginId } from "../src/index.ts";
 
 const ABOVE_ONE = 1.5;
 const FIVE_PERCENT = 500;
@@ -41,6 +41,13 @@ describe("Domain entities", () => {
   it("ships default settings that pass the settings schema, with a 5% price drop threshold", () => {
     expect(settingsSchema.parse(DEFAULT_SETTINGS)).toEqual(DEFAULT_SETTINGS);
     expect(DEFAULT_SETTINGS.priceDropMinBasisPoints).toBe(FIVE_PERCENT);
+  });
+
+  it("types the default settings as readonly all the way down, as they are frozen", () => {
+    expectTypeOf(DEFAULT_SETTINGS.importTax.dutyFreeThreshold).toEqualTypeOf<
+      Readonly<{ amountMinor: number; currency: CurrencyCode }>
+    >();
+    expect(Object.isFrozen(DEFAULT_SETTINGS.importTax.dutyFreeThreshold)).toBe(true);
   });
 
   it("rejects a negative or fractional price drop threshold", () => {

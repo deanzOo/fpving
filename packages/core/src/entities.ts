@@ -214,13 +214,16 @@ export const settingsSchema = z.object({
 /** Settings as {@link settingsSchema} accepts them. */
 export type Settings = z.infer<typeof settingsSchema>;
 
+/** `T` with every property readonly, recursively. */
+export type DeepReadonly<T> = { readonly [K in keyof T]: DeepReadonly<T[K]> };
+
 const { importTax } = COUNTRY_PRESETS.IL;
 
 /**
  * The settings used until the user saves their own: Israel, shown in ILS, scanned every 12 hours, 5% drops. Frozen
  * down to the import tax threshold; copy it before changing anything.
  */
-export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
+export const DEFAULT_SETTINGS: DeepReadonly<Settings> = Object.freeze({
   displayCurrency: "ILS",
   shipToCountry: "IL",
   importTax: Object.freeze({ ...importTax, dutyFreeThreshold: Object.freeze({ ...importTax.dutyFreeThreshold }) }),

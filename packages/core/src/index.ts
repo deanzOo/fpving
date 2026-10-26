@@ -45,6 +45,7 @@ export {
 export type {
   Alert,
   CachedVerdict,
+  DeepReadonly,
   Listing,
   MatchCandidate,
   PluginHealth,
