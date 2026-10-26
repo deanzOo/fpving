@@ -1,8 +1,9 @@
 import type { Result } from "@fpving/plugin-sdk";
+import type { PortErrorKind } from "./errors.js";
 
 /** The page could not be saved; `detail` is for logs. */
 export interface DebugWriteFailed {
-  readonly kind: "debug_write_failed";
+  readonly kind: typeof PortErrorKind.DebugWriteFailed;
   readonly detail: string;
 }
 

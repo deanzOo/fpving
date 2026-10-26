@@ -1,5 +1,6 @@
 import type { Result } from "@fpving/plugin-sdk";
 import type { AlertId } from "../ids.js";
+import type { PortErrorKind } from "./errors.js";
 
 /** An alert rendered for the user, ready to show as a desktop notification. */
 export interface AlertNotification {
@@ -13,7 +14,7 @@ export interface AlertNotification {
 
 /** The notification could not be shown; the alert stays stored either way. `detail` is for logs. */
 export interface NotifyFailed {
-  readonly kind: "notify_failed";
+  readonly kind: typeof PortErrorKind.NotifyFailed;
   readonly detail: string;
 }
 

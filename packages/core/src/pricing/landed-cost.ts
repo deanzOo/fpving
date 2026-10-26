@@ -1,6 +1,7 @@
 import { ShippingKind } from "@fpving/plugin-sdk";
 import type { Amount, CurrencyCode, Money, Result, Shipping } from "@fpving/plugin-sdk";
 import { err } from "@fpving/plugin-sdk";
+import { PricingErrorKind } from "./errors.js";
 import { convert, convertExact } from "./fx.js";
 import type { FxTable, PricingError } from "./fx.js";
 import { toAmount } from "./money.js";
@@ -14,17 +15,17 @@ export interface PricingSettings {
 }
 
 /** A landed cost cannot be computed because the listing's shipping cost to the destination is unknown. */
-export interface ShippingUnknown {
-  kind: "shipping_unknown";
+export interface ShippingUnknownError {
+  kind: typeof PricingErrorKind.ShippingUnknown;
 }
 
 const landedTotal = (
   listing: { itemPrice: Money; shipping: Shipping },
   settings: PricingSettings,
   rates: FxTable,
-): Result<Amount, PricingError | ShippingUnknown> => {
+): Result<Amount, PricingError | ShippingUnknownError> => {
   if (listing.shipping.kind === ShippingKind.Unknown) {
-    return err({ kind: "shipping_unknown" });
+    return err({ kind: PricingErrorKind.ShippingUnknown });
   }
   const { itemPrice } = listing;
   const quoted = { amountMinor: listing.shipping.amountMinor, currency: listing.shipping.currency };
@@ -50,7 +51,7 @@ export const landedCost = (
   listing: { itemPrice: Money; shipping: Shipping },
   settings: PricingSettings,
   rates: FxTable,
-): Result<Amount, PricingError | ShippingUnknown> => {
+): Result<Amount, PricingError | ShippingUnknownError> => {
   const total = landedTotal(listing, settings, rates);
   return total.ok ? convert(total.value, settings.displayCurrency, rates) : total;
 };
@@ -63,7 +64,7 @@ export const landedCostExact = (
   listing: { itemPrice: Money; shipping: Shipping },
   settings: PricingSettings,
   rates: FxTable,
-): Result<number, PricingError | ShippingUnknown> => {
+): Result<number, PricingError | ShippingUnknownError> => {
   const total = landedTotal(listing, settings, rates);
   return total.ok ? convertExact(total.value, settings.displayCurrency, rates) : total;
 };

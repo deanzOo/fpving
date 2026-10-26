@@ -1,9 +1,10 @@
 import type { Result } from "@fpving/plugin-sdk";
+import type { PortErrorKind } from "./errors.js";
 import type { FxTable } from "../pricing/fx.js";
 
 /** The rates source could not be reached or answered something unusable; `detail` is for logs. */
 export interface RatesUnavailable {
-  readonly kind: "rates_unavailable";
+  readonly kind: typeof PortErrorKind.RatesUnavailable;
   readonly detail: string;
 }
 

@@ -20,7 +20,8 @@ export type { FxTable, MissingRate, PricingError } from "./pricing/fx.js";
 export { importTax, ThresholdBasis } from "./pricing/import-tax.js";
 export type { ImportTaxRule } from "./pricing/import-tax.js";
 export { landedCost } from "./pricing/landed-cost.js";
-export type { PricingSettings, ShippingUnknown } from "./pricing/landed-cost.js";
+export type { PricingSettings, ShippingUnknownError } from "./pricing/landed-cost.js";
+export { PricingErrorKind } from "./pricing/errors.js";
 export type { AmountOutOfRange } from "./pricing/money.js";
 export {
   AlertKind,
@@ -62,6 +63,7 @@ export {
   snapshotIdSchema,
 } from "./ids.js";
 export type { AlertId, ListingId, MatchCandidateId, ProductId, ScanRunId, SnapshotId } from "./ids.js";
+export { PortErrorKind } from "./ports/errors.js";
 export type { RatesUnavailable, CurrencyRates } from "./ports/currency-rates.js";
 export type { DebugSink, DebugWriteFailed } from "./ports/debug-sink.js";
 export type { IdGenerator } from "./ports/id-generator.js";

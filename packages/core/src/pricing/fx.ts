@@ -1,5 +1,6 @@
 import { CURRENCY_MINOR_UNITS, err, ok } from "@fpving/plugin-sdk";
 import type { Amount, CurrencyCode, Result } from "@fpving/plugin-sdk";
+import { PricingErrorKind } from "./errors.js";
 import { roundMinor, toAmount } from "./money.js";
 import type { AmountOutOfRange } from "./money.js";
 
@@ -17,7 +18,7 @@ export interface FxTable {
 
 /** A conversion needed the rate of `currency` and the table had none. */
 export interface MissingRate {
-  kind: "missing_rate";
+  kind: typeof PricingErrorKind.MissingRate;
   currency: CurrencyCode;
 }
 
@@ -46,11 +47,11 @@ export const convertExact = (amount: Amount, to: CurrencyCode, rates: FxTable): 
   }
   const fromRate = rateFor(amount.currency, rates);
   if (fromRate === undefined) {
-    return err({ kind: "missing_rate", currency: amount.currency });
+    return err({ kind: PricingErrorKind.MissingRate, currency: amount.currency });
   }
   const toRate = rateFor(to, rates);
   if (toRate === undefined) {
-    return err({ kind: "missing_rate", currency: to });
+    return err({ kind: PricingErrorKind.MissingRate, currency: to });
   }
   return ok((amount.amountMinor * toRate * minorPerMajor(to)) / (fromRate * minorPerMajor(amount.currency)));
 };

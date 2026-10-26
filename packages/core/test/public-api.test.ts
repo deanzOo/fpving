@@ -12,6 +12,8 @@ describe("Core public API", () => {
       "ListingStatus",
       "LlmErrorKind",
       "LlmVerdict",
+      "PortErrorKind",
+      "PricingErrorKind",
       "RepositoryErrorKind",
       "ScanOutcome",
       "ThresholdBasis",
