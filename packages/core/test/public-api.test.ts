@@ -20,6 +20,7 @@ describe("Core public API", () => {
       "cachedVerdictSchema",
       "convert",
       "err",
+      "evaluate",
       "importTax",
       "landedCost",
       "listingIdSchema",

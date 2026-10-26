@@ -10,6 +10,9 @@ export type {
   Money,
   Result,
 } from "@fpving/plugin-sdk";
+export { evaluate } from "./alerts/evaluate.js";
+export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
+export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
 export { COUNTRY_PRESETS } from "./pricing/country-presets.js";
 export type { CountryPreset, PresetSource } from "./pricing/country-presets.js";
 export { convert } from "./pricing/fx.js";
