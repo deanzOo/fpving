@@ -8,7 +8,9 @@ import { priceDrop } from "./price-drop.js";
 
 /**
  * Everything one evaluation reads. `history` is the listing's earlier snapshots, `incoming` the one just observed.
- * `productListings` holds every listing of the product with its newest snapshot, the incoming one included.
+ * `productListings` holds the product's listings with their newest snapshots; the listing's own entry is replaced by
+ * the incoming snapshot, or added if absent. History entries that are the incoming snapshot or not older than it are
+ * ignored.
  */
 export interface EvaluateInput {
   listing: Listing;
@@ -32,10 +34,17 @@ export interface Evaluation {
  * reads only its input, and the caller assigns alert ids and persists `cheapestListingId`.
  */
 export const evaluate = (input: EvaluateInput): Evaluation => {
-  const { listing, history, incoming, now } = input;
+  const { listing, incoming, now } = input;
+  const history = input.history.filter(
+    (snapshot) => snapshot.id !== incoming.id && snapshot.observedAt < incoming.observedAt,
+  );
+  const productListings = [
+    ...input.productListings.filter((entry) => entry.listing.id !== listing.id),
+    { listing, latest: incoming },
+  ];
   const cheapest = newCheapest(
     listing,
-    input.productListings,
+    productListings,
     input.previousCheapestListingId,
     input.rates,
     input.settings,

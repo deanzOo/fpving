@@ -11,9 +11,10 @@ const PRICE_DROP_WINDOW_MS = WINDOW_DAYS * HOURS_PER_DAY * MS_PER_HOUR;
 
 /**
  * Raises a price drop alert when the incoming item price is lower than every earlier snapshot in the window and at
- * least `minBasisPoints` below the window's lowest. Only snapshots for the same destination and item currency count,
- * and shipping is ignored, so the comparison is like for like in the store's own currency. The threshold is checked
- * in exact integer arithmetic. Returns null when the window holds no earlier snapshot.
+ * least `minBasisPoints` below the window's lowest. The incoming snapshot must be in stock. Only in-stock snapshots
+ * for the same destination and item currency count. Shipping is ignored, so the comparison is like for like in the
+ * store's own currency. The threshold is checked in exact integer arithmetic. Returns null when the window holds
+ * no earlier snapshot.
  */
 export const priceDrop = (
   listing: Listing,
@@ -22,11 +23,15 @@ export const priceDrop = (
   minBasisPoints: number,
   now: Date,
 ): AlertDraft | null => {
+  if (!incoming.inStock) {
+    return null;
+  }
   const since = now.getTime() - PRICE_DROP_WINDOW_MS;
   const low = history
     .filter(
       (snapshot) =>
-        snapshot.shipTo === incoming.shipTo
+        snapshot.inStock
+        && snapshot.shipTo === incoming.shipTo
         && snapshot.itemPrice.currency === incoming.itemPrice.currency
         && snapshot.observedAt.getTime() >= since,
     )
