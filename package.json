@@ -16,7 +16,10 @@
     "dup": "jscpd",
     "knip": "knip",
     "licenses:check": "license-checker-rseidelsohn --excludePrivatePackages --onlyAllow \"MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;Python-2.0;CC-BY-4.0;CC-BY-3.0;MPL-2.0;(MIT AND CC-BY-3.0)\"",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build && pnpm dup && pnpm knip && pnpm licenses:check",
+    "docs:spec": "node tools/spec-to-docs-cli.ts",
+    "docs:build": "pnpm docs:spec && pnpm --filter @fpving/docs build",
+    "docs:dev": "pnpm docs:spec && pnpm --filter @fpving/docs dev",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build && pnpm docs:build && pnpm dup && pnpm knip && pnpm licenses:check",
     "prepare": "lefthook install"
   },
   "devDependencies": {
@@ -40,5 +43,10 @@
     "typescript-eslint": "8.71.2",
     "vitest": "5.0.4",
     "yaml": "2.9.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@typescript-eslint/utils": "8.71.2"
+    }
   }
 }

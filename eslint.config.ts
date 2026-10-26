@@ -14,6 +14,7 @@ export default defineConfig(
       "**/coverage/**",
       "reports/**",
       "graphify-out/**",
+      "apps/docs/**",
       "tests/tooling/fixtures/**",
     ],
   },
