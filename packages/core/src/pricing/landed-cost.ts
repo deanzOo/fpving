@@ -43,9 +43,9 @@ const landedTotal = (
 
 /**
  * The true cost of a listing delivered to the user: item plus shipping plus import tax, in the display currency.
- * Unknown shipping is never treated as free and yields `shipping_unknown`. Shipping is converted into the item's
- * currency, tax is computed there with {@link importTax}, the three are summed and the total is converted to the
- * display currency once, so the parts are never rounded separately.
+ * Unknown shipping is never treated as free and yields `shipping_unknown`. Rounding happens in three places, each
+ * half-up to a minor unit: shipping converted into the item's currency, the VAT computed there with
+ * {@link importTax}, and one final conversion of the summed total into the display currency.
  */
 export const landedCost = (
   listing: { itemPrice: Money; shipping: Shipping },
@@ -57,8 +57,9 @@ export const landedCost = (
 };
 
 /**
- * The same cost as {@link landedCost} but left unrounded, in fractional minor units of the display currency, so
- * costs from different currencies can be compared without rounding ties.
+ * The same cost as {@link landedCost} but the final conversion into the display currency is left unrounded, in
+ * fractional minor units of that currency, so costs from different currencies can be compared without rounding
+ * ties. Shipping and VAT are still rounded in the item's currency first.
  */
 export const landedCostExact = (
   listing: { itemPrice: Money; shipping: Shipping },
