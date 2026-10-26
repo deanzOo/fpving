@@ -8,6 +8,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "fpving",
+      disable404Route: true,
       description: "A local-first gear watcher for people entering the FPV drone hobby.",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/deanzoo/fpving" }],
       editLink: { baseUrl: "https://github.com/deanzoo/fpving/edit/main/apps/docs/" },
