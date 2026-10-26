@@ -13,7 +13,7 @@ export type {
 export { evaluate } from "./alerts/evaluate.js";
 export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
 export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
-export { COUNTRY_PRESETS } from "./pricing/country-presets.js";
+export { COUNTRY_PRESETS, presetFor } from "./pricing/country-presets.js";
 export type { CountryPreset, PresetSource } from "./pricing/country-presets.js";
 export { convert } from "./pricing/fx.js";
 export type { FxTable, MissingRate, PricingError } from "./pricing/fx.js";

@@ -32,3 +32,8 @@ export const COUNTRY_PRESETS = {
     },
   },
 } as const satisfies Partial<Record<CountryCode, CountryPreset>>;
+
+const presets: Partial<Record<CountryCode, CountryPreset>> = COUNTRY_PRESETS;
+
+/** The preset of `code`, or undefined when no preset exists for that country. */
+export const presetFor = (code: CountryCode): CountryPreset | undefined => presets[code];
