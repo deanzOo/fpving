@@ -63,7 +63,13 @@ export default defineConfig(
           ignoreTypeIndexes: true,
         },
       ],
-      "no-warning-comments": ["error", { terms: ["todo", "fixme", "hack", "xxx"], location: "anywhere" }],
+      "no-warning-comments": [
+        "error",
+        {
+          terms: ["todo", "fixme", "hack", "xxx", "v8 ignore", "c8 ignore", "istanbul ignore", "node:coverage"],
+          location: "anywhere",
+        },
+      ],
       "multiline-comment-style": ["error", "separate-lines"],
       "local/max-one-line-comment": "error",
     },

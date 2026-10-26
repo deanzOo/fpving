@@ -41,6 +41,11 @@ describe("lint rules", () => {
     ["ts-expect-error.ts", "@typescript-eslint/ban-ts-comment"],
     ["ts-nocheck.ts", "@typescript-eslint/ban-ts-comment"],
     ["eslint-disable.ts", "@eslint-community/eslint-comments/no-use"],
+    ["coverage-ignore-v8-line.ts", "no-warning-comments"],
+    ["coverage-ignore-v8-block.ts", "no-warning-comments"],
+    ["coverage-ignore-c8.ts", "no-warning-comments"],
+    ["coverage-ignore-istanbul.ts", "no-warning-comments"],
+    ["coverage-ignore-node.ts", "no-warning-comments"],
   ])("reports %s as %s", (name, ruleId) => {
     expect(lint(name)).toContain(ruleId);
   });
