@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ShippingKind } from "@fpving/plugin-sdk";
 import { err, ok } from "../../src/index.ts";
 import type { FxTable } from "../../src/pricing/fx.ts";
 import { ThresholdBasis } from "../../src/pricing/import-tax.ts";
@@ -9,6 +10,11 @@ const THRESHOLD_USD = 7500;
 const VAT_EIGHTEEN_PERCENT = 1800;
 const ILS_PER_USD = 3.6;
 const EUR_PER_USD = 0.8;
+const JPY_PER_USD = 150;
+const ONE_CENT = 1;
+const THREE_YEN = 3;
+const HUGE_ITEM = 5_000_000_000_000_000;
+const FULL_VAT = 10_000;
 const CHEAP_ITEM = 5000;
 const DEAR_ITEM = 10000;
 const SHIPPING = 1000;
@@ -21,7 +27,7 @@ const CHEAP_FREE_TOTAL_ILS = 18000;
 
 const rates: FxTable = {
   base: "USD",
-  ratesPerBase: { ILS: ILS_PER_USD, EUR: EUR_PER_USD },
+  ratesPerBase: { ILS: ILS_PER_USD, EUR: EUR_PER_USD, JPY: JPY_PER_USD },
   fetchedOn: "2026-10-27",
 };
 
@@ -40,7 +46,7 @@ describe("Landed cost", () => {
   it("adds only shipping when the item is within the duty-free threshold", () => {
     expect(
       landedCost(
-        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: "known", ...usd(SHIPPING) } },
+        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: ShippingKind.Known, ...usd(SHIPPING) } },
         settingsIn("ILS"),
         rates,
       ),
@@ -50,7 +56,7 @@ describe("Landed cost", () => {
   it("adds VAT on item plus shipping when the item exceeds the duty-free threshold", () => {
     expect(
       landedCost(
-        { itemPrice: usd(DEAR_ITEM), shipping: { kind: "known", ...usd(SHIPPING) } },
+        { itemPrice: usd(DEAR_ITEM), shipping: { kind: ShippingKind.Known, ...usd(SHIPPING) } },
         settingsIn("ILS"),
         rates,
       ),
@@ -60,7 +66,7 @@ describe("Landed cost", () => {
   it("accepts free shipping", () => {
     expect(
       landedCost(
-        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: "known", ...usd(FREE_SHIPPING) } },
+        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: ShippingKind.Known, ...usd(FREE_SHIPPING) } },
         settingsIn("ILS"),
         rates,
       ),
@@ -70,7 +76,10 @@ describe("Landed cost", () => {
   it("converts shipping quoted in another currency before adding it", () => {
     expect(
       landedCost(
-        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: "known", amountMinor: SHIPPING_EUR, currency: "EUR" } },
+        {
+          itemPrice: usd(CHEAP_ITEM),
+          shipping: { kind: ShippingKind.Known, amountMinor: SHIPPING_EUR, currency: "EUR" },
+        },
         settingsIn("USD"),
         rates,
       ),
@@ -78,15 +87,14 @@ describe("Landed cost", () => {
   });
 
   it("refuses to price an item whose shipping is unknown", () => {
-    expect(landedCost({ itemPrice: usd(CHEAP_ITEM), shipping: { kind: "unknown" } }, settingsIn("ILS"), rates)).toEqual(
-      err({ kind: "shipping_unknown" }),
-    );
+    const listing = { itemPrice: usd(CHEAP_ITEM), shipping: { kind: ShippingKind.Unknown } };
+    expect(landedCost(listing, settingsIn("ILS"), rates)).toEqual(err({ kind: "shipping_unknown" }));
   });
 
   it("reports a missing rate for the display currency", () => {
     expect(
       landedCost(
-        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: "known", ...usd(SHIPPING) } },
+        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: ShippingKind.Known, ...usd(SHIPPING) } },
         settingsIn("GBP"),
         rates,
       ),
@@ -96,10 +104,34 @@ describe("Landed cost", () => {
   it("reports a missing rate for the shipping currency", () => {
     expect(
       landedCost(
-        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: "known", amountMinor: SHIPPING, currency: "GBP" } },
+        { itemPrice: usd(CHEAP_ITEM), shipping: { kind: ShippingKind.Known, amountMinor: SHIPPING, currency: "GBP" } },
         settingsIn("ILS"),
         rates,
       ),
     ).toEqual(err({ kind: "missing_rate", currency: "GBP" }));
+  });
+
+  it("converts the combined total once, so parts are not rounded separately", () => {
+    expect(
+      landedCost(
+        { itemPrice: usd(ONE_CENT), shipping: { kind: ShippingKind.Known, ...usd(ONE_CENT) } },
+        settingsIn("JPY"),
+        rates,
+      ),
+    ).toEqual(ok({ amountMinor: THREE_YEN, currency: "JPY" }));
+  });
+
+  it("reports an out-of-range amount when item, shipping and tax together are not a safe integer", () => {
+    const fullVat: PricingSettings = {
+      ...settingsIn("USD"),
+      importTax: { ...settingsIn("USD").importTax, vatBasisPoints: FULL_VAT },
+    };
+    expect(
+      landedCost(
+        { itemPrice: usd(HUGE_ITEM), shipping: { kind: ShippingKind.Known, ...usd(FREE_SHIPPING) } },
+        fullVat,
+        rates,
+      ),
+    ).toEqual(err({ kind: "amount_out_of_range" }));
   });
 });
