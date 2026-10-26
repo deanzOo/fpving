@@ -1,1 +1,1 @@
-export const triple = (value: number): number => value * value;
+export const square = (value: number): number => value * value;
