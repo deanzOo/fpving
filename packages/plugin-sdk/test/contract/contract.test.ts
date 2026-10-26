@@ -20,7 +20,7 @@ const manifest: PluginManifest = {
   id: "example-shop",
   displayName: "Example Shop",
   version: "1.0.0",
-  sdkVersion: "^0.1.0",
+  sdkVersion: ">=0.0.0 <1.0.0",
   domains: ["shop.example.com"],
   capabilities: [PluginCapability.FetchListing, PluginCapability.Search],
 };

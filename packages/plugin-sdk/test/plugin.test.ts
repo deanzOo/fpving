@@ -14,7 +14,7 @@ const plugin: StorePlugin = {
     id: "example",
     displayName: "Example",
     version: "1.0.0",
-    sdkVersion: "^0.1.0",
+    sdkVersion: ">=0.0.0 <1.0.0",
     domains: ["example.com"],
     capabilities: [PluginCapability.FetchListing],
   },
