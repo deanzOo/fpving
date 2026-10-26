@@ -2,6 +2,7 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import {
   listingIdSchema,
   ListingOrigin,
+  pluginIdSchema,
   ListingStatus,
   productIdSchema,
   snapshotIdSchema,
@@ -41,7 +42,7 @@ export const settings: AlertSettings = {
 export const listing = (id: string, overrides: Partial<Listing> = {}): Listing => ({
   id: listingIdSchema.parse(id),
   productId: productIdSchema.parse("p1"),
-  pluginId: "store",
+  pluginId: pluginIdSchema.parse("store"),
   url: `https://store.example/${id}`,
   title: id,
   status: ListingStatus.Active,

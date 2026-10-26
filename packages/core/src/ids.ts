@@ -1,3 +1,4 @@
+import { manifestSchema } from "@fpving/plugin-sdk";
 import { z } from "zod";
 
 /** Accepts a non-empty string as the id of a product. Ids come from an `IdGenerator`. */
@@ -35,3 +36,9 @@ export const scanRunIdSchema = z.string().min(1).brand<"ScanRunId">();
 
 /** A scan run id as {@link scanRunIdSchema} accepts it. */
 export type ScanRunId = z.infer<typeof scanRunIdSchema>;
+
+/** Accepts a plugin id the way a manifest does, so the manifest's `id` is the one source of the id rules. */
+export const pluginIdSchema = manifestSchema.shape.id.brand<"PluginId">();
+
+/** A plugin id as {@link pluginIdSchema} accepts it. */
+export type PluginId = z.infer<typeof pluginIdSchema>;

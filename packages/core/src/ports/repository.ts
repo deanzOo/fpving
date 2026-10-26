@@ -10,7 +10,7 @@ import type {
   ScanRun,
   Settings,
 } from "../entities.js";
-import type { AlertId, ListingId, MatchCandidateId, ProductId } from "../ids.js";
+import type { AlertId, ListingId, MatchCandidateId, PluginId, ProductId } from "../ids.js";
 import type { FxTable } from "../pricing/fx.js";
 
 /** Why a repository call was refused: the referenced row does not exist, or the url is already taken. */
@@ -103,7 +103,7 @@ export interface ScanRunRepository {
   /** Records a finished scan run. */
   record(run: ScanRun): Promise<void>;
   /** The most recently started run of `pluginId`, or of any plugin when omitted; null when none ran. */
-  latest(pluginId?: string): Promise<ScanRun | null>;
+  latest(pluginId?: PluginId): Promise<ScanRun | null>;
 }
 
 /** Stores exchange rates. */
@@ -117,7 +117,7 @@ export interface FxRateRepository {
 /** Stores each plugin's backoff state. */
 export interface PluginHealthRepository {
   /** A plugin's health; a plugin without a record has no blocks and no backoff. */
-  get(pluginId: string): Promise<PluginHealth>;
+  get(pluginId: PluginId): Promise<PluginHealth>;
   /** Stores a plugin's health, replacing its earlier record. */
   upsert(health: PluginHealth): Promise<void>;
 }

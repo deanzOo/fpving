@@ -31,6 +31,7 @@ describe("Core public API", () => {
       "matchCandidateSchema",
       "ok",
       "pluginHealthSchema",
+      "pluginIdSchema",
       "presetFor",
       "priceSnapshotSchema",
       "productIdSchema",

@@ -1,8 +1,7 @@
 import type { Result } from "@fpving/plugin-sdk";
 import { z } from "zod";
 import type { Verdict } from "../entities.js";
-
-const textSchema = z.string().trim().min(1);
+import { textSchema } from "../text.js";
 
 /** What identifies a product independent of the store: `variantAttributes` such as `"6S"` or `"1300mAh"`. */
 export const productIdentitySchema = z.object({

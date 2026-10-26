@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { StoreErrorKind } from "@fpving/plugin-sdk";
 import {
   CandidateStatus,
@@ -6,12 +6,14 @@ import {
   LlmVerdict,
   listingIdSchema,
   matchCandidateSchema,
+  pluginIdSchema,
   productIdentitySchema,
   ScanOutcome,
   scanRunSchema,
   settingsSchema,
   verdictSchema,
 } from "../src/index.ts";
+import type { PluginId } from "../src/index.ts";
 
 const ABOVE_ONE = 1.5;
 const FIVE_PERCENT = 500;
@@ -30,6 +32,12 @@ const candidate = {
 };
 
 describe("Domain entities", () => {
+  it("accepts a plugin id only in the form a manifest allows, and brands it", () => {
+    expect(pluginIdSchema.safeParse("example-shop").success).toBe(true);
+    expect(pluginIdSchema.safeParse("Example_Shop").success).toBe(false);
+    expectTypeOf<string>().not.toExtend<PluginId>();
+  });
+
   it("ships default settings that pass the settings schema, with a 5% price drop threshold", () => {
     expect(settingsSchema.parse(DEFAULT_SETTINGS)).toEqual(DEFAULT_SETTINGS);
     expect(DEFAULT_SETTINGS.priceDropMinBasisPoints).toBe(FIVE_PERCENT);

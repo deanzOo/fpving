@@ -58,11 +58,12 @@ export {
   alertIdSchema,
   listingIdSchema,
   matchCandidateIdSchema,
+  pluginIdSchema,
   productIdSchema,
   scanRunIdSchema,
   snapshotIdSchema,
 } from "./ids.js";
-export type { AlertId, ListingId, MatchCandidateId, ProductId, ScanRunId, SnapshotId } from "./ids.js";
+export type { AlertId, ListingId, MatchCandidateId, PluginId, ProductId, ScanRunId, SnapshotId } from "./ids.js";
 export { PortErrorKind } from "./ports/errors.js";
 export type { RatesUnavailable, CurrencyRates } from "./ports/currency-rates.js";
 export type { DebugSink, DebugWriteFailed } from "./ports/debug-sink.js";

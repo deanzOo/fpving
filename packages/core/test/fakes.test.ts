@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertIdSchema, err, LlmErrorKind, LlmVerdict, ok } from "../src/index.ts";
+import { alertIdSchema, err, LlmErrorKind, LlmVerdict, ok, pluginIdSchema } from "../src/index.ts";
 import { fakeClock } from "./fakes/fake-clock.ts";
 import { fakeDebugSink } from "./fakes/fake-debug-sink.ts";
 import { fakeIdGenerator } from "./fakes/fake-id-generator.ts";
@@ -45,7 +45,8 @@ describe("Test fakes", () => {
 
   it("fake debug sink records saved pages", async () => {
     const sink = fakeDebugSink();
-    expect(await sink.savePage("example-shop", "https://shop.example/x", "<html>")).toEqual(ok(undefined));
-    expect(sink.pages).toEqual([{ pluginId: "example-shop", url: "https://shop.example/x", html: "<html>" }]);
+    const pluginId = pluginIdSchema.parse("example-shop");
+    expect(await sink.savePage(pluginId, "https://shop.example/x", "<html>")).toEqual(ok(undefined));
+    expect(sink.pages).toEqual([{ pluginId, url: "https://shop.example/x", html: "<html>" }]);
   });
 });

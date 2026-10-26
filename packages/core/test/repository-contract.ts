@@ -10,6 +10,7 @@ import {
   ListingStatus,
   listingIdSchema,
   matchCandidateIdSchema,
+  pluginIdSchema,
   productIdSchema,
   RepositoryErrorKind,
   ScanOutcome,
@@ -23,6 +24,7 @@ import type {
   Listing,
   ListingId,
   MatchCandidate,
+  PluginId,
   PriceSnapshot,
   Product,
   ProductId,
@@ -41,8 +43,8 @@ const BLOCKS = 2;
 const SCAN_HOURS = 24;
 const DROP_BASIS_POINTS = 1000;
 const ILS_PER_USD = 3.6;
-const PLUGIN = "example-shop";
-const OTHER_PLUGIN = "other-shop";
+const PLUGIN = pluginIdSchema.parse("example-shop");
+const OTHER_PLUGIN = pluginIdSchema.parse("other-shop");
 
 const JAN_1 = new Date("2026-01-01T03:04:05.678Z");
 const JAN_2 = new Date("2026-01-02T03:04:05.678Z");
@@ -106,7 +108,7 @@ const alert = (id: string, row: Listing, createdAt: Date, afterSnapshotId: Snaps
   readAt: null,
 });
 
-const scanRun = (id: string, pluginId: string, startedAt: Date): ScanRun => ({
+const scanRun = (id: string, pluginId: PluginId, startedAt: Date): ScanRun => ({
   id: scanRunIdSchema.parse(id),
   pluginId,
   startedAt,
