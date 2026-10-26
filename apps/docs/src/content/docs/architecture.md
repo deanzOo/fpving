@@ -52,7 +52,7 @@ Every runtime or integration dependency sits behind an interface the domain defi
 | `IdGenerator` | Random UUIDs |
 | `DebugSink` | Files under `.data/debug/<plugin>/` |
 
-`BrowserDriver`, `HttpClient`, `Clock` and `Logger` are defined in `@fpving/plugin-sdk` as the capabilities the host hands to plugins; `@fpving/core` re-exports `Clock` and `Logger`. `LlmJudge`, `CurrencyRates`, `Notifier`, `Repository`, `Scheduler`, `IdGenerator` and `DebugSink` are defined in `@fpving/core`. No default adapter is built yet. `IdGenerator` and `DebugSink` are explained in [ADR 0013](../adr/0013-id-generator-and-debug-sink-ports/).
+`BrowserDriver`, `HttpClient`, `Clock` and `Logger` are defined in `@fpving/plugin-sdk` as the capabilities the host hands to plugins; `@fpving/core` re-exports all four. `LlmJudge`, `CurrencyRates`, `Notifier`, `Repository`, `Scheduler`, `IdGenerator` and `DebugSink` are defined in `@fpving/core`. No default adapter is built yet. `IdGenerator` and `DebugSink` are explained in [ADR 0013](../adr/0013-id-generator-and-debug-sink-ports/).
 
 `Repository` groups one repository per aggregate: products, listings, price snapshots, match candidates, the LLM verdict cache, alerts, scan runs, exchange rates, plugin health and settings. Expected refusals, such as a url that is already tracked, resolve to a `Result`. Every implementation must pass the shared repository contract suite, `describeRepositoryContract` from `@fpving/core/testing`, which an adapter runs against its own repository; core runs it against an in-memory fake. Vitest is an optional peer dependency needed only by that entry, as it is for `@fpving/plugin-sdk/contract`.
 
@@ -64,9 +64,9 @@ Plugins supply all store support and are designed to run in worker threads. The 
 
 ## Data flow
 
-1. **Add product.** A pasted URL resolves to the plugin for its domain, which fetches the listing. A product, a listing and a first price snapshot are stored.
-2. **Assisted match.** Extract the product identity from the title, search every other plugin that supports search, prefilter by model number and token similarity, then have the LLM judge each candidate as same, variant or different. Candidates wait in a review queue.
-3. **Scan.** On each interval, group listings by plugin, fetch each, append a price snapshot and record a scan run.
+1. **Add product.** Once wired, a pasted URL will resolve to the plugin for its domain, which will fetch the listing. A product, a listing and a first price snapshot will be stored.
+2. **Assisted match.** Once wired, the matcher will extract the product identity from the title, search every other plugin that supports search, prefilter by model number and token similarity, then have the LLM judge each candidate as same, variant or different. Candidates will wait in a review queue.
+3. **Scan.** Once wired, on each interval the scheduler will group listings by plugin, fetch each, append a price snapshot and record a scan run.
 4. **Alert evaluation.** `evaluate` in `packages/core` is a pure function of the listing's earlier snapshots, the new snapshot, the product's listings with their newest snapshots, exchange rates and settings. It returns alert drafts and the product's cheapest listing id; the scan, once wired, assigns ids, stores the alerts and the cheapest id, and sends them through the notifier.
    - **Price drop.** The new item price, in the store's own currency and for the same destination, is in stock, lower than every in-stock snapshot of the last 30 days and at least `priceDropMinBasisPoints` below their lowest. Shipping and exchange rates play no part, and a listing with no earlier snapshot in the window never alerts.
    - **Back in stock.** The previous snapshot for the same destination was out of stock and the new one is in stock.
