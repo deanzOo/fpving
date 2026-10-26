@@ -18,7 +18,7 @@ Plugins are third-party code that can hang or crash. The host must stay up and k
 
 ## Decision outcome
 
-Each plugin runs in its own worker thread with hard timeouts. The design is that a crashed or hung worker is killed and restarted once, and a second failure disables the plugin for the session. Not built yet.
+Each plugin will run in its own worker thread with hard timeouts. The design is that a crashed or hung worker is killed and restarted once, and a second failure disables the plugin for the session. Not built yet.
 
 ## Consequences
 

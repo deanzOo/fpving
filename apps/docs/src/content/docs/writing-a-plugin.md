@@ -7,7 +7,7 @@ description: The plugin contract, the context the host provides, and the planned
 The plugin SDK is under construction. Only the `Result` type and its `ok` and `err` constructors are exported today. The contract below is the design, not a stable API.
 :::
 
-Plugins are for personal use. Respect each site's terms of service. Plugins run in worker threads for crash containment, not as a security sandbox: install only plugins you trust.
+Plugins are for personal use. Respect each site's terms of service. Plugins are designed to run in worker threads for crash containment, not as a security sandbox (not built yet): install only plugins you trust.
 
 ## Contract
 

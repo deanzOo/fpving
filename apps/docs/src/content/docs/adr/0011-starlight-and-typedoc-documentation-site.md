@@ -18,7 +18,7 @@ The project needs public docs that stay in step with the code: guides, decision 
 
 ## Decision outcome
 
-Astro with Starlight (`astro`, `@astrojs/starlight`, `@astrojs/check`) hosts the site in `apps/docs`. `starlight-typedoc` with `typedoc` and `typedoc-plugin-markdown` generates the API reference from TSDoc on `@fpving/plugin-sdk` and `@fpving/core`. `eslint-plugin-jsdoc` requires TSDoc on their public exports and `eslint-plugin-tsdoc` checks its syntax. The behaviour specification page is generated from test names. The site is built and link checked in CI and deployed to GitHub Pages from `main`.
+Astro with Starlight (`astro`, `@astrojs/starlight`, `@astrojs/check`) hosts the site in `apps/docs`. `starlight-typedoc` with `typedoc` and `typedoc-plugin-markdown` generates the API reference from TSDoc on `@fpving/plugin-sdk` and `@fpving/core`. `eslint-plugin-jsdoc` requires TSDoc on every exported symbol in their src modules and `eslint-plugin-tsdoc` checks its syntax. The behaviour specification page is generated from test names. The site is built and link checked in CI and deployed to GitHub Pages from `main`.
 
 ## Consequences
 

@@ -9,7 +9,7 @@ This is the target design. The workspace and the public SDK result type exist; t
 
 ## Shape
 
-fpving is a local web app: a Node server with SQLite on the user's machine and a React UI in the browser. It runs the same on macOS, Windows and Linux. See [ADR 0002](../adr/0002-local-web-app-over-desktop-shell/).
+fpving is designed as a local web app: a Node server with SQLite on the user's machine and a React UI in the browser. It is meant to run the same on macOS, Windows and Linux. See [ADR 0002](../adr/0002-local-web-app-over-desktop-shell/).
 
 ```text
 browser UI (localhost)

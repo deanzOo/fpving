@@ -6,9 +6,9 @@ An open-source companion for people entering the FPV drone hobby. The first piec
 
 Pre-alpha, under construction. Nothing is released yet and interfaces will change.
 
-## How it works
+## How it will work
 
-fpving is a local web app: a Node server with SQLite on your machine and a React UI in your browser. Nothing is hosted and each machine keeps its own data.
+None of this is built yet. fpving is designed as a local web app: a Node server with SQLite on your machine and a React UI in your browser. Nothing will be hosted and each machine will keep its own data.
 
 - Watch products; each product has one listing per store.
 - Paste a URL and LLM-assisted matching suggests the same product in other stores for you to confirm.
@@ -19,7 +19,7 @@ fpving is a local web app: a Node server with SQLite on your machine and a React
 
 Store support comes exclusively from plugins. A plugin is an npm package or local folder that exports a manifest and a store factory, built against `@fpving/plugin-sdk`. This repository ships no store plugins.
 
-Plugins are for personal use. Respect each site's terms of service. Plugins run in worker threads for crash containment, not as a security sandbox, so install only plugins you trust.
+Plugins are for personal use. Respect each site's terms of service. Plugins are designed to run in worker threads for crash containment, not as a security sandbox (not built yet), so install only plugins you trust.
 
 ## Documentation
 
