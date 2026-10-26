@@ -9,6 +9,8 @@ Thanks for helping. Be kind: see the [Code of Conduct](CODE_OF_CONDUCT.md).
 3. `pnpm install`
 4. `pnpm verify` runs typecheck, lint, tests with the 100% coverage gate, build, the docs build, duplication, unused-code and license checks.
 
+Run `pnpm audit:osv` (needs the `osv-scanner` binary and network, so it is not part of `verify`) to check the lockfile for known vulnerabilities; CI runs the same scan.
+
 Run the full gate before every push. Commit hooks (lefthook) run eslint and gitleaks on staged files and commitlint on the message.
 
 ## Worktree workflow
