@@ -1,7 +1,7 @@
 import { ShippingKind } from "@fpving/plugin-sdk";
 import type { Amount, CurrencyCode, Money, Result, Shipping } from "@fpving/plugin-sdk";
 import { err } from "@fpving/plugin-sdk";
-import { convert } from "./fx.js";
+import { convert, convertExact } from "./fx.js";
 import type { FxTable, PricingError } from "./fx.js";
 import { toAmount } from "./money.js";
 import { importTax } from "./import-tax.js";
@@ -18,13 +18,7 @@ export interface ShippingUnknown {
   kind: "shipping_unknown";
 }
 
-/**
- * The true cost of a listing delivered to the user: item plus shipping plus import tax, in the display currency.
- * Unknown shipping is never treated as free and yields `shipping_unknown`. Shipping is converted into the item's
- * currency, tax is computed there with {@link importTax}, the three are summed and the total is converted to the
- * display currency once, so the parts are never rounded separately.
- */
-export const landedCost = (
+const landedTotal = (
   listing: { itemPrice: Money; shipping: Shipping },
   settings: PricingSettings,
   rates: FxTable,
@@ -43,6 +37,33 @@ export const landedCost = (
     return err(tax.error);
   }
   const sum = itemPrice.amountMinor + shipping.value.amountMinor + tax.value.amountMinor;
-  const total = toAmount(sum, itemPrice.currency);
-  return total.ok ? convert(total.value, settings.displayCurrency, rates) : err(total.error);
+  return toAmount(sum, itemPrice.currency);
+};
+
+/**
+ * The true cost of a listing delivered to the user: item plus shipping plus import tax, in the display currency.
+ * Unknown shipping is never treated as free and yields `shipping_unknown`. Shipping is converted into the item's
+ * currency, tax is computed there with {@link importTax}, the three are summed and the total is converted to the
+ * display currency once, so the parts are never rounded separately.
+ */
+export const landedCost = (
+  listing: { itemPrice: Money; shipping: Shipping },
+  settings: PricingSettings,
+  rates: FxTable,
+): Result<Amount, PricingError | ShippingUnknown> => {
+  const total = landedTotal(listing, settings, rates);
+  return total.ok ? convert(total.value, settings.displayCurrency, rates) : total;
+};
+
+/**
+ * The same cost as {@link landedCost} but left unrounded, in fractional minor units of the display currency, so
+ * costs from different currencies can be compared without rounding ties.
+ */
+export const landedCostExact = (
+  listing: { itemPrice: Money; shipping: Shipping },
+  settings: PricingSettings,
+  rates: FxTable,
+): Result<number, PricingError | ShippingUnknown> => {
+  const total = landedTotal(listing, settings, rates);
+  return total.ok ? convertExact(total.value, settings.displayCurrency, rates) : total;
 };

@@ -3,7 +3,7 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import { err, ok } from "../../src/index.ts";
 import type { FxTable } from "../../src/pricing/fx.ts";
 import { ThresholdBasis } from "../../src/pricing/import-tax.ts";
-import { landedCost } from "../../src/pricing/landed-cost.ts";
+import { landedCost, landedCostExact } from "../../src/pricing/landed-cost.ts";
 import type { PricingSettings } from "../../src/pricing/landed-cost.ts";
 
 const THRESHOLD_USD = 7500;
@@ -24,6 +24,9 @@ const CHEAP_TOTAL_ILS = 21600;
 const DEAR_TOTAL_ILS = 46728;
 const CHEAP_TOTAL_USD = 6000;
 const CHEAP_FREE_TOTAL_ILS = 18000;
+const ITEM_FRACTIONAL = 1001;
+const EXACT_ILS = 3603.6;
+const ROUNDED_ILS = 3604;
 
 const rates: FxTable = {
   base: "USD",
@@ -147,5 +150,26 @@ describe("Landed cost", () => {
         rates,
       ),
     ).toEqual(err({ kind: "missing_rate", currency: "GBP" }));
+  });
+});
+
+describe("Exact landed cost", () => {
+  const oneUsd = {
+    itemPrice: usd(ITEM_FRACTIONAL),
+    shipping: { kind: ShippingKind.Known, ...usd(FREE_SHIPPING) },
+  } as const;
+
+  it("keeps the fraction of a minor unit that the rounded landed cost drops", () => {
+    expect(landedCostExact(oneUsd, settingsIn("ILS"), rates)).toEqual(ok(EXACT_ILS));
+    expect(landedCost(oneUsd, settingsIn("ILS"), rates)).toEqual(ok({ amountMinor: ROUNDED_ILS, currency: "ILS" }));
+  });
+
+  it("reports unknown shipping", () => {
+    const listing = { itemPrice: usd(ITEM_FRACTIONAL), shipping: { kind: ShippingKind.Unknown } } as const;
+    expect(landedCostExact(listing, settingsIn("ILS"), rates)).toEqual(err({ kind: "shipping_unknown" }));
+  });
+
+  it("reports a display currency without a rate", () => {
+    expect(landedCostExact(oneUsd, settingsIn("GBP"), rates)).toEqual(err({ kind: "missing_rate", currency: "GBP" }));
   });
 });
