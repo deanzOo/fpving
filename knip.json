@@ -4,7 +4,8 @@
     ".": {
       "entry": ["tools/**/*.ts", "tests/**/*.test.ts"],
       "project": ["*.ts", "tools/**/*.ts", "tests/**/*.ts"],
-      "ignore": ["tests/tooling/fixtures/**"]
+      "ignore": ["tests/tooling/fixtures/**"],
+      "ignoreBinaries": ["osv-scanner"]
     },
     "packages/*": { "project": ["src/**/*.ts"] },
     "apps/*": { "project": ["src/**/*.ts"] },
