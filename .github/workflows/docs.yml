@@ -2,6 +2,11 @@ name: docs
 
 on:
   workflow_call:
+    inputs:
+      upload:
+        description: Upload the built site as the GitHub Pages artifact
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,24 +28,7 @@ jobs:
         with:
           lycheeVersion: v0.24.2
           args: --config lychee.toml --root-dir "${{ github.workspace }}/apps/docs/dist" 'apps/docs/dist/**/*.html'
-      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - if: inputs.upload
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: apps/docs/dist
-
-  deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

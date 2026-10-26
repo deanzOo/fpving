@@ -98,10 +98,6 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
   docs:
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
     uses: ./.github/workflows/docs.yml
 
   ci-ok:

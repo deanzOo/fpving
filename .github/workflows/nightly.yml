@@ -20,6 +20,4 @@ jobs:
       contents: read
       pull-requests: read
       security-events: write
-      pages: write
-      id-token: write
     uses: ./.github/workflows/ci.yml
