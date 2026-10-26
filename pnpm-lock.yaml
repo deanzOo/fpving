@@ -99,14 +99,7 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  apps/fpving:
-    dependencies:
-      '@fpving/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@fpving/plugin-sdk':
-        specifier: workspace:*
-        version: link:../../packages/plugin-sdk
+  apps/fpving: {}
 
   packages/core:
     dependencies:
