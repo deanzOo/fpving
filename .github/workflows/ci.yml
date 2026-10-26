@@ -26,10 +26,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      - run: pnpm typecheck
+      - run: pnpm build
       - run: pnpm lint
       - run: pnpm test:coverage
-      - run: pnpm build
 
   dup:
     runs-on: ubuntu-latest

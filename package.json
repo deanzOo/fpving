@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -20,7 +20,7 @@
     "docs:spec": "node tools/spec-to-docs-cli.ts",
     "docs:build": "pnpm docs:spec && pnpm --filter @fpving/docs build",
     "docs:dev": "pnpm docs:spec && pnpm --filter @fpving/docs dev",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build && pnpm docs:build && pnpm dup && pnpm knip && pnpm licenses:check",
+    "verify": "pnpm build && pnpm lint && pnpm test:coverage && pnpm docs:build && pnpm dup && pnpm knip && pnpm licenses:check",
     "prepare": "lefthook install"
   },
   "devDependencies": {
