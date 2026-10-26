@@ -13,6 +13,7 @@
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@fpving/plugin-sdk": "workspace:*"
+    "@fpving/plugin-sdk": "workspace:*",
+    "zod": "4.6.7"
   }
 }

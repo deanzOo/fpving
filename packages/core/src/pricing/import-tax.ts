@@ -1,4 +1,5 @@
-import { err } from "@fpving/plugin-sdk";
+import { z } from "zod";
+import { err, moneySchema } from "@fpving/plugin-sdk";
 import type { Amount, Money, Result } from "@fpving/plugin-sdk";
 import { convert, convertExact } from "./fx.js";
 import type { FxTable, PricingError } from "./fx.js";
@@ -17,11 +18,14 @@ export type ThresholdBasis = (typeof ThresholdBasis)[keyof typeof ThresholdBasis
  * `dutyFreeThreshold`.
  * `vatBasisPoints` is the rate in hundredths of a percent, so 1800 is 18%, which keeps the rate an exact integer.
  */
-export interface ImportTaxRule {
-  dutyFreeThreshold: Money;
-  vatBasisPoints: number;
-  thresholdBasis: ThresholdBasis;
-}
+export const importTaxRuleSchema = z.object({
+  dutyFreeThreshold: moneySchema,
+  vatBasisPoints: z.int().nonnegative(),
+  thresholdBasis: z.enum(ThresholdBasis),
+});
+
+/** An import tax rule as {@link importTaxRuleSchema} accepts it. */
+export type ImportTaxRule = z.infer<typeof importTaxRuleSchema>;
 
 /**
  * Import VAT owed on an item and its shipping, in the item's currency; `0` when exempt. The basis amount,
