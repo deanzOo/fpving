@@ -20,10 +20,13 @@ const TAX_ON_ABOVE_COMBINED = 1350;
 const NO_TAX = 0;
 const NO_SHIPPING = 0;
 const ILS_AT_THRESHOLD = 27000;
-const ILS_ABOVE_THRESHOLD = 27002;
+const ILS_ABOVE_THRESHOLD = 27001;
 const SHIPPING_USD_IN_ILS_TAX = 5508;
 const TIE_ITEM = 7525;
 const TIE_TAX = 1355;
+const LARGEST_AMOUNT = Number.MAX_SAFE_INTEGER;
+const HUGE_ITEM = 5_000_000_000_000_000;
+const TRIPLE_VAT = 30_000;
 
 const rates: FxTable = { base: "USD", ratesPerBase: { ILS: ILS_PER_USD }, fetchedOn: "2026-10-27" };
 
@@ -73,7 +76,7 @@ describe("Import tax", () => {
     ).toEqual(ok(usd(TAX_ON_ABOVE_COMBINED)));
   });
 
-  it("compares in the threshold currency and returns tax in the item currency", () => {
+  it("compares exactly, so an item a fraction of a cent above the threshold is taxed", () => {
     const rule = ruleWith(ThresholdBasis.Item);
     expect(importTax(ils(ILS_AT_THRESHOLD), usd(SHIPPING), rule, rates)).toEqual(ok(ils(NO_TAX)));
     expect(importTax(ils(ILS_ABOVE_THRESHOLD), usd(SHIPPING), rule, rates)).toEqual(
@@ -108,6 +111,26 @@ describe("Import tax", () => {
     };
     expect(importTax(usd(AT_THRESHOLD), usd(SHIPPING), rule, rates)).toEqual(
       err({ kind: "missing_rate", currency: "GBP" }),
+    );
+  });
+
+  it("reports an out-of-range amount when item plus shipping is not a safe integer", () => {
+    const largest = { amountMinor: LARGEST_AMOUNT, currency: "USD" as const };
+    expect(importTax(largest, usd(SHIPPING), ruleWith(ThresholdBasis.Item), rates)).toEqual(
+      err({ kind: "amount_out_of_range" }),
+    );
+  });
+
+  it("reports an out-of-range amount when the tax is not a safe integer", () => {
+    const rule: ImportTaxRule = { ...ruleWith(ThresholdBasis.Item), vatBasisPoints: TRIPLE_VAT };
+    expect(importTax({ amountMinor: HUGE_ITEM, currency: "USD" }, usd(NO_SHIPPING), rule, rates)).toEqual(
+      err({ kind: "amount_out_of_range" }),
+    );
+  });
+
+  it("reports an out-of-range amount when the shipping converts beyond the safe integer range", () => {
+    expect(importTax(ils(AT_THRESHOLD), usd(LARGEST_AMOUNT), ruleWith(ThresholdBasis.Item), rates)).toEqual(
+      err({ kind: "amount_out_of_range" }),
     );
   });
 });
