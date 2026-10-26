@@ -26,18 +26,18 @@ export interface ContractCheck {
   readonly run: () => Promise<string | undefined>;
 }
 
-type Transport = (url: URL) => Result<FixturePage, TransportError>;
+type Transport = (url: string) => Result<FixturePage, TransportError>;
 type CheckRun = ContractCheck["run"];
 
 const noop = (): void => undefined;
 
+const normalize = (url: string): string => (URL.canParse(url) ? new URL(url).href : url);
+
 const serve = (fixtures: ContractFixtures): Transport => {
-  const pages = new Map(Object.entries(fixtures.pages).map(([url, page]) => [new URL(url).href, page]));
+  const pages = new Map(Object.entries(fixtures.pages).map(([url, page]) => [normalize(url), page]));
   return (url) => {
-    const page = pages.get(url.href);
-    return page === undefined
-      ? err({ kind: StoreErrorKind.Network, detail: `no fixture page for ${url.href}` })
-      : ok(page);
+    const page = pages.get(normalize(url));
+    return page === undefined ? err({ kind: StoreErrorKind.Network, detail: `no fixture page for ${url}` }) : ok(page);
   };
 };
 
@@ -68,7 +68,7 @@ const outcome = (result: StoreResult<unknown>): string =>
 
 const contractChecks = (plugin: StorePlugin, fixtures: ContractFixtures): ContractCheck[] => {
   const fetchListing = (url: string, transport = serve(fixtures)): Promise<StoreResult<FetchedListing>> =>
-    plugin.createStore(fixtureContext(fixtures, transport)).fetchListing(new URL(url));
+    plugin.createStore(fixtureContext(fixtures, transport)).fetchListing(url);
 
   const validListing = async (url: string): Promise<Result<FetchedListing, string>> => {
     const result = await fetchListing(url);

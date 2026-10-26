@@ -47,7 +47,7 @@ describe("store plugin", () => {
   it("builds a store from the host context and reads pages through the host http client", async () => {
     const page = { status: HTTP_OK, body: "Frame", headers: {} };
     const store = plugin.createStore(context({ get: () => Promise.resolve(ok(page)) }));
-    const result = await store.fetchListing(new URL("https://example.com/p/1"));
+    const result = await store.fetchListing("https://example.com/p/1");
     const itemPrice = { amountMinor: PRICE, currency: "ILS" };
     expect(result).toEqual(ok(expect.objectContaining({ title: "Frame", itemPrice })));
   });
@@ -55,7 +55,7 @@ describe("store plugin", () => {
   it("passes a host transport error straight through as a store error", async () => {
     const timeout = { kind: StoreErrorKind.Timeout, detail: "30s elapsed" };
     const store = plugin.createStore(context({ get: () => Promise.resolve(err(timeout)) }));
-    expect(await store.fetchListing(new URL("https://example.com/p/1"))).toEqual(err(timeout));
+    expect(await store.fetchListing("https://example.com/p/1")).toEqual(err(timeout));
   });
 
   it("makes search optional on a store", () => {

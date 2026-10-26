@@ -15,8 +15,8 @@ export interface SearchQuery {
 
 /** One store, bound to a {@link PluginContext}. Methods resolve to a {@link StoreResult} and never reject. */
 export interface Store {
-  /** Fetches one product page on a domain from the manifest. */
-  fetchListing(url: URL): Promise<StoreResult<FetchedListing>>;
+  /** Fetches one product page, given as an absolute http(s) URL string on a domain from the manifest. */
+  fetchListing(url: string): Promise<StoreResult<FetchedListing>>;
   /** Searches the store. Required when the manifest declares the `search` capability, absent otherwise. */
   search?(query: SearchQuery): Promise<StoreResult<SearchCandidate[]>>;
 }

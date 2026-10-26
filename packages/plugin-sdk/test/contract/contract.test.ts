@@ -52,7 +52,7 @@ const fetchListing = (ctx: PluginContext): Store["fetchListing"] => async (url) 
   if (!response.ok) return err(response.error);
   const { status, body } = response.value;
   ctx.logger.debug("fetched", { status, at: ctx.clock.now().toISOString() });
-  if (status === HTTP_NOT_FOUND) return err({ kind: StoreErrorKind.NotFound, detail: url.href });
+  if (status === HTTP_NOT_FOUND) return err({ kind: StoreErrorKind.NotFound, detail: url });
   if (body.includes("captcha")) return err({ kind: StoreErrorKind.Blocked, detail: "captcha" });
   const groups = LISTING.exec(body)?.groups;
   if (groups === undefined) return err({ kind: StoreErrorKind.ParseFailed, detail: "no listing", rawPage: body });
@@ -66,7 +66,7 @@ const fetchListing = (ctx: PluginContext): Store["fetchListing"] => async (url) 
 };
 
 const search = (ctx: PluginContext, base = SEARCH_BASE): NonNullable<Store["search"]> => async (query) => {
-  const page = await ctx.browser.fetchPage(new URL(`${base}${query.text}`));
+  const page = await ctx.browser.fetchPage(`${base}${query.text}`);
   if (!page.ok) return err(page.error);
   return ok(page.value.html.split("\n").map((line) => {
     const [url = "", title = ""] = line.split("|");
@@ -185,12 +185,20 @@ describe("store plugin contract kit", () => {
 
   it("fails every fetch check for a plugin that requests pages the fixtures do not have", async () => {
     const plugin = withStore((ctx) => ({
-      fetchListing: (url) => fetchListing(ctx)(new URL(`${url.href}?ref=elsewhere`)),
+      fetchListing: (url) => fetchListing(ctx)(`${url}?ref=elsewhere`),
       search: search(ctx),
     }));
     const failures = await checkStorePluginContract(plugin, fixtures);
     expect(failures).toHaveLength(Object.keys(fixtures.listings).length);
     expect(failures[0]?.message).toContain("no fixture page for https://shop.example.com/p/in-stock?ref=elsewhere");
+  });
+
+  it("answers a malformed request url with a network error instead of throwing", async () => {
+    const plugin = withStore((ctx) => ({ fetchListing: () => fetchListing(ctx)("not a url") }), {
+      capabilities: [PluginCapability.FetchListing],
+    });
+    const failures = await checkStorePluginContract(plugin, fixtures);
+    expect(failures[0]?.message).toBe("expected a listing, got network: no fixture page for not a url");
   });
 
   it("fails a plugin that throws instead of returning a store result", async () => {

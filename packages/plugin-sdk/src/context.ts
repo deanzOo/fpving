@@ -31,8 +31,8 @@ export interface HttpResponse {
 
 /** Plain HTTP access provided by the host, which applies per-domain rate limits, jitter and timeouts. */
 export interface HttpClient {
-  /** Sends a GET request and resolves to the response or a {@link TransportError}. It never rejects. */
-  get(url: URL, options?: HttpRequestOptions): Promise<Result<HttpResponse, TransportError>>;
+  /** Sends a GET request to an absolute http(s) URL and resolves to the response or a {@link TransportError}. */
+  get(url: string, options?: HttpRequestOptions): Promise<Result<HttpResponse, TransportError>>;
 }
 
 /** A page rendered by the host browser. */
@@ -41,14 +41,14 @@ export interface BrowserPage {
   readonly status: number;
   /** The rendered document as HTML. */
   readonly html: string;
-  /** The URL after redirects. */
-  readonly finalUrl: URL;
+  /** The absolute URL after redirects. */
+  readonly finalUrl: string;
 }
 
 /** A real browser provided by the host for pages that need JavaScript; the host owns the browser profile. */
 export interface BrowserDriver {
-  /** Loads and renders a page and resolves to it or a {@link TransportError}. It never rejects. */
-  fetchPage(url: URL): Promise<Result<BrowserPage, TransportError>>;
+  /** Loads and renders an absolute http(s) URL and resolves to the page or a {@link TransportError}. */
+  fetchPage(url: string): Promise<Result<BrowserPage, TransportError>>;
 }
 
 /** Structured log fields. Never put secrets, cookies or page bodies in them. */
@@ -75,6 +75,11 @@ export interface Clock {
 /**
  * Everything the host gives a store. Plugins never bring their own HTTP client or browser, so the host can enforce
  * rate limits, timeouts and one browser profile.
+ *
+ * @remarks
+ * Every value crossing the host and plugin boundary is plain data that survives `structuredClone`, because plugins
+ * are designed to run in worker threads. URLs are therefore absolute http(s) URL strings, never `URL` objects. Host
+ * methods resolve to a `Result` and never reject.
  */
 export interface PluginContext {
   /** Plain HTTP access. */
