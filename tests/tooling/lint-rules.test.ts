@@ -46,6 +46,11 @@ describe("lint rules", () => {
     ["coverage-ignore-c8.ts", "no-warning-comments"],
     ["coverage-ignore-istanbul.ts", "no-warning-comments"],
     ["coverage-ignore-node.ts", "no-warning-comments"],
+    ["formatting.ts", "@stylistic/semi"],
+    ["formatting.ts", "@stylistic/quotes"],
+    ["formatting.ts", "@stylistic/object-curly-spacing"],
+    ["formatting.ts", "@stylistic/comma-dangle"],
+    ["formatting-long-line.ts", "@stylistic/max-len"],
   ])("reports %s as %s", (name, ruleId) => {
     expect(lint(name)).toContain(ruleId);
   });

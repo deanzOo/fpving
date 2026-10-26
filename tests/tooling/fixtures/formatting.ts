@@ -1,0 +1,4 @@
+export const value = {a:1,
+  b:2
+};
+export const text = 'single'

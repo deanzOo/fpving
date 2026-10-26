@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import js from "@eslint/js";
+import stylistic from "@stylistic/eslint-plugin";
 import { defineConfig } from "eslint/config";
 import jsdoc from "eslint-plugin-jsdoc";
 import tsdoc from "eslint-plugin-tsdoc";
@@ -22,6 +23,15 @@ export default defineConfig(
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
+  stylistic.configs.customize({
+    indent: 2,
+    quotes: "double",
+    semi: true,
+    commaDangle: "always-multiline",
+    braceStyle: "1tbs",
+    arrowParens: true,
+    jsx: false,
+  }),
   {
     languageOptions: {
       parserOptions: {
@@ -36,7 +46,7 @@ export default defineConfig(
     },
     plugins: {
       "@eslint-community/eslint-comments": eslintComments,
-      local: { rules: { "max-one-line-comment": maxOneLineComment } },
+      "local": { rules: { "max-one-line-comment": maxOneLineComment } },
     },
     rules: {
       "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "never" }],
@@ -72,6 +82,7 @@ export default defineConfig(
       ],
       "multiline-comment-style": ["error", "separate-lines"],
       "local/max-one-line-comment": "error",
+      "@stylistic/max-len": ["error", { code: 120, ignoreUrls: true, ignoreStrings: false }],
     },
   },
   {
