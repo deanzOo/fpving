@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { moneySchema, shippingCostSchema } from "./money.js";
+import { amountSchema, moneySchema } from "./money.js";
 
 /** Whether a listing's shipping cost to the destination country is known. */
 export const ShippingKind = { Known: "known", Unknown: "unknown" } as const;
@@ -12,7 +12,7 @@ export const ShippingUnknown = { kind: ShippingKind.Unknown } as const;
 
 /** Shipping to the context's `shipTo` country: a known cost, which may be zero, or {@link ShippingUnknown}. */
 export const shippingSchema = z.discriminatedUnion("kind", [
-  shippingCostSchema.extend({ kind: z.literal(ShippingKind.Known) }),
+  amountSchema.extend({ kind: z.literal(ShippingKind.Known) }),
   z.object({ kind: z.literal(ShippingKind.Unknown) }),
 ]);
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moneySchema, shippingCostSchema } from "../src/money.ts";
+import { amountSchema, moneySchema } from "../src/money.ts";
 
 const PRICE = 1999;
 const NEGATIVE = -100;
@@ -24,15 +24,16 @@ describe("money", () => {
   });
 });
 
-describe("shipping cost", () => {
-  it("accepts zero because free shipping is real", () => {
-    expect(shippingCostSchema.parse({ amountMinor: 0, currency: "EUR" })).toEqual({ amountMinor: 0, currency: "EUR" });
+describe("amount", () => {
+  it("accepts zero because free shipping and exempt tax are real amounts", () => {
+    expect(amountSchema.parse({ amountMinor: 0, currency: "EUR" })).toEqual({ amountMinor: 0, currency: "EUR" });
   });
 
   it.each([
     ["a negative amount", NEGATIVE],
     ["a fractional amount", FRACTIONAL],
+    ["an amount beyond the safe integer range", Number.MAX_SAFE_INTEGER + 1],
   ])("rejects %s", (_name, amountMinor) => {
-    expect(shippingCostSchema.safeParse({ amountMinor, currency: "EUR" }).success).toBe(false);
+    expect(amountSchema.safeParse({ amountMinor, currency: "EUR" }).success).toBe(false);
   });
 });

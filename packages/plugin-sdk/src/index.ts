@@ -30,8 +30,8 @@ export {
 export type { FetchedListing, SearchCandidate, Shipping } from "./listing.js";
 export { manifestSchema, PluginCapability } from "./manifest.js";
 export type { PluginManifest } from "./manifest.js";
-export { moneySchema, shippingCostSchema } from "./money.js";
-export type { Money } from "./money.js";
+export { amountSchema, moneySchema } from "./money.js";
+export type { Amount, Money } from "./money.js";
 export type { SearchQuery, Store, StorePlugin } from "./plugin.js";
 export { err, ok } from "./result.js";
 export type { Result } from "./result.js";

@@ -29,6 +29,7 @@ describe("plugin-sdk entry points", () => {
       "ShippingKind",
       "ShippingUnknown",
       "StoreErrorKind",
+      "amountSchema",
       "countryCodeSchema",
       "currencyCodeSchema",
       "err",
@@ -37,7 +38,6 @@ describe("plugin-sdk entry points", () => {
       "moneySchema",
       "ok",
       "searchCandidateSchema",
-      "shippingCostSchema",
       "shippingSchema",
       "storeErrorSchema",
     ]);

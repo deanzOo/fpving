@@ -29,7 +29,7 @@ The SDK is pre-1.0: any `0.x` minor release may break the contract. Declare the 
 A `FetchedListing` is `{ title, itemPrice, shipping, inStock, images }`:
 
 - `itemPrice` is `Money`: `{ amountMinor, currency }`, a positive integer in the currency's minor units and an ISO 4217 code. `CURRENCY_MINOR_UNITS` gives the decimal places: USD 19.99 is `1999`, JPY 1999 is `1999`, KWD 1.999 is `1999`. A price of `0` is rejected, because a store's placeholder price must never become a price snapshot.
-- `shipping` is `{ kind: "known", amountMinor, currency }`, where `0` means free shipping, or `ShippingUnknown` (`{ kind: "unknown" }`) when the store does not show it. Unknown shipping is never treated as free.
+- `shipping` is `{ kind: "known", amountMinor, currency }`, where the cost is an `Amount` (the non-negative sibling of `Money`, validated by `amountSchema`) and `0` means free shipping, or `ShippingUnknown` (`{ kind: "unknown" }`) when the store does not show it. Unknown shipping is never treated as free.
 - `images` are absolute `http` or `https` URLs.
 
 A `SearchCandidate` is `{ url, title, itemPrice? }`, where `url` is an absolute URL string.
