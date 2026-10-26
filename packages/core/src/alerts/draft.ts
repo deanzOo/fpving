@@ -10,4 +10,7 @@ export interface ListingWithLatest {
 }
 
 /** The settings alert evaluation reads. */
-export type AlertSettings = Pick<Settings, "displayCurrency" | "importTax" | "priceDropMinBasisPoints">;
+export type AlertSettings = Pick<
+  Settings,
+  "displayCurrency" | "shipToCountry" | "importTax" | "priceDropMinBasisPoints"
+>;

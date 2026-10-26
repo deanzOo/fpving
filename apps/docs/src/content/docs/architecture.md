@@ -70,7 +70,7 @@ Plugins supply all store support and are designed to run in worker threads. The 
 4. **Alert evaluation.** `evaluate` in `packages/core` is a pure function of the listing's earlier snapshots, the new snapshot, the product's listings with their newest snapshots, exchange rates and settings. It returns alert drafts and the product's cheapest listing id; the scan, once wired, assigns ids, stores the alerts and the cheapest id, and sends them through the notifier.
    - **Price drop.** The new item price, in the store's own currency and for the same destination, is in stock, lower than every in-stock snapshot of the last 30 days and at least `priceDropMinBasisPoints` below their lowest. Shipping and exchange rates play no part, and a listing with no earlier snapshot in the window never alerts.
    - **Back in stock.** The previous snapshot for the same destination was out of stock and the new one is in stock.
-   - **New cheapest.** Among active, in-stock listings with known shipping and a computable landed cost, the cheapest differs from the previously stored cheapest. Ties go to the earlier added listing, then the lower id. Costs are compared unrounded. When no listing qualifies the stored cheapest is kept, and the first scan, with no stored cheapest, never alerts.
+   - **New cheapest.** Among active, in-stock listings whose latest snapshot was quoted for the user's ship-to country, with known shipping and a computable landed cost, the cheapest differs from the previously stored cheapest. Ties go to the earlier added listing, then the lower id. Costs are compared unrounded. When no listing qualifies the stored cheapest is kept, and the first scan, with no stored cheapest, never alerts.
 
 ## Money
 

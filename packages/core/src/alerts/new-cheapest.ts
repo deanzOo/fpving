@@ -25,12 +25,13 @@ export interface CheapestResult {
 }
 
 /**
- * Finds the product's cheapest listing among those that are active, in stock, with known shipping and a landed
- * cost computable in the display currency; the others are left out. Ties go to the lower landed cost, then the
- * earlier `addedAt`, then the lower listing id. Raises a new cheapest alert on that listing when
- * `previousCheapestListingId` is set and differs, and never on the first scan, when it is null. When no listing
- * qualifies the previous id is returned unchanged, so null only ever means a cheapest was never computed. Ids
- * compare by code point.
+ * Finds the product's cheapest listing among those that are active, in stock, quoted for `settings.shipToCountry`,
+ * with known shipping and a landed cost computable in the display currency; the others are left out. A latest
+ * snapshot quoted for another destination, as after a destination switch, is never compared. Ties go to the lower
+ * landed cost, then the earlier `addedAt`, then the lower listing id. Raises a new cheapest alert on that listing
+ * when `previousCheapestListingId` is set and differs, and never on the first scan, when it is null. When no
+ * listing qualifies the previous id is returned unchanged, so null only ever means a cheapest was never computed.
+ * Ids compare by code point.
  */
 export const newCheapest = (
   listing: Listing,
@@ -43,7 +44,10 @@ export const newCheapest = (
   const ranked = productListings
     .filter(
       ({ listing: l, latest }) =>
-        l.status === ListingStatus.Active && latest.inStock && latest.shipping.kind === ShippingKind.Known,
+        l.status === ListingStatus.Active
+        && latest.shipTo === settings.shipToCountry
+        && latest.inStock
+        && latest.shipping.kind === ShippingKind.Known,
     )
     .flatMap((entry): Ranked[] => {
       const cost = landedCostExact(entry.latest, settings, rates);

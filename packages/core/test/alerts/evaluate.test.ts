@@ -339,6 +339,12 @@ describe("New cheapest alert", () => {
     expect(result.cheapestListingId).toBe(listingB);
   });
 
+  it("leaves out a latest snapshot quoted for another destination, as after a destination switch", () => {
+    const result = run([entry("b", HUNDRED, { shipTo: "US" })], listingA);
+    expect(result.alerts).toEqual([]);
+    expect(result.cheapestListingId).toBe(listingA);
+  });
+
   it("ranks by landed cost, shipping included", () => {
     const result = run([entry("b", HIGHER)], listingA, arriving("in", HUNDRED, { shipping: known(HUNDRED) }));
     expect(result.cheapestListingId).toBe(listingB);

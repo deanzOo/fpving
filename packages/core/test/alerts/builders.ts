@@ -29,6 +29,7 @@ export const rates: FxTable = { base: "USD", ratesPerBase: { ILS: ILS_PER_USD },
 
 export const settings: AlertSettings = {
   displayCurrency: "USD",
+  shipToCountry: "IL",
   importTax: {
     dutyFreeThreshold: { amountMinor: DUTY_FREE_USD, currency: "USD" },
     vatBasisPoints: NO_VAT,
