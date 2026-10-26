@@ -99,9 +99,20 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  apps/fpving: {}
+  apps/fpving:
+    dependencies:
+      '@fpving/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@fpving/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      '@fpving/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
 
   packages/plugin-sdk: {}
 

@@ -4,6 +4,15 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "exports": { ".": "./dist/index.js" },
-  "types": "./dist/index.d.ts"
+  "exports": {
+    ".": {
+      "@fpving/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@fpving/plugin-sdk": "workspace:*"
+  }
 }
