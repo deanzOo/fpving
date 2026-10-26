@@ -20,8 +20,10 @@ describe("renderSpecPage", () => {
     expect(renderSpecPage("## A\n- b\n")).toContain("Generated from test names");
   });
 
-  it("rejects an empty spec", () => {
-    expect(() => renderSpecPage("")).toThrow("spec is empty");
+  it.each(["", "  \n"])("says no behaviour is specified yet for an empty spec %j", (spec) => {
+    const page = renderSpecPage(spec);
+    expect(page.startsWith("---\ntitle: Behaviour specification\n")).toBe(true);
+    expect(page).toContain("No behaviour is specified yet.");
   });
 });
 
@@ -43,6 +45,14 @@ describe("generateSpecPage", () => {
     await writeFile(input, "## Alerts\n- fires\n");
     await generateSpecPage(input, output);
     expect(await readFile(output, "utf8")).toBe(renderSpecPage("## Alerts\n- fires\n"));
+  });
+
+  it("renders the no-behaviour page when the spec file exists but is empty", async () => {
+    const input = join(dir, "spec.md");
+    const output = join(dir, "out.md");
+    await writeFile(input, "");
+    await generateSpecPage(input, output);
+    expect(await readFile(output, "utf8")).toContain("No behaviour is specified yet.");
   });
 
   it("fails loudly and tells the caller to run the tests first when the spec is missing", async () => {

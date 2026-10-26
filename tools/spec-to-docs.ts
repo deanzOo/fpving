@@ -11,10 +11,9 @@ const FRONTMATTER = [
   "",
 ].join("\n");
 
-export const renderSpecPage = (spec: string): string => {
-  if (spec.trim() === "") throw new Error("spec is empty: the test run produced no behaviour spec");
-  return `${FRONTMATTER}\n${spec}`;
-};
+const EMPTY_SPEC = "No behaviour is specified yet. Product tests will appear here as they are written.\n";
+
+export const renderSpecPage = (spec: string): string => `${FRONTMATTER}\n${spec.trim() === "" ? EMPTY_SPEC : spec}`;
 
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && "code" in error && error.code === "ENOENT";
