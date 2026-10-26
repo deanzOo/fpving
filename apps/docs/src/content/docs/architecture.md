@@ -4,7 +4,7 @@ description: Components, ports and adapters, the plugin system and the data flow
 ---
 
 :::note
-This is the target design. The workspace and the public SDK result type exist; the host app and domain logic are still being built.
+This is the target design. The workspace and the public plugin SDK contract (types, schemas, error taxonomy and contract test kit) exist; the host app and domain logic are still being built.
 :::
 
 ## Shape
@@ -50,11 +50,13 @@ Every runtime or integration dependency sits behind an interface the domain defi
 | `Scheduler` | In-process timer |
 | `Logger` | Structured logger |
 
+`BrowserDriver`, `HttpClient`, `Clock` and `Logger` already exist in `@fpving/plugin-sdk` as the capabilities the host will hand to plugins. The other ports and every default adapter are not built yet.
+
 Zod, React, Fastify and dev tooling are not wrapped: they are framework or type-system level and swapping them has no value.
 
 ## Plugin system
 
-Plugins supply all store support and are designed to run in worker threads. The host owns the browser, HTTP client, rate limits and timeouts. See [Writing a plugin](../writing-a-plugin/) and ADRs [0003](../adr/0003-store-support-via-plugins-only/) and [0004](../adr/0004-worker-thread-plugin-isolation/).
+Plugins supply all store support and are designed to run in worker threads. The host will own the browser, HTTP client, rate limits and timeouts. Everything that crosses the host and plugin boundary is plain data that survives `structuredClone`, so URLs are absolute http(s) strings. See [Writing a plugin](../writing-a-plugin/) and ADRs [0003](../adr/0003-store-support-via-plugins-only/) and [0004](../adr/0004-worker-thread-plugin-isolation/).
 
 ## Data flow
 
@@ -65,8 +67,8 @@ Plugins supply all store support and are designed to run in worker threads. The 
 
 ## Money
 
-Money is `{ amountMinor, currency }`: integer minor units plus an ISO 4217 code, never floats. Snapshots store store-native amounts only and conversion happens at read time. See [ADR 0006](../adr/0006-store-native-money-snapshots-and-read-time-fx/).
+Money is `{ amountMinor, currency }`: integer minor units plus an ISO 4217 code, never floats. `CURRENCY_MINOR_UNITS` in the SDK gives each currency's decimal places. Snapshots store store-native amounts only and conversion happens at read time. See [ADR 0006](../adr/0006-store-native-money-snapshots-and-read-time-fx/).
 
 ## Errors
 
-Domain operations return `Result<T, E>`, a plain discriminated union. Exceptions are for real bugs and are never swallowed. The planned plugin error taxonomy is `not_found`, `blocked`, `parse_failed`, `timeout`, `network` and `unsupported_ship_to`. The `Result` type is available today in the [API reference](../api/fpving/plugin-sdk/).
+Domain operations return `Result<T, E>`, a plain discriminated union. Exceptions are for real bugs and are never swallowed. The plugin error taxonomy, `StoreErrorKind` in the SDK, is `not_found`, `blocked`, `parse_failed`, `timeout`, `network` and `unsupported_ship_to`. It and `Result` are in the [API reference](../api/fpving/plugin-sdk/).

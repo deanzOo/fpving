@@ -14,25 +14,29 @@ Plugins are for personal use. Respect each site's terms of service. Plugins are 
 A plugin is an npm package or local folder that exports a `StorePlugin`:
 
 - `manifest`: a `PluginManifest`, validated by `manifestSchema`.
-  - `id`: lowercase letters, digits and hyphens.
+  - `id`: lowercase letters and digits in hyphen-separated words, such as `example-shop`, at most 64 characters.
   - `displayName`: not empty.
-  - `version`: the plugin's canonical semver version, such as `1.2.3`.
-  - `sdkVersion`: the semver range of `@fpving/plugin-sdk` the plugin supports, such as `^0.1.0`.
+  - `version`: the plugin's canonical semver version, such as `1.2.3` or `1.2.3+build.1`. No `v` prefix.
+  - `sdkVersion`: the semver range of `@fpving/plugin-sdk` the plugin was tested against, such as `>=0.0.0 <1.0.0`. Unbounded ranges (`*`, `x`, `>=0.0.0`) are rejected.
   - `domains`: at least one lowercase hostname, such as `shop.example.com`. No scheme, port, path or wildcard.
   - `capabilities`: at least one `PluginCapability`: `fetchListing`, `search`, `shippingToCountry`.
 - `createStore(ctx)`: returns a `Store` bound to the host context.
-  - `fetchListing(url)` resolves to a `StoreResult<FetchedListing>`.
+  - `fetchListing(url)` takes the product URL as an absolute http(s) string and resolves to a `StoreResult<FetchedListing>`.
   - `search(query)` resolves to a `StoreResult<SearchCandidate[]>`. Implement it exactly when the manifest declares `search`.
+
+The SDK is pre-1.0: any `0.x` minor release may break the contract. Declare the range you test against, for example `>=0.0.0 <1.0.0` today, and narrow it once the SDK publishes releases.
 
 A `FetchedListing` is `{ title, itemPrice, shipping, inStock, images }`:
 
-- `itemPrice` is `Money`: `{ amountMinor, currency }`, a positive integer in the currency's minor units and an ISO 4217 code. A price of `0` is rejected, because a store's placeholder price must never become a price snapshot.
+- `itemPrice` is `Money`: `{ amountMinor, currency }`, a positive integer in the currency's minor units and an ISO 4217 code. `CURRENCY_MINOR_UNITS` gives the decimal places: USD 19.99 is `1999`, JPY 1999 is `1999`, KWD 1.999 is `1999`. A price of `0` is rejected, because a store's placeholder price must never become a price snapshot.
 - `shipping` is `{ kind: "known", amountMinor, currency }`, where `0` means free shipping, or `ShippingUnknown` (`{ kind: "unknown" }`) when the store does not show it. Unknown shipping is never treated as free.
 - `images` are absolute `http` or `https` URLs.
 
 A `SearchCandidate` is `{ url, title, itemPrice? }`, where `url` is an absolute URL string.
 
-The host parses everything a plugin returns with these schemas (`fetchedListingSchema`, `searchCandidateSchema`, `storeErrorSchema`) before it reaches core.
+The host will parse everything a plugin returns with these schemas (`fetchedListingSchema`, `searchCandidateSchema`, `storeErrorSchema`) before it reaches core.
+
+Plugins are designed to run in worker threads, so every value crossing the host and plugin boundary is plain data that survives `structuredClone`. URLs are absolute http(s) strings everywhere, never `URL` objects.
 
 ## Errors
 
@@ -53,8 +57,8 @@ Store methods never throw for expected failures. They resolve to `err({ kind, de
 
 `ctx` is a `PluginContext`:
 
-- `http.get(url, options?)` resolves to `{ status, body, headers }` or a `TransportError`.
-- `browser.fetchPage(url)` renders a page and resolves to `{ status, html, finalUrl }` or a `TransportError`.
+- `http.get(url, options?)` takes an absolute http(s) URL string and resolves to `{ status, body, headers }` or a `TransportError`.
+- `browser.fetchPage(url)` renders a page and resolves to `{ status, html, finalUrl }`, where `finalUrl` is the URL string after redirects, or a `TransportError`.
 - `logger` has `debug`, `info`, `warn` and `error(message, fields?)`. Never log secrets, cookies or page bodies.
 - `clock.now()` is the current time.
 - `shipTo` is an ISO 3166-1 alpha-2 country code and `currencyPreference` an ISO 4217 code. Report prices in the store's own currency.
@@ -76,7 +80,7 @@ const plugin: StorePlugin = {
     id: "example-shop",
     displayName: "Example Shop",
     version: "1.0.0",
-    sdkVersion: "^0.1.0",
+    sdkVersion: ">=0.0.0 <1.0.0",
     domains: ["shop.example.com"],
     capabilities: [PluginCapability.FetchListing],
   },
@@ -85,7 +89,7 @@ const plugin: StorePlugin = {
       const page = await ctx.browser.fetchPage(url);
       if (!page.ok) return err(page.error);
       const { status, html } = page.value;
-      if (status === 404) return err({ kind: StoreErrorKind.NotFound, detail: url.href });
+      if (status === 404) return err({ kind: StoreErrorKind.NotFound, detail: url });
       const price = /data-price="(\d+)"/.exec(html)?.[1];
       if (price === undefined) {
         return err({ kind: StoreErrorKind.ParseFailed, detail: "no price", rawPage: html });
@@ -153,7 +157,8 @@ runStorePluginContract(plugin, fixtures);
 
 Each check creates a fresh store over a fake context whose `http` and `browser` serve `pages` by URL. A request for a URL not in `pages` fails with a `network` error naming it. The checks:
 
-- the manifest is schema-valid;
+- every fixture URL is an absolute http(s) URL; if one is not, only this check runs and fails with a fixture error, so your plugin is not blamed;
+- the manifest is schema-valid (a malformed manifest fails this check rather than crashing the suite);
 - the in-stock page parses to a schema-valid listing with `inStock: true`;
 - the out-of-stock page parses to a schema-valid listing with `inStock: false`;
 - the 404 page gives `not_found`;
