@@ -13,7 +13,7 @@ No settings screen or config file exists yet. This page records the intended sha
 | --- | --- |
 | `displayCurrency` | ISO 4217 code prices are shown in, for example `ILS`. |
 | `shipToCountry` | ISO 3166 country the landed cost is computed for, for example `IL`. |
-| `importTax` | `{ dutyFreeThreshold, vatBasisPoints, thresholdBasis }`. VAT applies above the threshold; `vatBasisPoints` is hundredths of a percent, so 1800 is 18%, and `thresholdBasis` says whether the threshold is compared with the item alone or with item plus shipping. |
+| `importTax` | `{ dutyFreeThreshold, vatBasisPoints, thresholdBasis }`. VAT applies above the threshold, which may be zero to tax everything; `vatBasisPoints` is hundredths of a percent, so 1800 is 18%, and `thresholdBasis` says whether the threshold is compared with the item alone or with item plus shipping. |
 | `scanIntervalHours` | How often listings are rescanned while the app runs. |
 | `priceDropMinPercent` | Minimum drop below the previous 30-day low to alert. Default 5. |
 

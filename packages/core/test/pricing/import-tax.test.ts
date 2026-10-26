@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { err, ok } from "../../src/index.ts";
 import type { FxTable } from "../../src/pricing/fx.ts";
-import { importTax, ThresholdBasis } from "../../src/pricing/import-tax.ts";
+import { importTax, importTaxRuleSchema, ThresholdBasis } from "../../src/pricing/import-tax.ts";
 import type { ImportTaxRule } from "../../src/pricing/import-tax.ts";
 
 const THRESHOLD_USD = 7500;
@@ -19,6 +19,8 @@ const TAX_ON_SPLIT = 1800;
 const TAX_ON_ABOVE_COMBINED = 1350;
 const NO_TAX = 0;
 const NO_SHIPPING = 0;
+const TAXED_FROM_ONE_UNIT = 100;
+const TAX_ON_ONE_UNIT_ITEM = 18;
 const ILS_AT_THRESHOLD = 27000;
 const ILS_ABOVE_THRESHOLD = 27001;
 const SHIPPING_USD_IN_ILS_TAX = 5508;
@@ -40,6 +42,12 @@ const usd = (amountMinor: number) => ({ amountMinor, currency: "USD" as const })
 const ils = (amountMinor: number) => ({ amountMinor, currency: "ILS" as const });
 
 describe("Import tax", () => {
+  it("accepts a zero duty-free threshold and taxes every amount from the first minor unit", () => {
+    const rule = { ...ruleWith(ThresholdBasis.Item), dutyFreeThreshold: usd(NO_TAX) };
+    expect(importTaxRuleSchema.parse(rule)).toEqual(rule);
+    expect(importTax(usd(TAXED_FROM_ONE_UNIT), usd(NO_SHIPPING), rule, rates)).toEqual(ok(usd(TAX_ON_ONE_UNIT_ITEM)));
+  });
+
   it("charges no tax when the item is exactly at the duty-free threshold", () => {
     expect(importTax(usd(AT_THRESHOLD), usd(SHIPPING), ruleWith(ThresholdBasis.Item), rates)).toEqual(
       ok(usd(NO_TAX)),
