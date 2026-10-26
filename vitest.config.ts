@@ -15,7 +15,14 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**", "apps/*/src/**", "tools/**"],
-      exclude: ["**/*.test.ts", "**/fixtures/**", "packages/*/src/index.ts", "apps/*/src/index.ts", "tools/*-cli.ts", "apps/docs/**"],
+      exclude: [
+        "**/*.test.ts",
+        "**/fixtures/**",
+        "packages/*/src/index.ts",
+        "apps/*/src/index.ts",
+        "tools/*-cli.ts",
+        "apps/docs/**",
+      ],
       thresholds: { lines: FULL, branches: FULL, functions: FULL, statements: FULL },
     },
   },

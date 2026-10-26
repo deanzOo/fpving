@@ -71,6 +71,19 @@ describe("commit rules", () => {
 
   it("exposes the agreed types and scopes", () => {
     expect(COMMIT_TYPES).toEqual(["feat", "fix", "perf", "refactor", "test", "docs", "build", "ci", "chore", "revert"]);
-    expect(COMMIT_SCOPES).toEqual(["core", "plugin-sdk", "plugins", "matcher", "pricing", "alerts", "scheduler", "db", "ui", "api", "ci", "deps"]);
+    expect(COMMIT_SCOPES).toEqual([
+      "core",
+      "plugin-sdk",
+      "plugins",
+      "matcher",
+      "pricing",
+      "alerts",
+      "scheduler",
+      "db",
+      "ui",
+      "api",
+      "ci",
+      "deps",
+    ]);
   });
 });

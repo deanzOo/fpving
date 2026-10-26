@@ -23,7 +23,10 @@ export default defineConfig({
       sidebar: [
         { label: "Start here", items: ["getting-started", "configuration"] },
         { label: "Concepts", items: ["architecture", "writing-a-plugin"] },
-        { label: "Project", items: ["contributing", { label: "Decisions (ADRs)", items: [{ autogenerate: { directory: "adr" } }] }] },
+        {
+          label: "Project",
+          items: ["contributing", { label: "Decisions (ADRs)", items: [{ autogenerate: { directory: "adr" } }] }],
+        },
         { label: "Reference", items: ["reference/behaviour-spec", typeDocSidebarGroup] },
       ],
     }),
