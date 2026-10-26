@@ -15,7 +15,11 @@ const FIFTEEN_HUNDRED_JPY = 1500;
 const THREE_KWD = 3000;
 const ONE_US_CENT = 1;
 const TWO_JPY = 2;
-const ZERO_RATE = 0;
+const ONE_JPY = 1;
+const USD_PER_JPY = 0.003;
+const ZERO_USD = 0;
+const BAD_RATES = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+const LARGEST_AMOUNT = Number.MAX_SAFE_INTEGER;
 
 const rates: FxTable = {
   base: "USD",
@@ -82,10 +86,23 @@ describe("Currency conversion", () => {
     );
   });
 
-  it("treats a rate that is not positive as missing", () => {
-    const broken: FxTable = { ...rates, ratesPerBase: { ILS: ZERO_RATE } };
+  it.each(BAD_RATES)("treats the rate %s as missing", (rate) => {
+    const broken: FxTable = { ...rates, ratesPerBase: { ILS: rate } };
     expect(convert({ amountMinor: TEN_USD, currency: "USD" }, "ILS", broken)).toEqual(
       err({ kind: "missing_rate", currency: "ILS" }),
+    );
+  });
+
+  it("returns zero rather than an error when an amount converts to less than half a minor unit", () => {
+    const yenBase: FxTable = { base: "JPY", ratesPerBase: { USD: USD_PER_JPY }, fetchedOn: "2026-10-27" };
+    expect(convert({ amountMinor: ONE_JPY, currency: "JPY" }, "USD", yenBase)).toEqual(
+      ok({ amountMinor: ZERO_USD, currency: "USD" }),
+    );
+  });
+
+  it("reports an out-of-range amount when the converted value is not a safe integer", () => {
+    expect(convert({ amountMinor: LARGEST_AMOUNT, currency: "USD" }, "JPY", rates)).toEqual(
+      err({ kind: "amount_out_of_range" }),
     );
   });
 });

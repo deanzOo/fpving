@@ -1,6 +1,7 @@
 import { CURRENCY_MINOR_UNITS, err, ok } from "@fpving/plugin-sdk";
-import type { CurrencyCode, Money, Result } from "@fpving/plugin-sdk";
-import { roundMinor } from "./money.js";
+import type { Amount, CurrencyCode, Result } from "@fpving/plugin-sdk";
+import { roundMinor, toAmount } from "./money.js";
+import type { AmountOutOfRange } from "./money.js";
 
 const DECIMAL_BASE = 10;
 
@@ -20,6 +21,9 @@ export interface MissingRate {
   currency: CurrencyCode;
 }
 
+/** Why a pricing computation could not produce an amount: a missing exchange rate or an unrepresentable result. */
+export type PricingError = MissingRate | AmountOutOfRange;
+
 const rateFor = (currency: CurrencyCode, rates: FxTable): number | undefined => {
   if (currency === rates.base) {
     return 1;
@@ -31,23 +35,33 @@ const rateFor = (currency: CurrencyCode, rates: FxTable): number | undefined => 
 const minorPerMajor = (currency: CurrencyCode): number => DECIMAL_BASE ** CURRENCY_MINOR_UNITS[currency];
 
 /**
- * Converts a price into another currency through the table's base, going via major units so currencies with
- * different minor-unit exponents (JPY 0, USD 2, KWD 3) convert correctly. The result is rounded half-up to minor
- * units. Converting to the price's own currency returns it unchanged and needs no rate. A currency without a
+ * Converts to `to` without rounding, in fractional minor units of `to`, so callers can compare exactly. The
+ * source and target exponents (JPY 0, USD 2, KWD 3) and rates are folded into one division to limit float error.
+ * Converting to the amount's own currency returns it unchanged and needs no rate; otherwise a currency without a
  * usable rate yields `missing_rate`, checking the source before the target.
  */
-export const convert = (money: Money, to: CurrencyCode, rates: FxTable): Result<Money, MissingRate> => {
-  if (money.currency === to) {
-    return ok(money);
+export const convertExact = (amount: Amount, to: CurrencyCode, rates: FxTable): Result<number, MissingRate> => {
+  if (amount.currency === to) {
+    return ok(amount.amountMinor);
   }
-  const fromRate = rateFor(money.currency, rates);
+  const fromRate = rateFor(amount.currency, rates);
   if (fromRate === undefined) {
-    return err({ kind: "missing_rate", currency: money.currency });
+    return err({ kind: "missing_rate", currency: amount.currency });
   }
   const toRate = rateFor(to, rates);
   if (toRate === undefined) {
     return err({ kind: "missing_rate", currency: to });
   }
-  const major = money.amountMinor / minorPerMajor(money.currency) / fromRate;
-  return ok({ amountMinor: roundMinor(major * toRate * minorPerMajor(to)), currency: to });
+  return ok((amount.amountMinor * toRate * minorPerMajor(to)) / (fromRate * minorPerMajor(amount.currency)));
+};
+
+/**
+ * Converts an amount into another currency through the table's base, rounding half-up to minor units. A result
+ * that rounds to zero is a valid zero amount, not an error. Converting to the amount's own currency returns it
+ * unchanged and needs no rate. A currency without a usable rate yields `missing_rate`, and a result that is not
+ * a safe integer yields `amount_out_of_range`.
+ */
+export const convert = (amount: Amount, to: CurrencyCode, rates: FxTable): Result<Amount, PricingError> => {
+  const exact = convertExact(amount, to, rates);
+  return exact.ok ? toAmount(roundMinor(exact.value), to) : err(exact.error);
 };
