@@ -22,6 +22,7 @@ export { COUNTRY_CODES, CURRENCY_CODES, CURRENCY_MINOR_UNITS, countryCodeSchema,
 export type { CountryCode, CurrencyCode } from "./iso.js";
 export {
   fetchedListingSchema,
+  httpUrlSchema,
   searchCandidateSchema,
   ShippingKind,
   ShippingUnknown,

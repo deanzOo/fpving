@@ -35,6 +35,7 @@ describe("plugin-sdk entry points", () => {
       "currencyCodeSchema",
       "err",
       "fetchedListingSchema",
+      "httpUrlSchema",
       "manifestSchema",
       "moneySchema",
       "ok",

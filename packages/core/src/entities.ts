@@ -1,9 +1,8 @@
 import {
   countryCodeSchema,
   currencyCodeSchema,
-  manifestSchema,
+  httpUrlSchema,
   moneySchema,
-  searchCandidateSchema,
   shippingSchema,
   StoreErrorKind,
 } from "@fpving/plugin-sdk";
@@ -12,16 +11,15 @@ import {
   alertIdSchema,
   listingIdSchema,
   matchCandidateIdSchema,
+  pluginIdSchema,
   productIdSchema,
   scanRunIdSchema,
   snapshotIdSchema,
 } from "./ids.js";
 import { COUNTRY_PRESETS } from "./pricing/country-presets.js";
 import { importTaxRuleSchema } from "./pricing/import-tax.js";
+import { textSchema } from "./text.js";
 
-const urlSchema = searchCandidateSchema.shape.url;
-const pluginIdSchema = manifestSchema.shape.id;
-const textSchema = z.string().trim().min(1);
 const countSchema = z.int().nonnegative();
 
 /**
@@ -89,7 +87,7 @@ export const listingSchema = z.object({
   id: listingIdSchema,
   productId: productIdSchema,
   pluginId: pluginIdSchema,
-  url: urlSchema,
+  url: httpUrlSchema,
   title: textSchema,
   status: z.enum(ListingStatus),
   origin: z.enum(ListingOrigin),
@@ -135,7 +133,7 @@ export const matchCandidateSchema = z.object({
   id: matchCandidateIdSchema,
   productId: productIdSchema,
   pluginId: pluginIdSchema,
-  url: urlSchema,
+  url: httpUrlSchema,
   title: textSchema,
   similarityScore: z.number().min(0).max(1),
   llmVerdict: z.enum(LlmVerdict),
@@ -150,8 +148,8 @@ export type MatchCandidate = z.infer<typeof matchCandidateSchema>;
 
 /** A verdict remembered for a source and candidate url pair, so the same pair is never judged twice. */
 export const cachedVerdictSchema = verdictSchema.extend({
-  sourceUrl: urlSchema,
-  candidateUrl: urlSchema,
+  sourceUrl: httpUrlSchema,
+  candidateUrl: httpUrlSchema,
   judgedAt: z.date(),
 });
 
