@@ -100,4 +100,14 @@ describe("Import tax", () => {
       err({ kind: "missing_rate", currency: "GBP" }),
     );
   });
+
+  it("reports a missing rate for the threshold currency", () => {
+    const rule: ImportTaxRule = {
+      ...ruleWith(ThresholdBasis.Item),
+      dutyFreeThreshold: { amountMinor: THRESHOLD_USD, currency: "GBP" },
+    };
+    expect(importTax(usd(AT_THRESHOLD), usd(SHIPPING), rule, rates)).toEqual(
+      err({ kind: "missing_rate", currency: "GBP" }),
+    );
+  });
 });
