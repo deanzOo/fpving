@@ -18,7 +18,7 @@ Scraping stores is fragile and each site has its own terms of service. The publi
 
 ## Decision outcome
 
-Store support comes exclusively from plugins built against `@fpving/plugin-sdk`. The public repository ships none. CI exercises plugin loading end to end with a test-only fixture plugin.
+Store support comes exclusively from plugins built against `@fpving/plugin-sdk`. The public repository ships none. Plugin loading will be exercised end to end in CI with a test-only fixture plugin once the loader exists.
 
 ## Consequences
 

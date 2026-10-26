@@ -45,7 +45,7 @@ Each worktree gets its own port, SQLite file and Playwright profile so parallel 
 The docs site lives in `apps/docs` (Starlight). Run `pnpm test` once, then `pnpm docs:dev` to preview it; `pnpm docs:build` builds it and `pnpm verify` includes that build.
 
 - Behaviour changes update the relevant guide.
-- Public exports of `packages/core` and `packages/plugin-sdk` need TSDoc. Lint enforces it and the API reference is generated from it. A JSDoc block is allowed only directly before an `export`.
+- Public exports of `packages/core` and `packages/plugin-sdk` need TSDoc. Lint enforces it and the API reference is generated from it. A JSDoc block is allowed only directly before an `export` or on a member of an exported declaration.
 - The behaviour specification page is generated from test names. Do not edit it.
 - An ADR is required for a new dependency, a new port, or a cross-cutting decision. Add it to `apps/docs/src/content/docs/adr/` in MADR format with the next number. Supersede an accepted ADR with a new one instead of rewriting it.
 

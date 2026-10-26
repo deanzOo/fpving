@@ -54,7 +54,7 @@ Zod, React, Fastify and dev tooling are not wrapped: they are framework or type-
 
 ## Plugin system
 
-Plugins supply all store support and run in worker threads. The host owns the browser, HTTP client, rate limits and timeouts. See [Writing a plugin](../writing-a-plugin/) and ADRs [0003](../adr/0003-store-support-via-plugins-only/) and [0004](../adr/0004-worker-thread-plugin-isolation/).
+Plugins supply all store support and are designed to run in worker threads. The host owns the browser, HTTP client, rate limits and timeouts. See [Writing a plugin](../writing-a-plugin/) and ADRs [0003](../adr/0003-store-support-via-plugins-only/) and [0004](../adr/0004-worker-thread-plugin-isolation/).
 
 ## Data flow
 
@@ -69,4 +69,4 @@ Money is `{ amountMinor, currency }`: integer minor units plus an ISO 4217 code,
 
 ## Errors
 
-Domain operations return `Result<T, E>`, a plain discriminated union. Exceptions are for real bugs and are never swallowed. The plugin error taxonomy is `not_found`, `blocked`, `parse_failed`, `timeout`, `network` and `unsupported_ship_to`. The `Result` type is available today in the [API reference](../api/fpving/plugin-sdk/).
+Domain operations return `Result<T, E>`, a plain discriminated union. Exceptions are for real bugs and are never swallowed. The planned plugin error taxonomy is `not_found`, `blocked`, `parse_failed`, `timeout`, `network` and `unsupported_ship_to`. The `Result` type is available today in the [API reference](../api/fpving/plugin-sdk/).
