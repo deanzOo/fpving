@@ -11,7 +11,10 @@ export interface StoreGateway {
   declaredDomains(): readonly string[];
   /** The plugin whose manifest declares the URL's hostname exactly, or null. Pass a normalized URL. */
   pluginFor(url: string): PluginId | null;
-  /** Fetches one product page through the plugin `pluginId`. */
+  /**
+   * Fetches one product page through the plugin `pluginId`. The implementation saves the raw page of a `parse_failed`
+   * fetch through the `DebugSink`.
+   */
   fetchListing(pluginId: PluginId, url: string): Promise<StoreResult<FetchedListing>>;
   /** Searches the store of `pluginId`, which must be one of {@link StoreGateway.searchablePlugins}. */
   search(pluginId: PluginId, query: SearchQuery): Promise<StoreResult<SearchCandidate[]>>;
