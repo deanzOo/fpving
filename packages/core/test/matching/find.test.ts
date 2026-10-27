@@ -15,6 +15,7 @@ import {
   pluginIdSchema,
   productIdSchema,
   RepositoryErrorKind,
+  rejudgeUnjudged,
 } from "../../src/index.ts";
 import type { LlmError, MatchDeps, ProductIdentity, Repository, Result, Verdict } from "../../src/index.ts";
 import { similarity } from "../../src/matching/similarity.ts";
@@ -232,5 +233,69 @@ describe("Finding matches for a product", () => {
     await findMatches(deps, productId);
     const racing = { ...deps, repository: forgetful(repository) };
     expect(await findMatches(racing, productId)).toEqual(err({ kind: RepositoryErrorKind.DuplicateUrl }));
+  });
+});
+
+describe("Judging unjudged candidates again", () => {
+  const unjudgedFirst = async () => {
+    const context = await setup({ verdict: err(UNAVAILABLE), b: ok([]) });
+    await findMatches(context.deps, context.productId);
+    const llm = fakeLlmJudge({ identity: ok(IDENTITY), verdict: ok(SAME) });
+    return { ...context, deps: { ...context.deps, llm }, llm };
+  };
+
+  it("judges the product's pending unjudged candidates, records and caches the verdicts and returns them", async () => {
+    const { deps, repository, productId } = await unjudgedFirst();
+    const rejudged = await rejudgeUnjudged(deps, productId);
+    const pending = await repository.matchCandidates.listPending();
+    expect(pending.map((row) => [row.url, row.llmVerdict, row.llmReason])).toEqual([
+      ["https://a.example/f60", SAME.verdict, SAME.reason],
+      [OLDER.url, SAME.verdict, SAME.reason],
+    ]);
+    expect(rejudged).toEqual(ok(pending));
+    expect(await repository.verdictCache.get(SOURCE_URL, OLDER.url)).toEqual({
+      ...SAME,
+      sourceUrl: SOURCE_URL,
+      candidateUrl: OLDER.url,
+      judgedAt: NOW,
+    });
+  });
+
+  it("leaves a candidate unjudged while the LLM still fails", async () => {
+    const { deps, repository, productId } = await setup({ verdict: err(UNAVAILABLE), b: ok([]) });
+    await findMatches(deps, productId);
+    expect(await rejudgeUnjudged(deps, productId)).toEqual(ok([]));
+    const pending = await repository.matchCandidates.listPending();
+    expect(pending.map((row) => row.llmVerdict)).toEqual([LlmVerdict.Unjudged, LlmVerdict.Unjudged]);
+  });
+
+  it("leaves judged, decided and other products' candidates alone", async () => {
+    const { deps, repository, llm, productId } = await unjudgedFirst();
+    const other = await addProduct(deps, "https://source.example/other");
+    expect(await rejudgeUnjudged(deps, other.ok ? other.value.product.id : productId)).toEqual(ok([]));
+    const [exact] = await repository.matchCandidates.listPending();
+    await repository.matchCandidates.reject(exact?.id ?? matchCandidateIdSchema.parse("missing"));
+    await rejudgeUnjudged(deps, productId);
+    await rejudgeUnjudged(deps, productId);
+    expect(llm.compared).toEqual([[SOURCE_TITLE, OLDER.title]]);
+  });
+
+  it("refuses a product without a manual listing", async () => {
+    const { deps } = await unjudgedFirst();
+    expect(await rejudgeUnjudged(deps, productIdSchema.parse("missing"))).toEqual(
+      err({ kind: MatchErrorKind.NoSourceListing }),
+    );
+  });
+
+  it("rejects as a bug when a pending candidate cannot be found to record its verdict", async () => {
+    const { deps, repository, productId } = await unjudgedFirst();
+    const lost: Repository = {
+      ...repository,
+      matchCandidates: {
+        ...repository.matchCandidates,
+        recordVerdict: async () => Promise.resolve(err({ kind: RepositoryErrorKind.NotFound })),
+      },
+    };
+    await expect(rejudgeUnjudged({ ...deps, repository: lost }, productId)).rejects.toThrow();
   });
 });

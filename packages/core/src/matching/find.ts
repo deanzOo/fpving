@@ -135,7 +135,7 @@ const searchAll = async ({ stores }: MatchDeps, plugins: PluginId[], query: Sear
  *   store are kept.
  * - Each is judged against the source title, from the verdict cache by source and candidate url when it holds the
  *   pair, else by the LLM, whose verdict is cached. A candidate the LLM could not judge is saved `unjudged` with no
- *   reason, ranked by its similarity until it is judged again.
+ *   reason, ranked by its similarity until {@link rejudgeUnjudged} judges it.
  *
  * @param deps - The ports to use.
  * @param productId - The product to find matches for.
@@ -182,4 +182,41 @@ export const findMatches = async (
   );
   const saved = await deps.repository.matchCandidates.save(candidates);
   return saved.ok ? ok({ candidates, failedSearches }) : saved;
+};
+
+/**
+ * Asks the LLM again to judge a product's pending candidates that are still `unjudged`, such as after it was
+ * unavailable, and records each verdict it gives.
+ *
+ * @remarks
+ * Judges exactly like {@link findMatches}, cache first. A candidate the LLM still cannot judge stays `unjudged`.
+ *
+ * @param deps - The ports to use.
+ * @param productId - The product whose candidates to judge.
+ * @returns The candidates that are judged now, or `no_source_listing`.
+ */
+export const rejudgeUnjudged = async (
+  deps: MatchDeps,
+  productId: ProductId,
+): Promise<Result<MatchCandidate[], NoSourceListing>> => {
+  const source = await sourceListing(deps.repository, productId);
+  if (!source.ok) {
+    return source;
+  }
+  const pending = await deps.repository.matchCandidates.listPending();
+  const unjudged = pending.filter((row) => row.productId === productId && row.llmVerdict === LlmVerdict.Unjudged);
+  const judged = await Promise.all(
+    unjudged.map(async (row): Promise<MatchCandidate | null> => {
+      const verdict = await judge(deps, source.value, row);
+      if (verdict === null) {
+        return null;
+      }
+      const recorded = await deps.repository.matchCandidates.recordVerdict(row.id, verdict);
+      if (!recorded.ok) {
+        throw new Error(`pending candidate ${row.id} vanished before its verdict was recorded`);
+      }
+      return { ...row, llmVerdict: verdict.verdict, llmReason: verdict.reason };
+    }),
+  );
+  return ok(judged.filter((row) => row !== null));
 };
