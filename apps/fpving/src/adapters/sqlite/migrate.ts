@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -15,16 +15,17 @@ const lastAppliedMillis = (client: Database.Database): number | null => {
   return tracked === undefined ? null : z.number().nullable().parse(lastMillis());
 };
 
-const backUp = (path: string): string => {
+const backUp = (client: Database.Database, path: string): string => {
   const backupPath = `${path}.${new Date().toISOString().replaceAll(/[:.]/g, "-")}.bak`;
-  copyFileSync(path, backupPath);
+  client.prepare("VACUUM INTO ?").run(backupPath);
   return backupPath;
 };
 
 /**
  * Applies the pending migrations in `migrationsFolder` to the SQLite file at `path`, creating it when missing. An
- * existing file with pending migrations is first copied to a timestamped `.bak` file beside it. All pending
- * migrations run in one transaction, so a failure leaves the database as it was and throws, naming the backup.
+ * existing file with pending migrations is first copied with `VACUUM INTO` to a timestamped `.bak` file beside it,
+ * which is consistent in any journal mode. All pending migrations run in one transaction, so a failure leaves the
+ * database as it was and throws, naming the backup. Run it before opening any repository connection to the file.
  *
  * @param path - The database file.
  * @param migrationsFolder - The drizzle-kit migrations; the app's own by default.
@@ -36,7 +37,7 @@ export const migrate = (path: string, migrationsFolder = MIGRATIONS_FOLDER): { b
   try {
     const last = lastAppliedMillis(client);
     const pending = readMigrationFiles({ migrationsFolder }).some((row) => last === null || row.folderMillis > last);
-    const backupPath = existed && pending ? backUp(path) : null;
+    const backupPath = existed && pending ? backUp(client, path) : null;
     try {
       applyMigrations(drizzle({ client }), { migrationsFolder });
     } catch (cause) {

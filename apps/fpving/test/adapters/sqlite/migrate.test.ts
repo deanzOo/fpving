@@ -46,6 +46,23 @@ const tables = (path: string): string[] => {
   return names;
 };
 
+const contents = (path: string): Record<string, unknown[]> => {
+  const client = new Database(path, { readonly: true });
+  const dump = Object.fromEntries(
+    tables(path).map((table) => [table, client.prepare(`select * from ${table} order by rowid`).all()]),
+  );
+  client.close();
+  return dump;
+};
+
+const seeded = (path: string): Record<string, unknown[]> => {
+  migrate(path);
+  const client = new Database(path);
+  client.prepare("insert into fx_tables (base, rates_json, fetched_on) values ('USD', '{}', '2026-01-01')").run();
+  client.close();
+  return contents(path);
+};
+
 const snapshotSchema = z.looseObject({ tables: z.record(z.string(), z.unknown()) });
 
 const backups = (dir: string): string[] => readdirSync(dir).filter((name) => name.endsWith(".bak"));
@@ -80,24 +97,23 @@ describe("SQLite migrations", () => {
   it("backs up an existing database before applying its pending migrations", () => {
     const dir = tempDir();
     const path = join(dir, "fpving.db");
-    migrate(path);
-    const before = readFileSync(path);
+    const before = seeded(path);
     const { backupPath } = migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"));
     expect(backupPath).not.toBeNull();
     expect(backups(dir)).toHaveLength(1);
-    expect(readFileSync(join(dir, backups(dir)[0] ?? ""))).toEqual(before);
+    expect(contents(join(dir, backups(dir)[0] ?? ""))).toEqual(before);
     expect(tables(path)).toContain("extra");
   });
 
   it("rolls back a failing migration, keeps the backup intact and names it in the error", () => {
     const dir = tempDir();
     const path = join(dir, "fpving.db");
-    migrate(path);
-    const before = readFileSync(path);
+    const before = seeded(path);
     const broken = migrationsWith("CREATE TABLE `half` (`id` integer);\n--> statement-breakpoint\nNOT SQL;");
     expect(() => migrate(path, broken)).toThrow(/^Migrating .* failed and was rolled back; backup: .*\.bak$/);
     const [backup] = backups(dir);
-    expect(readFileSync(join(dir, backup ?? ""))).toEqual(before);
+    expect(contents(join(dir, backup ?? ""))).toEqual(before);
+    expect(contents(path)).toEqual(before);
     expect(tables(path)).not.toContain("half");
   });
 
