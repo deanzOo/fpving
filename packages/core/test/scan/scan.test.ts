@@ -9,7 +9,6 @@ import {
   ListingOrigin,
   ListingStatus,
   listingIdSchema,
-  ok,
   pluginIdSchema,
   PortErrorKind,
   productIdSchema,
@@ -29,6 +28,7 @@ import type {
   ScanDeps,
 } from "../../src/index.ts";
 import { fakeClock } from "../fakes/fake-clock.ts";
+import { fetchedListing } from "../fakes/fetched-listing.ts";
 import { fakeIdGenerator } from "../fakes/fake-id-generator.ts";
 import { fakeLogger } from "../fakes/fake-logger.ts";
 import { fakeNotifier } from "../fakes/fake-notifier.ts";
@@ -90,14 +90,7 @@ const snapshot = (row: Listing, amountMinor: number, overrides: Partial<PriceSna
   ...overrides,
 });
 
-const fetched = (amountMinor: number, inStock = true): StoreResult<FetchedListing> =>
-  ok({
-    title: "Fetched",
-    itemPrice: { amountMinor, currency: "USD" },
-    shipping: { kind: ShippingKind.Known, amountMinor: 0, currency: "USD" },
-    inStock,
-    images: [],
-  });
+const fetched = fetchedListing;
 
 const TIMEOUT = err({ kind: StoreErrorKind.Timeout, detail: "slow" });
 const NOT_FOUND = err({ kind: StoreErrorKind.NotFound, detail: "404" });

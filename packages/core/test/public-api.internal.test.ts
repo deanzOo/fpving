@@ -54,6 +54,7 @@ describe("Core public API", () => {
       "scanRunSchema",
       "settingsSchema",
       "snapshotIdSchema",
+      "startScheduler",
       "verdictSchema",
     ]);
   });

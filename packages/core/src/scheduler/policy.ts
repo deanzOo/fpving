@@ -7,8 +7,7 @@ export const MS_PER_HOUR = 3_600_000;
 
 const HOURS_PER_DAY = 24;
 
-/** How old stored exchange rates may get, in milliseconds, before a scan refreshes them. */
-export const FX_MAX_AGE_MS = HOURS_PER_DAY * MS_PER_HOUR;
+const FX_MAX_AGE_MS = HOURS_PER_DAY * MS_PER_HOUR;
 
 /**
  * When the next scan is due: one interval after `lastScanAt`, or `now` when there was no previous scan. A result

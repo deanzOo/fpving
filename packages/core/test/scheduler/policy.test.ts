@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { err, nextScanDue, ok, PortErrorKind, RatesRefresh, refreshRatesIfStale } from "../../src/index.ts";
-import type { FxTable } from "../../src/index.ts";
+import type { FxTable, RatesUnavailable, Result } from "../../src/index.ts";
 import { fakeClock } from "../fakes/fake-clock.ts";
 import { fakeCurrencyRates } from "../fakes/fake-rates.ts";
 import { fakeLogger } from "../fakes/fake-logger.ts";
@@ -11,7 +11,7 @@ const HOUR_MS = 3_600_000;
 const INTERVAL_HOURS = 12;
 const ILS_PER_USD = 3.6;
 
-describe("nextScanDue", () => {
+describe("The next scan due time", () => {
   it("is due now when there was no previous scan", () => {
     expect(nextScanDue(null, INTERVAL_HOURS, NOW)).toEqual(NOW);
   });
@@ -36,7 +36,7 @@ const table = (fetchedOn: string, usd = 1): FxTable => ({ base: "USD", ratesPerB
 const FRESH = table("2026-10-27", ILS_PER_USD);
 const UNAVAILABLE = err({ kind: PortErrorKind.RatesUnavailable, detail: "offline" });
 
-const setup = async (stored: FxTable | null, answer = ok(FRESH)) => {
+const setup = async (stored: FxTable | null, answer: Result<FxTable, RatesUnavailable> = ok(FRESH)) => {
   const repository = inMemoryRepository();
   if (stored !== null) {
     await repository.fxRates.save(stored);
@@ -46,7 +46,7 @@ const setup = async (stored: FxTable | null, answer = ok(FRESH)) => {
   return { deps, repository, logger };
 };
 
-describe("refreshRatesIfStale", () => {
+describe("Refreshing stale exchange rates", () => {
   it("fetches and saves rates when none are stored", async () => {
     const { deps, repository } = await setup(null);
     expect(await refreshRatesIfStale(deps)).toBe(RatesRefresh.Refreshed);
