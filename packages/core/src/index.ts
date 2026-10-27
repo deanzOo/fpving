@@ -93,3 +93,4 @@ export type {
   VerdictCacheRepository,
 } from "./ports/repository.js";
 export type { Scheduler } from "./ports/scheduler.js";
+export type { StoreGateway } from "./ports/store-gateway.js";
