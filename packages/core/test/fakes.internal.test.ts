@@ -25,12 +25,13 @@ describe("Test fakes", () => {
     expect([ids.next(), ids.next()]).toEqual(["id-1", "id-2"]);
   });
 
-  it("fake llm judge gives its scripted answers", async () => {
+  it("fake llm judge gives its scripted answers and records compared titles", async () => {
     const unavailable = err({ kind: LlmErrorKind.Unavailable, detail: "no key" });
     const same = ok({ verdict: LlmVerdict.Same, reason: "Identical." });
     const judge = fakeLlmJudge({ identity: unavailable, verdict: same });
     expect(await judge.extractIdentity("title")).toEqual(unavailable);
     expect(await judge.compare("a", "b")).toEqual(same);
+    expect(judge.compared).toEqual([["a", "b"]]);
   });
 
   it("fake currency rates answer the given table", async () => {
@@ -52,7 +53,7 @@ describe("Test fakes", () => {
     expect(sink.pages).toEqual([{ pluginId, url: "https://shop.example/x", html: "<html>" }]);
   });
 
-  it("fake store gateway resolves plugins by exact declared host and answers scripted results", async () => {
+  it("fake store gateway resolves plugins by exact host, answers scripted results and records calls", async () => {
     const shop = pluginIdSchema.parse("example-shop");
     const quiet = pluginIdSchema.parse("quiet-shop");
     const itemPrice = { amountMinor: 1, currency: "USD" as const };
@@ -73,5 +74,6 @@ describe("Test fakes", () => {
     expect(stores.fetched).toEqual(["https://shop.example/x"]);
     expect(stores.searchablePlugins()).toEqual([shop]);
     expect(await stores.search(shop, { text: "Motor" })).toEqual(found);
+    expect(stores.searched).toEqual([{ pluginId: shop, query: { text: "Motor" } }]);
   });
 });
