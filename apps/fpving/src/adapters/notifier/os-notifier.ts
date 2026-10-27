@@ -13,23 +13,24 @@ export type NotifyBackend = (notification: OsNotification) => Promise<void>;
 
 /** The part of `node-notifier` the backend uses. */
 export interface NodeNotifierLike {
-  notify(notification: OsNotification, callback: (error: Error | null) => void): unknown;
+  notify(notification: OsNotification, callback: (error: Error | string | null | undefined) => void): unknown;
 }
 
 /**
  * Adapts a callback-style notifier, such as `node-notifier`, to a {@link NotifyBackend}.
  *
  * @param notifier - The callback-style notifier.
- * @returns A backend that rejects with the error the notifier reports.
+ * @returns A backend that rejects with the error the notifier reports. `node-notifier` reports success as an empty
+ * string, `undefined` or `null`, so only a truthy error argument is a failure; a string is the command's stderr.
  */
 export const callbackBackend = (notifier: NodeNotifierLike): NotifyBackend => {
   return async (notification) =>
     new Promise((resolve, reject) => {
       notifier.notify(notification, (error) => {
-        if (error === null) {
+        if (!error) {
           resolve();
         } else {
-          reject(error);
+          reject(typeof error === "string" ? new Error(error) : error);
         }
       });
     });

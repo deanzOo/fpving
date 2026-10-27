@@ -44,7 +44,9 @@ describe("Showing alerts as OS notifications", () => {
 });
 
 describe("The callback style notifier backend", () => {
-  const notifierCalling = (error: Error | null): { fake: NodeNotifierLike; received: OsNotification[] } => {
+  const notifierCalling = (
+    error: Error | string | null | undefined,
+  ): { fake: NodeNotifierLike; received: OsNotification[] } => {
     const received: OsNotification[] = [];
     const fake: NodeNotifierLike = {
       notify: (notification, callback) => {
@@ -59,6 +61,22 @@ describe("The callback style notifier backend", () => {
     const { fake, received } = notifierCalling(null);
     await expect(callbackBackend(fake)({ title: "t", message: "m" })).resolves.toBeUndefined();
     expect(received).toEqual([{ title: "t", message: "m" }]);
+  });
+
+  it.each([[""], [undefined], [null]])("resolves when the callback reports the falsy error %j", async (error) => {
+    const { fake } = notifierCalling(error);
+    await expect(callbackBackend(fake)({ title: "t", message: "m" })).resolves.toBeUndefined();
+  });
+
+  it("rejects with an error built from a stderr string", async () => {
+    const { fake } = notifierCalling("some stderr");
+    await expect(callbackBackend(fake)({ title: "t", message: "m" })).rejects.toThrow("some stderr");
+  });
+
+  it("maps a stderr string to notify failed through the notifier", async () => {
+    const { fake } = notifierCalling("some stderr");
+    const result = await createOsNotifier(callbackBackend(fake)).notify(ALERT);
+    expect(result).toEqual({ ok: false, error: { kind: PortErrorKind.NotifyFailed, detail: "Error: some stderr" } });
   });
 
   it("rejects with the error the callback reports", async () => {
