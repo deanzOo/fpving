@@ -28,5 +28,6 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - The domain entities and the ports the host and adapters will implement, with a shared repository contract suite.
 - The alert evaluator: price drop, back in stock and new cheapest, as a pure function.
 - Adding a product or a listing from a pasted URL, with URL normalization, behind a `StoreGateway` port the plugin host will implement.
+- Assisted matching: searching the other stores, ranking and LLM-judging candidates, and accepting or rejecting them.
 
 None of it is wired into a running app yet. To work on it, follow the setup in [Contributing](../contributing/).
