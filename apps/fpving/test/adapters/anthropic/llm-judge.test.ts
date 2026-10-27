@@ -114,10 +114,11 @@ describe("Anthropic LLM judge", () => {
     ["a verdict outside the schema", reply({ verdict: "maybe", reason: "unsure" })],
     ["text that is not json", textReply("same")],
     ["no text at all", { content: [], stop_reason: "end_turn", stop_details: null }],
-  ] satisfies [string, MessageReply][])("reports %s as malformed output and logs it", async (_, answer) => {
+  ] satisfies [string, MessageReply][])("reports %s as malformed invalid output and logs it", async (_, answer) => {
     const { judge, logged } = judgeReplying(() => answer);
     const error = failure(await judge.compare(SOURCE, CANDIDATE));
     expect(error?.kind).toBe(LlmErrorKind.MalformedOutput);
+    expect(error?.detail).toMatch(/^invalid output: /v);
     expect(logged).toEqual([{ method: "compare", ...error }]);
   });
 

@@ -90,7 +90,7 @@ export const createAnthropicLlmJudge = (createMessage: CreateMessage, logger: Lo
     try {
       return ok(format.parse(answer));
     } catch (error) {
-      return failed(method, LlmErrorKind.MalformedOutput, describeFailure(error));
+      return failed(method, LlmErrorKind.MalformedOutput, `invalid output: ${String(error)}`);
     }
   };
 
