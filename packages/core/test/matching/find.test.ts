@@ -46,6 +46,16 @@ const gate = (): { closed: Promise<void>; open: () => void } => {
   return { closed, open };
 };
 
+const gatedLlm = (heldTitle: string | undefined, closed: Promise<void>): LlmJudge => ({
+  extractIdentity: async () => Promise.resolve(ok(IDENTITY)),
+  compare: async (_, candidateTitle) => {
+    if (candidateTitle === heldTitle) {
+      await closed;
+    }
+    return ok(SAME);
+  },
+});
+
 const rejectsOnlyAfterOpen = async (run: Promise<unknown>, open: () => void, message: string): Promise<void> => {
   let settled = false;
   const rejected = expect(
@@ -270,15 +280,7 @@ describe("Finding matches while a branch fails", () => {
   it("rejects only after every candidate has been judged and cached", async () => {
     const { deps, repository, productId } = await setup();
     const { closed, open } = gate();
-    const llm: LlmJudge = {
-      extractIdentity: async () => Promise.resolve(ok(IDENTITY)),
-      compare: async (_, candidateTitle) => {
-        if (candidateTitle === OTHER_STORE.title) {
-          await closed;
-        }
-        return ok(SAME);
-      },
-    };
+    const llm = gatedLlm(OTHER_STORE.title, closed);
     const caching: Repository = {
       ...repository,
       verdictCache: {
@@ -351,15 +353,7 @@ describe("Judging unjudged candidates again", () => {
     const { deps, repository, productId } = await unjudgedFirst();
     const [exact, older] = await repository.matchCandidates.listPending();
     const { closed, open } = gate();
-    const llm: LlmJudge = {
-      extractIdentity: async () => Promise.resolve(ok(IDENTITY)),
-      compare: async (_, candidateTitle) => {
-        if (candidateTitle === older?.title) {
-          await closed;
-        }
-        return ok(SAME);
-      },
-    };
+    const llm = gatedLlm(older?.title, closed);
     const recording: Repository = {
       ...repository,
       matchCandidates: {
