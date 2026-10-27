@@ -189,7 +189,8 @@ export const findMatches = async (
  * unavailable, and records each verdict it gives.
  *
  * @remarks
- * Judges exactly like {@link findMatches}, cache first. A candidate the LLM still cannot judge stays `unjudged`.
+ * Judges exactly like {@link findMatches}, cache first. A candidate the LLM still cannot judge stays `unjudged`, and
+ * one accepted or rejected while it was being judged is skipped.
  *
  * @param deps - The ports to use.
  * @param productId - The product whose candidates to judge.
@@ -212,10 +213,7 @@ export const rejudgeUnjudged = async (
         return null;
       }
       const recorded = await deps.repository.matchCandidates.recordVerdict(row.id, verdict);
-      if (!recorded.ok) {
-        throw new Error(`pending candidate ${row.id} vanished before its verdict was recorded`);
-      }
-      return { ...row, llmVerdict: verdict.verdict, llmReason: verdict.reason };
+      return recorded.ok ? { ...row, llmVerdict: verdict.verdict, llmReason: verdict.reason } : null;
     }),
   );
   return ok(judged.filter((row) => row !== null));

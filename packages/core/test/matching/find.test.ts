@@ -14,7 +14,7 @@ import {
   RepositoryErrorKind,
   rejudgeUnjudged,
 } from "../../src/index.ts";
-import type { Repository } from "../../src/index.ts";
+import type { LlmJudge, Repository } from "../../src/index.ts";
 import { similarity } from "../../src/matching/similarity.ts";
 import { fakeLlmJudge } from "../fakes/fake-llm.ts";
 import {
@@ -244,15 +244,22 @@ describe("Judging unjudged candidates again", () => {
     );
   });
 
-  it("rejects as a bug when a pending candidate cannot be found to record its verdict", async () => {
+  it("skips a candidate decided while it was being judged", async () => {
     const { deps, repository, productId } = await unjudgedFirst();
-    const lost: Repository = {
-      ...repository,
-      matchCandidates: {
-        ...repository.matchCandidates,
-        recordVerdict: async () => Promise.resolve(err({ kind: RepositoryErrorKind.NotFound })),
+    const [exact, older] = await repository.matchCandidates.listPending();
+    const llm: LlmJudge = {
+      extractIdentity: async () => Promise.resolve(ok(IDENTITY)),
+      compare: async (_, candidateTitle) => {
+        if (candidateTitle === exact?.title) {
+          await repository.matchCandidates.reject(exact.id);
+        }
+        return ok(SAME);
       },
     };
-    await expect(rejudgeUnjudged({ ...deps, repository: lost }, productId)).rejects.toThrow();
+    const rejudged = await rejudgeUnjudged({ ...deps, llm }, productId);
+    expect(rejudged.ok && rejudged.value.map((row) => row.id)).toEqual([older?.id]);
+    expect(await repository.matchCandidates.listPending()).toEqual([
+      { ...older, llmVerdict: SAME.verdict, llmReason: SAME.reason },
+    ]);
   });
 });

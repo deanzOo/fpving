@@ -37,8 +37,8 @@ const pendingCandidate = async (
  *
  * @remarks
  * The listing and snapshot are built exactly like {@link addListing} builds them. A candidate that is not pending
- * is never fetched. When the fetch fails, or a listing started tracking the url meanwhile, the candidate stays
- * pending.
+ * is never fetched, and one decided during the fetch yields `not_pending` and stores nothing. When the fetch fails,
+ * or a listing started tracking the url meanwhile, the candidate stays pending.
  *
  * @param deps - The ports to use.
  * @param id - The candidate to accept.
@@ -77,10 +77,6 @@ export const rejectCandidate = async (
   { repository }: Pick<AddDeps, "repository">,
   id: MatchCandidateId,
 ): Promise<Result<void, NotPending>> => {
-  const candidate = await pendingCandidate(repository, id);
-  if (!candidate.ok) {
-    return candidate;
-  }
   const rejected = await repository.matchCandidates.reject(id);
   return rejected.ok ? rejected : notPending;
 };

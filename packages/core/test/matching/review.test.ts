@@ -14,10 +14,9 @@ import {
   MatchErrorKind,
   ok,
   rejectCandidate,
-  RepositoryErrorKind,
   snapshotIdSchema,
 } from "../../src/index.ts";
-import type { MatchCandidate, Repository } from "../../src/index.ts";
+import type { MatchCandidate, Repository, StoreGateway } from "../../src/index.ts";
 import { EXACT, fetched, NOW, setup, SHOP_A } from "./fixture.ts";
 
 const EXACT_URL = "https://a.example/f60";
@@ -105,16 +104,17 @@ describe("Accepting a match candidate", () => {
     expect(await pendingIds(repository)).toEqual([exact.id, older.id]);
   });
 
-  it("refuses a candidate decided by someone else during the fetch", async () => {
+  it("refuses a candidate rejected while its page was being fetched, storing no listing", async () => {
     const { deps, repository, exact } = await withCandidates();
-    const racing: Repository = {
-      ...repository,
-      matchCandidates: {
-        ...repository.matchCandidates,
-        accept: async () => Promise.resolve(err({ kind: RepositoryErrorKind.NotFound })),
+    const stores: StoreGateway = {
+      ...deps.stores,
+      fetchListing: async (pluginId, url) => {
+        await repository.matchCandidates.reject(exact.id);
+        return deps.stores.fetchListing(pluginId, url);
       },
     };
-    expect(await acceptCandidate({ ...deps, repository: racing }, exact.id)).toEqual(notPending);
+    expect(await acceptCandidate({ ...deps, stores }, exact.id)).toEqual(notPending);
+    expect(await repository.listings.findByUrl(EXACT_URL)).toBeNull();
   });
 });
 
@@ -131,17 +131,5 @@ describe("Rejecting a match candidate", () => {
     await rejectCandidate(deps, exact.id);
     expect(await rejectCandidate(deps, exact.id)).toEqual(notPending);
     expect(await rejectCandidate(deps, missing)).toEqual(notPending);
-  });
-
-  it("refuses a candidate decided by someone else meanwhile", async () => {
-    const { repository, exact } = await withCandidates();
-    const racing: Repository = {
-      ...repository,
-      matchCandidates: {
-        ...repository.matchCandidates,
-        reject: async () => Promise.resolve(err({ kind: RepositoryErrorKind.NotFound })),
-      },
-    };
-    expect(await rejectCandidate({ repository: racing }, exact.id)).toEqual(notPending);
   });
 });
