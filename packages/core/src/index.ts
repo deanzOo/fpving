@@ -13,6 +13,17 @@ export type {
 export { evaluate } from "./alerts/evaluate.js";
 export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
 export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
+export { addListing, addProduct } from "./products/add.js";
+export type {
+  AddDeps,
+  AddedListing,
+  AddedProduct,
+  AddListingError,
+  AddProductError,
+  AlreadyTracked,
+  FetchFailed,
+  NoPluginForDomain,
+} from "./products/add.js";
 export { AddErrorKind } from "./products/errors.js";
 export { normalizeListingUrl } from "./products/normalize-url.js";
 export type { InvalidUrl } from "./products/normalize-url.js";

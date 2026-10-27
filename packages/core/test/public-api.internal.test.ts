@@ -18,6 +18,8 @@ describe("Core public API", () => {
       "RepositoryErrorKind",
       "ScanOutcome",
       "ThresholdBasis",
+      "addListing",
+      "addProduct",
       "alertIdSchema",
       "alertSchema",
       "cachedVerdictSchema",
