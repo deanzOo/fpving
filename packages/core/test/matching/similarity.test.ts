@@ -10,6 +10,10 @@ describe("Title similarity", () => {
     expect(similarity("Tattu R-Line 1300mAh 6S", "Foxeer Lollipop antenna")).toBe(0);
   });
 
+  it("scores texts without a single letter or digit as 0", () => {
+    expect(similarity("---", "!!!")).toBe(0);
+  });
+
   it("ignores case and punctuation", () => {
     expect(similarity("T-Motor F60 Pro", "t motor, f60 (pro)")).toBe(1);
   });
