@@ -359,6 +359,33 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         );
       });
 
+      it("refuses with not_found to accept or reject a candidate already decided, storing nothing", async () => {
+        const accepted = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const rejected = candidate("c2", p1.id, url("c2"), HIGH_SIMILARITY);
+        const l3 = listing("l3", p1.id, accepted.url);
+        await repo.matchCandidates.save([accepted, rejected]);
+        await repo.matchCandidates.accept(accepted.id, l3, snapshot("s3", l3.id, JAN_2));
+        await repo.matchCandidates.reject(rejected.id);
+        const again = listing("l4", p1.id, url("again"));
+        const againFirst = snapshot("s4", again.id, JAN_2);
+        expect(await repo.matchCandidates.accept(accepted.id, again, againFirst)).toEqual(notFound);
+        const late = listing("l5", p1.id, rejected.url);
+        expect(await repo.matchCandidates.accept(rejected.id, late, snapshot("s5", late.id, JAN_2))).toEqual(notFound);
+        expect(await repo.matchCandidates.reject(accepted.id)).toEqual(notFound);
+        expect(await repo.listings.listByProduct(p1.id)).toEqual([l1, l3]);
+        expect(await repo.snapshots.listSince(late.id, JAN_1)).toEqual([]);
+        expect(await repo.matchCandidates.isKnownUrl(p1.id, rejected.url)).toBe(true);
+        expect(await repo.matchCandidates.listPending()).toEqual([]);
+      });
+
+      it("refuses with not_found to record a verdict on a candidate already decided", async () => {
+        const rejected = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        await repo.matchCandidates.save([rejected]);
+        await repo.matchCandidates.reject(rejected.id);
+        const judged = { verdict: LlmVerdict.Same, reason: "Same model." };
+        expect(await repo.matchCandidates.recordVerdict(rejected.id, judged)).toEqual(notFound);
+      });
+
       it("refuses a batch repeating a url already suggested for the same product and saves none of it", async () => {
         const first = candidate("c1", p1.id, url("c1"), LOW_SIMILARITY);
         await repo.matchCandidates.save([first]);

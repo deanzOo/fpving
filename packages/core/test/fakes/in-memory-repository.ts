@@ -162,7 +162,7 @@ export const inMemoryRepository = (): Repository => {
         ),
       accept: async (id, listing, firstSnapshot) => {
         const row = candidates.get(id);
-        if (row === undefined) {
+        if (row?.status !== CandidateStatus.Pending) {
           return Promise.resolve(notFound);
         }
         if (listing.productId !== row.productId || firstSnapshot.listingId !== listing.id) {
@@ -176,7 +176,7 @@ export const inMemoryRepository = (): Repository => {
       },
       recordVerdict: async (id, { verdict, reason }) => {
         const row = candidates.get(id);
-        if (row === undefined) {
+        if (row?.status !== CandidateStatus.Pending) {
           return Promise.resolve(notFound);
         }
         candidates.set(id, { ...row, llmVerdict: verdict, llmReason: reason });
@@ -184,7 +184,7 @@ export const inMemoryRepository = (): Repository => {
       },
       reject: async (id) => {
         const row = candidates.get(id);
-        if (row === undefined) {
+        if (row?.status !== CandidateStatus.Pending) {
           return Promise.resolve(notFound);
         }
         candidates.set(id, { ...row, status: CandidateStatus.Rejected });

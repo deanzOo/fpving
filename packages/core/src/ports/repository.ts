@@ -67,24 +67,27 @@ export interface SnapshotRepository {
   latestPerListing(productId: ProductId): Promise<PriceSnapshot[]>;
 }
 
-/** Stores match candidates. A url is suggested at most once per product. */
+/**
+ * Stores match candidates. A url is suggested at most once per product. Only a pending candidate can be accepted,
+ * rejected or given a verdict; a decided one is refused with `not_found`, like a missing one.
+ */
 export interface MatchCandidateRepository {
   /** Saves all candidates, or none when any url was already suggested for its product. */
   save(candidates: readonly MatchCandidate[]): Promise<Result<void, DuplicateUrl>>;
   /** Every pending candidate, highest similarity first. */
   listPending(): Promise<MatchCandidate[]>;
   /**
-   * Marks a candidate accepted and adds its listing with the listing's first snapshot in one step, or does none of
-   * it. Rejects when the listing is not for the candidate's product or the snapshot not the listing's.
+   * Marks a pending candidate accepted and adds its listing with the listing's first snapshot in one step, or does
+   * none of it. Rejects when the listing is not for the candidate's product or the snapshot not the listing's.
    */
   accept(
     id: MatchCandidateId,
     listing: Listing,
     firstSnapshot: PriceSnapshot,
   ): Promise<Result<void, NotFound | DuplicateUrl>>;
-  /** Replaces a candidate's verdict and reason with the ones the LLM gave. */
+  /** Replaces a pending candidate's verdict and reason with the ones the LLM gave. */
   recordVerdict(id: MatchCandidateId, verdict: Verdict): Promise<Result<void, NotFound>>;
-  /** Marks a candidate rejected, so its url is never suggested for the product again. */
+  /** Marks a pending candidate rejected, so its url is never suggested for the product again. */
   reject(id: MatchCandidateId): Promise<Result<void, NotFound>>;
   /** Whether `url` was already suggested for the product, whatever its status, or is tracked by any listing. */
   isKnownUrl(productId: ProductId, url: string): Promise<boolean>;
