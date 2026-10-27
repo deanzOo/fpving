@@ -104,6 +104,7 @@ const searchAll = async ({ stores }: MatchDeps, plugins: PluginId[], query: Sear
     plugins.map(async (pluginId) => ({ pluginId, results: await stores.search(pluginId, query) })),
   );
   const found: Found[] = [];
+  const seen = new Set<string>();
   const failedSearches: FailedSearch[] = [];
   for (const { pluginId, results } of searches) {
     if (!results.ok) {
@@ -112,7 +113,8 @@ const searchAll = async ({ stores }: MatchDeps, plugins: PluginId[], query: Sear
     }
     for (const row of results.value) {
       const url = normalizeListingUrl(row.url, domains);
-      if (url.ok && !found.some((other) => other.url === url.value)) {
+      if (url.ok && !seen.has(url.value)) {
+        seen.add(url.value);
         found.push({ pluginId, url: url.value, title: row.title });
       }
     }
