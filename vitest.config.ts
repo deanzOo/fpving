@@ -25,6 +25,7 @@ export default defineConfig({
         "packages/plugin-sdk/src/contract/check.ts",
         "packages/core/src/testing/index.ts",
         "apps/*/src/index.ts",
+        "apps/fpving/src/adapters/transport/launch-chromium.ts",
         "tools/*-cli.ts",
         "apps/docs/**",
       ],
