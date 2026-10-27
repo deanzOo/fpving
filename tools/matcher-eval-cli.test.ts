@@ -10,6 +10,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const JITI = join(ROOT, "node_modules", "jiti", "lib", "jiti-cli.mjs");
 const CLI = join(ROOT, "tools", "matcher-eval-cli.ts");
 const CLI_TIMEOUT_MS = 30_000;
+const SOURCE_CONDITIONS = "--conditions=@fpving/source";
 
 let dir: string | undefined;
 
@@ -26,7 +27,8 @@ const runWithEnvFile = async (contents: string | null): Promise<string> => {
     await writeFile(envFile, contents);
   }
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== "ANTHROPIC_API_KEY"));
-  return execFileSync(process.execPath, [`--env-file-if-exists=${envFile}`, JITI, CLI], { env, encoding: "utf8" });
+  const args = [SOURCE_CONDITIONS, `--env-file-if-exists=${envFile}`, JITI, CLI];
+  return execFileSync(process.execPath, args, { env, encoding: "utf8" });
 };
 
 describe("Matcher eval command", () => {

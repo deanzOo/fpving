@@ -18,7 +18,7 @@
     "licenses:check": "license-checker-rseidelsohn --excludePrivatePackages --onlyAllow \"MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;Python-2.0;CC-BY-4.0;CC-BY-3.0;MPL-2.0;(MIT AND CC-BY-3.0)\"",
     "audit:osv": "osv-scanner scan source --lockfile pnpm-lock.yaml",
     "worktree:init": "node tools/worktree-init-cli.ts",
-    "eval:matcher": "pnpm build && node --env-file-if-exists=.env node_modules/jiti/lib/jiti-cli.mjs tools/matcher-eval-cli.ts",
+    "eval:matcher": "node --conditions=@fpving/source --env-file-if-exists=.env node_modules/jiti/lib/jiti-cli.mjs tools/matcher-eval-cli.ts",
     "docs:spec": "node tools/spec-to-docs-cli.ts",
     "docs:build": "pnpm build && pnpm docs:spec && pnpm --filter @fpving/docs build",
     "docs:dev": "pnpm build && pnpm docs:spec && pnpm --filter @fpving/docs dev",
