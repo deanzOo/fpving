@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": { "rootDir": ".", "outDir": "dist/tools", "emitDeclarationOnly": true, "allowImportingTsExtensions": true, "types": ["node"] },
-  "include": ["eslint.config.ts", "commitlint.config.ts", "vitest.config.ts", "tools/**/*.ts", "packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "tests/**/*.ts", "packages/*/test/**/*.ts", "apps/*/test/**/*.ts"],
+  "include": ["eslint.config.ts", "commitlint.config.ts", "vitest.config.ts", "tools/**/*.ts", "packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "tests/**/*.ts", "packages/*/test/**/*.ts", "packages/core/eval/**/*.ts", "apps/*/test/**/*.ts"],
   "exclude": ["tests/tooling/fixtures/**", "apps/docs/**"]
 }

@@ -1,0 +1,302 @@
+[
+  {
+    "source": "T-Motor F60 Pro V 2207 1950KV Brushless Motor",
+    "candidate": "TMOTOR F60PROV 2207 1950KV FPV Racing Motor",
+    "label": "same",
+    "note": "Same motor, store spelling of the name differs"
+  },
+  {
+    "source": "DJI O3 Air Unit",
+    "candidate": "DJI O3 Air Unit Digital FPV Video Transmission Module",
+    "label": "same",
+    "note": "Same air unit with a longer title"
+  },
+  {
+    "source": "Tattu R-Line Version 5.0 1200mAh 6S 150C LiPo XT60",
+    "candidate": "Tattu R-Line V5 6S 1200mAh 150C Lipo Battery XT60 Plug",
+    "label": "same",
+    "note": "Same pack, words reordered"
+  },
+  {
+    "source": "Foxeer Lollipop 4 Plus 5.8G RHCP Antenna (2pcs)",
+    "candidate": "Foxeer Lollipop 4+ 5.8GHz Omni FPV Antenna RHCP 2 Pcs",
+    "label": "same",
+    "note": "Same antenna pair, plus written as a symbol"
+  },
+  {
+    "source": "SpeedyBee F405 V4 BLS 55A 30x30 FC&ESC Stack",
+    "candidate": "SpeedyBee F405 V4 55A Flight Controller ESC Stack 30.5x30.5",
+    "label": "same",
+    "note": "Same stack, mounting written two ways"
+  },
+  {
+    "source": "RadioMaster Boxer Radio Controller ELRS M2",
+    "candidate": "Radiomaster BOXER ExpressLRS M2 Transmitter",
+    "label": "same",
+    "note": "Same radio, ELRS spelled out"
+  },
+  {
+    "source": "HQProp Ethix S5 5.1x5.1x3 Light Grey (2CW+2CCW)x2",
+    "candidate": "Ethix S5 5 inch Propellers Light Grey 4 Pairs by HQProp",
+    "label": "same",
+    "note": "Same props, same count of four pairs"
+  },
+  {
+    "source": "BetaFPV ELRS Nano Receiver 2.4GHz",
+    "candidate": "BETAFPV ExpressLRS Nano RX 2.4G",
+    "label": "same",
+    "note": "Same receiver"
+  },
+  {
+    "source": "Caddx Ratel 2 1/1.8 Starlight FPV Camera",
+    "candidate": "CADDX Ratel2 Starlight Analog Camera 1/1.8 inch CMOS",
+    "label": "same",
+    "note": "Same camera, model number joined"
+  },
+  {
+    "source": "iFlight XING2 2207 1855KV Unibell Motor",
+    "candidate": "iFlight XING 2 2207 1855KV FPV Motor",
+    "label": "same",
+    "note": "Same motor, model number split"
+  },
+  {
+    "source": "GEPRC CineLog35 V2 HD O3 4S BNF",
+    "candidate": "GEPRC Cinelog35 V2 with DJI O3 Air Unit 4S BNF",
+    "label": "same",
+    "note": "Same drone, video system named differently"
+  },
+  {
+    "source": "Happymodel EP2 ELRS 2.4G Receiver",
+    "candidate": "Happymodel ExpressLRS EP2 RX with tower antenna",
+    "label": "same",
+    "note": "Same receiver, EP2 is the antenna version"
+  },
+  {
+    "source": "TBS Crossfire Nano RX",
+    "candidate": "Team BlackSheep Crossfire Nano Receiver",
+    "label": "same",
+    "note": "Same receiver, brand spelled out"
+  },
+  {
+    "source": "ISDT Q8 Max 1000W Smart Charger",
+    "candidate": "ISDT Q8MAX 1000W 30A Balance Charger",
+    "label": "same",
+    "note": "Same charger"
+  },
+  {
+    "source": "T-Motor F60 Pro V 2207 1950KV",
+    "candidate": "T-Motor F60 Pro V 2207 2550KV",
+    "label": "variant",
+    "note": "KV differs"
+  },
+  {
+    "source": "Tattu R-Line 1300mAh 6S 120C XT60",
+    "candidate": "Tattu R-Line 1300mAh 4S 120C XT60",
+    "label": "variant",
+    "note": "6S versus 4S"
+  },
+  {
+    "source": "CNHL Black Series 1500mAh 6S 100C LiPo",
+    "candidate": "CNHL Black Series 1500mAh 4S 100C LiPo",
+    "label": "variant",
+    "note": "6S versus 4S"
+  },
+  {
+    "source": "GNB 550mAh 2S HV 100C XT30",
+    "candidate": "GNB 550mAh 3S HV 100C XT30",
+    "label": "variant",
+    "note": "2S versus 3S"
+  },
+  {
+    "source": "Foxeer Lollipop 4 Plus 5.8G RHCP Antenna",
+    "candidate": "Foxeer Lollipop 4 Plus 5.8G LHCP Antenna",
+    "label": "variant",
+    "note": "Polarization differs"
+  },
+  {
+    "source": "Caddx Ratel 2 Starlight Camera Black",
+    "candidate": "Caddx Ratel 2 Starlight Camera Orange",
+    "label": "variant",
+    "note": "Colour differs"
+  },
+  {
+    "source": "HQProp Ethix S5 5.1x5.1x3 Light Grey",
+    "candidate": "HQProp Ethix S5 5.1x5.1x3 Lemon Lime",
+    "label": "variant",
+    "note": "Colour differs"
+  },
+  {
+    "source": "RadioMaster Pocket Radio ELRS",
+    "candidate": "RadioMaster Pocket Radio CC2500",
+    "label": "variant",
+    "note": "Radio protocol differs"
+  },
+  {
+    "source": "iFlight Nazgul5 Evoque F5 6S Analog BNF",
+    "candidate": "iFlight Nazgul Evoque F5 6S DJI O3 BNF",
+    "label": "variant",
+    "note": "Analog versus digital video"
+  },
+  {
+    "source": "GEPRC Mark5 HD O3 6S BNF",
+    "candidate": "GEPRC MARK5 Analog 6S BNF",
+    "label": "variant",
+    "note": "Digital versus analog video"
+  },
+  {
+    "source": "BetaFPV Meteor75 Pro 1S Brushless Whoop Analog",
+    "candidate": "BetaFPV Meteor75 Pro 1S Brushless Whoop Walksnail HD",
+    "label": "variant",
+    "note": "Analog versus digital video"
+  },
+  {
+    "source": "iFlight Nazgul5 V3 6S BNF ELRS 2.4G",
+    "candidate": "iFlight Nazgul5 V3 6S BNF TBS Crossfire",
+    "label": "variant",
+    "note": "Receiver differs"
+  },
+  {
+    "source": "SpeedyBee F405 V4 55A Stack",
+    "candidate": "SpeedyBee F405 V4 Flight Controller only",
+    "label": "variant",
+    "note": "Stack versus the flight controller alone"
+  },
+  {
+    "source": "DJI O3 Air Unit",
+    "candidate": "DJI O3 Air Unit and Goggles 2 Combo",
+    "label": "variant",
+    "note": "Bundle adds goggles"
+  },
+  {
+    "source": "iFlight Nazgul5 Evoque F5 6S BNF",
+    "candidate": "iFlight Nazgul5 Evoque F5 6S BNF with 1100mAh 6S battery and props",
+    "label": "variant",
+    "note": "Bundle adds a battery and props"
+  },
+  {
+    "source": "BetaFPV Meteor65 1S Brushless Whoop BNF",
+    "candidate": "BetaFPV Meteor65 1S Brushless Whoop BNF with 5 batteries",
+    "label": "variant",
+    "note": "Bundle adds batteries"
+  },
+  {
+    "source": "GEPRC CineLog35 V2 Analog 4S PNP",
+    "candidate": "GEPRC CineLog35 V2 Analog 4S PNP with props",
+    "label": "variant",
+    "note": "Bundle adds props"
+  },
+  {
+    "source": "Emax ECO II 2207 1700KV",
+    "candidate": "Emax ECO II 2207 1900KV",
+    "label": "variant",
+    "note": "KV differs"
+  },
+  {
+    "source": "Gemfan 51466 Hurricane 3-Blade Propeller 2 Pairs",
+    "candidate": "Gemfan 51466 Hurricane 3-Blade Propeller 10 Pairs",
+    "label": "variant",
+    "note": "Pack size differs"
+  },
+  {
+    "source": "TBS Source One V5 5 inch Frame",
+    "candidate": "TBS Source One V5 6 inch Frame",
+    "label": "variant",
+    "note": "Frame size differs"
+  },
+  {
+    "source": "T-Motor F60 Pro V 2207 1950KV",
+    "candidate": "T-Motor F60 Pro IV 2207 1950KV",
+    "label": "different",
+    "note": "Older motor generation"
+  },
+  {
+    "source": "SpeedyBee F405 V4 55A Stack",
+    "candidate": "SpeedyBee F405 V3 50A Stack",
+    "label": "different",
+    "note": "Older stack generation"
+  },
+  {
+    "source": "DJI O3 Air Unit",
+    "candidate": "DJI O4 Air Unit Pro",
+    "label": "different",
+    "note": "Different air unit"
+  },
+  {
+    "source": "Caddx Ratel 2 Starlight Camera",
+    "candidate": "Caddx Ratel Pro Starlight Camera",
+    "label": "different",
+    "note": "Different camera model"
+  },
+  {
+    "source": "RadioMaster Boxer ELRS",
+    "candidate": "RadioMaster TX16S Mark II ELRS",
+    "label": "different",
+    "note": "Different radio"
+  },
+  {
+    "source": "T-Motor F60 Pro V 2207 1950KV",
+    "candidate": "F60 PRO V Style 2207 1950KV Brushless Motor Replacement for FPV",
+    "label": "different",
+    "note": "Unbranded clone"
+  },
+  {
+    "source": "Foxeer Lollipop 4 Plus 5.8G RHCP Antenna",
+    "candidate": "5.8G Lollipop Style RHCP Antenna 2pcs compatible with Foxeer",
+    "label": "different",
+    "note": "Unbranded clone"
+  },
+  {
+    "source": "DJI O3 Air Unit",
+    "candidate": "Protective Cooling Case for DJI O3 Air Unit",
+    "label": "different",
+    "note": "Accessory for the product"
+  },
+  {
+    "source": "Tattu R-Line 1300mAh 6S 120C",
+    "candidate": "LiPo Safe Bag for Tattu R-Line 6S batteries",
+    "label": "different",
+    "note": "Accessory for the product"
+  },
+  {
+    "source": "BetaFPV ELRS Nano Receiver 2.4GHz",
+    "candidate": "BetaFPV ELRS Nano TX Module 2.4GHz",
+    "label": "different",
+    "note": "Transmitter module, not a receiver"
+  },
+  {
+    "source": "iFlight XING2 2207 1855KV",
+    "candidate": "iFlight XING2 2306 1755KV",
+    "label": "different",
+    "note": "Different stator size"
+  },
+  {
+    "source": "GEPRC CineLog35 V2 Analog",
+    "candidate": "GEPRC CineLog30 V3 Analog",
+    "label": "different",
+    "note": "Different frame and generation"
+  },
+  {
+    "source": "HQProp Ethix S5 Light Grey",
+    "candidate": "HQProp Ethix S4 Light Grey",
+    "label": "different",
+    "note": "Different prop model"
+  },
+  {
+    "source": "Happymodel Mobula7 1S Whoop",
+    "candidate": "Happymodel Mobula6 2024 1S Whoop",
+    "label": "different",
+    "note": "Different whoop"
+  },
+  {
+    "source": "Tattu R-Line V5 1200mAh 6S",
+    "candidate": "Tattu Funfly 1300mAh 6S",
+    "label": "different",
+    "note": "Different battery series"
+  },
+  {
+    "source": "ISDT Q8 Max 1000W Smart Charger",
+    "candidate": "ISDT 608AC Smart Charger",
+    "label": "different",
+    "note": "Different charger"
+  }
+]
