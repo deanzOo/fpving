@@ -11,6 +11,7 @@ import type { Notifier } from "../ports/notifier.js";
 import type { ListingStatusUpdate, NotFound } from "../ports/repository.js";
 import type { FxTable } from "../pricing/fx.js";
 import type { CoreDeps } from "../products/add.js";
+import { settleAll } from "../settle.js";
 
 const STALE_AFTER_FAILURES = 3;
 const GONE_AFTER_NOT_FOUND = 2;
@@ -252,7 +253,8 @@ const evaluateProduct = async (
  *   has only its cheapest recomputed; a gone cheapest is cleared when no other listing qualifies. Without stored
  *   rates no new cheapest is computed. Each alert gets an id and is stored before it is notified; an alert the
  *   notifier cannot show stays stored and is logged.
- * - A listing or product that goes missing while the scan runs is a bug: the scan rejects.
+ * - A listing or product that goes missing while the scan runs is a bug: the scan rejects, but only after every
+ *   plugin's scan has settled, so nothing is still writing when the caller sees the rejection.
  *
  * @param deps - The ports to use.
  * @returns Each plugin's run and counts, the alerts raised and the listings whose status changed.
@@ -261,7 +263,7 @@ export const scanListings = async (deps: ScanDeps): Promise<ScanReport> => {
   const { repository } = deps;
   const settings = await repository.settings.get();
   const listings = await repository.listings.listToScan();
-  const scans = await Promise.all(
+  const scans = await settleAll(
     [...Map.groupBy(listings, (row) => row.pluginId)].map(async ([pluginId, rows]) =>
       scanPlugin(deps, settings, pluginId, rows),
     ),

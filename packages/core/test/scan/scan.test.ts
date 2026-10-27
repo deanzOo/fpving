@@ -221,6 +221,40 @@ describe("Scanning listings", () => {
     });
   });
 
+  describe("A failing plugin scan", () => {
+    it("rejects only after every other plugin's scan has settled", async () => {
+      let open: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      const diskFull = (repository: Repository): Repository => ({
+        ...repository,
+        snapshots: {
+          ...repository.snapshots,
+          append: async (row) =>
+            row.listingId === l1.id ? Promise.reject(new Error("disk full")) : repository.snapshots.append(row),
+        },
+      });
+      const { deps, repository } = await setup({
+        listings: [l1, o1],
+        onFetch: async (url) => (url === o1.url ? gate : Promise.resolve()),
+        wrap: diskFull,
+      });
+      let settled = false;
+      const scan = scanListings(deps).finally(() => {
+        settled = true;
+      });
+      const rejected = expect(scan).rejects.toThrow("disk full");
+      await new Promise((resolve) => {
+        setImmediate(resolve);
+      });
+      expect(settled).toBe(false);
+      open();
+      await rejected;
+      expect(await repository.snapshots.listSince(o1.id, NOW)).toHaveLength(1);
+    });
+  });
+
   describe("Listing health", () => {
     it("counts a failed fetch in the listing's failure streak and stores no snapshot", async () => {
       const { deps, repository } = await setup({ answers: [[l1, TIMEOUT]] });
