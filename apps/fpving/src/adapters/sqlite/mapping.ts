@@ -1,7 +1,6 @@
-import { matchCandidateSchema, priceSnapshotSchema, settingsSchema } from "@fpving/core";
+import { fxTableSchema, matchCandidateSchema, priceSnapshotSchema, settingsSchema } from "@fpving/core";
 import type { FxTable, MatchCandidate, PriceSnapshot, Settings } from "@fpving/core";
-import { currencyCodeSchema, ShippingKind } from "@fpving/plugin-sdk";
-import { z } from "zod";
+import { ShippingKind } from "@fpving/plugin-sdk";
 import { SETTINGS_ROW_ID } from "./schema.js";
 import type { fxTables, matchCandidates, priceSnapshots, settings } from "./schema.js";
 
@@ -9,12 +8,6 @@ type SnapshotRow = typeof priceSnapshots.$inferSelect;
 type CandidateRow = typeof matchCandidates.$inferSelect;
 type SettingsRow = typeof settings.$inferSelect;
 type FxRow = typeof fxTables.$inferSelect;
-
-const fxTableSchema = z.object({
-  base: currencyCodeSchema,
-  ratesPerBase: z.partialRecord(currencyCodeSchema, z.number()),
-  fetchedOn: z.string(),
-}) satisfies z.ZodType<FxTable>;
 
 export const toSnapshotRow = ({ itemPrice, shipping, ...rest }: PriceSnapshot): SnapshotRow => ({
   ...rest,
