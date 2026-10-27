@@ -188,6 +188,13 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.products.get(p1.id)).toEqual(p1);
       });
 
+      it("rejects a cheapest listing that is missing or another product's as a bug, changing nothing", async () => {
+        await seed();
+        await expect(repo.products.setCheapest(p1.id, missingListing)).rejects.toThrow();
+        await expect(repo.products.setCheapest(p1.id, l2.id)).rejects.toThrow();
+        expect(await repo.products.get(p1.id)).toEqual(p1);
+      });
+
       it("reports not_found when setting the cheapest listing of a product that does not exist", async () => {
         expect(await repo.products.setCheapest(missingProduct, null)).toEqual(notFound);
       });

@@ -39,7 +39,10 @@ export interface ProductRepository {
   add(product: Product, firstListing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, DuplicateUrl>>;
   /** The product with id `id`, or null. */
   get(id: ProductId): Promise<Product | null>;
-  /** Replaces a product's cheapest listing, or clears it with null. */
+  /**
+   * Replaces a product's cheapest listing, or clears it with null. Rejects when the listing does not exist or is
+   * another product's.
+   */
   setCheapest(id: ProductId, listingId: ListingId | null): Promise<Result<void, NotFound>>;
 }
 

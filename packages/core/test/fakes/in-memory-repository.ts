@@ -87,6 +87,9 @@ export const inMemoryRepository = (): Repository => {
         if (row === undefined) {
           return Promise.resolve(notFound);
         }
+        if (cheapestListingId !== null && listings.get(cheapestListingId)?.productId !== id) {
+          return bug("cheapest listing is missing or another product's");
+        }
         products.set(id, { ...row, cheapestListingId });
         return Promise.resolve(done);
       },
