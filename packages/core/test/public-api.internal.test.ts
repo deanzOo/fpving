@@ -31,6 +31,7 @@ describe("Core public API", () => {
       "err",
       "evaluate",
       "findMatches",
+      "fxTableSchema",
       "importTax",
       "importTaxRuleSchema",
       "landedCost",

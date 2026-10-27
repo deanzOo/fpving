@@ -1,4 +1,5 @@
-import { CURRENCY_MINOR_UNITS, err, ok } from "@fpving/plugin-sdk";
+import { CURRENCY_MINOR_UNITS, currencyCodeSchema, err, ok } from "@fpving/plugin-sdk";
+import { z } from "zod";
 import type { Amount, CurrencyCode, Result } from "@fpving/plugin-sdk";
 import { PricingErrorKind } from "./errors.js";
 import { roundMinor, toAmount } from "./money.js";
@@ -8,13 +9,17 @@ const DECIMAL_BASE = 10;
 
 /**
  * Exchange rates at one point in time. `ratesPerBase` holds units of each currency per one unit of `base`, which
- * implicitly has the rate 1. `fetchedOn` is the ISO date the rates were published.
+ * implicitly has the rate 1; every rate is positive and finite. `fetchedOn` is the ISO date (`YYYY-MM-DD`) the rates
+ * were published.
  */
-export interface FxTable {
-  base: CurrencyCode;
-  ratesPerBase: Partial<Record<CurrencyCode, number>>;
-  fetchedOn: string;
-}
+export const fxTableSchema = z.object({
+  base: currencyCodeSchema,
+  ratesPerBase: z.partialRecord(currencyCodeSchema, z.number().positive()),
+  fetchedOn: z.iso.date(),
+});
+
+/** An exchange rate table as {@link fxTableSchema} accepts it. */
+export type FxTable = z.infer<typeof fxTableSchema>;
 
 /** A conversion needed the rate of `currency` and the table had none. */
 export interface MissingRate {

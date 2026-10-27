@@ -44,7 +44,7 @@ export { normalizeListingUrl } from "./products/normalize-url.js";
 export type { InvalidUrl } from "./products/normalize-url.js";
 export { COUNTRY_PRESETS, presetFor } from "./pricing/country-presets.js";
 export type { CountryPreset, PresetSource } from "./pricing/country-presets.js";
-export { convert } from "./pricing/fx.js";
+export { convert, fxTableSchema } from "./pricing/fx.js";
 export type { FxTable, MissingRate, PricingError } from "./pricing/fx.js";
 export { importTax, importTaxRuleSchema, ThresholdBasis } from "./pricing/import-tax.js";
 export type { ImportTaxRule } from "./pricing/import-tax.js";
