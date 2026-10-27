@@ -73,6 +73,13 @@ describe("Refreshing stale exchange rates", () => {
     expect(await repository.fxRates.latest()).toEqual(FRESH);
   });
 
+  it("does not save fetched rates that carry the date already stored", async () => {
+    const stored = table("2026-10-20", ILS_PER_USD);
+    const { deps, repository } = await setup(stored, ok(table("2026-10-20", ILS_PER_USD + 1)));
+    expect(await refreshRatesIfStale(deps)).toBe(RatesRefresh.Fresh);
+    expect(await repository.fxRates.latest()).toEqual(stored);
+  });
+
   it("refreshes stored rates whose date cannot be read", async () => {
     const { deps } = await setup(table("garbage"));
     expect(await refreshRatesIfStale(deps)).toBe(RatesRefresh.Refreshed);

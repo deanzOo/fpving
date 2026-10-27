@@ -45,7 +45,8 @@ export interface RefreshRatesDeps {
 /**
  * Fetches and saves exchange rates unless the stored ones are fresh. Rates are stale when none are stored, when
  * their `fetchedOn` date cannot be read, or when more than a day has passed since the start (UTC) of that date.
- * A failed fetch is logged, not thrown, so the scan still runs on the last rates.
+ * A fetch that returns the date already stored is not saved again. A failed fetch is logged, not thrown, so the
+ * scan still runs on the last rates.
  *
  * @param deps - The ports to use.
  * @returns What happened.
@@ -60,6 +61,9 @@ export const refreshRatesIfStale = async (deps: RefreshRatesDeps): Promise<Rates
   if (!fetched.ok) {
     logger.warn("exchange rates could not be refreshed, using the last ones", { detail: fetched.error.detail });
     return RatesRefresh.Failed;
+  }
+  if (stored?.fetchedOn === fetched.value.fetchedOn) {
+    return RatesRefresh.Fresh;
   }
   await repository.fxRates.save(fetched.value);
   return RatesRefresh.Refreshed;
