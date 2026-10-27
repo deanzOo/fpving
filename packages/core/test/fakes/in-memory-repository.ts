@@ -3,13 +3,16 @@ import { CandidateStatus, DEFAULT_SETTINGS, RepositoryErrorKind } from "../../sr
 import type {
   Alert,
   CachedVerdict,
+  DuplicateUrl,
   FxTable,
   Listing,
   MatchCandidate,
+  NotFound,
   PluginHealth,
   PriceSnapshot,
   Product,
   Repository,
+  Result,
   ScanRun,
   Settings,
 } from "../../src/index.ts";
@@ -41,6 +44,26 @@ export const inMemoryRepository = (): Repository => {
   const suggested = (row: Pick<MatchCandidate, "productId" | "url">, pool: Iterable<MatchCandidate>): boolean =>
     [...pool].some((other) => other.productId === row.productId && other.url === row.url);
 
+  const insertListing = async (
+    listing: Listing,
+    firstSnapshots: PriceSnapshot[],
+  ): Promise<Result<void, NotFound | DuplicateUrl>> => {
+    if (listings.has(listing.id) || firstSnapshots.some((row) => snapshots.has(row.id))) {
+      return bug("duplicate id");
+    }
+    if (!products.has(listing.productId)) {
+      return Promise.resolve(notFound);
+    }
+    if (urlTracked(listing.url)) {
+      return Promise.resolve(duplicateUrl);
+    }
+    listings.set(listing.id, copy(listing));
+    for (const row of firstSnapshots) {
+      snapshots.set(row.id, copy(row));
+    }
+    return Promise.resolve(done);
+  };
+
   return {
     products: {
       add: async (product, firstListing, firstSnapshot) => {
@@ -60,36 +83,11 @@ export const inMemoryRepository = (): Repository => {
       },
     },
     listings: {
-      add: async (listing) => {
-        if (listings.has(listing.id)) {
-          return bug("duplicate listing id");
-        }
-        if (!products.has(listing.productId)) {
-          return Promise.resolve(notFound);
-        }
-        if (urlTracked(listing.url)) {
-          return Promise.resolve(duplicateUrl);
-        }
-        listings.set(listing.id, copy(listing));
-        return Promise.resolve(done);
-      },
-      addWithSnapshot: async (listing, firstSnapshot) => {
-        if (firstSnapshot.listingId !== listing.id) {
-          return bug("first snapshot belongs to another listing");
-        }
-        if (listings.has(listing.id) || snapshots.has(firstSnapshot.id)) {
-          return bug("duplicate id");
-        }
-        if (!products.has(listing.productId)) {
-          return Promise.resolve(notFound);
-        }
-        if (urlTracked(listing.url)) {
-          return Promise.resolve(duplicateUrl);
-        }
-        listings.set(listing.id, copy(listing));
-        snapshots.set(firstSnapshot.id, copy(firstSnapshot));
-        return Promise.resolve(done);
-      },
+      add: async (listing) => insertListing(listing, []),
+      addWithSnapshot: async (listing, firstSnapshot) =>
+        firstSnapshot.listingId === listing.id
+          ? insertListing(listing, [firstSnapshot])
+          : bug("first snapshot belongs to another listing"),
       findByUrl: async (url) => Promise.resolve(copy([...listings.values()].find((row) => row.url === url) ?? null)),
       listByProduct: async (productId) =>
         Promise.resolve(
