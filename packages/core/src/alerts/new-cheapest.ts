@@ -1,9 +1,8 @@
 import { ShippingKind } from "@fpving/plugin-sdk";
 import { AlertKind, ListingStatus } from "../entities.js";
-import type { Listing } from "../entities.js";
 import type { FxTable } from "../pricing/fx.js";
 import { landedCostExact } from "../pricing/landed-cost.js";
-import type { ListingId } from "../ids.js";
+import type { ListingId, ProductId } from "../ids.js";
 import type { AlertDraft, AlertSettings, ListingWithLatest } from "./draft.js";
 
 interface Ranked {
@@ -25,16 +24,30 @@ export interface CheapestResult {
 }
 
 /**
+ * The cheapest listing to keep when none qualifies: the previous one, or null when that listing is gone. A previous
+ * cheapest that is stale or out of stock is kept.
+ */
+export const keptCheapest = (
+  productListings: readonly ListingWithLatest[],
+  previousCheapestListingId: ListingId | null,
+): ListingId | null =>
+  productListings.some(
+    ({ listing }) => listing.id === previousCheapestListingId && listing.status === ListingStatus.Gone,
+  )
+    ? null
+    : previousCheapestListingId;
+
+/**
  * Finds the product's cheapest listing among those that are active, in stock, quoted for `settings.shipToCountry`,
  * with known shipping and a landed cost computable in the display currency; the others are left out. A latest
  * snapshot quoted for another destination, as after a destination switch, is never compared. Ties go to the lower
  * landed cost, then the earlier `addedAt`, then the lower listing id. Raises a new cheapest alert on that listing
  * when `previousCheapestListingId` is set and differs, and never on the first scan, when it is null. When no
- * listing qualifies the previous id is returned unchanged, so null only ever means a cheapest was never computed.
+ * listing qualifies the previous id is returned as {@link keptCheapest} keeps it, without an alert.
  * Ids compare by code point.
  */
 export const newCheapest = (
-  listing: Listing,
+  productId: ProductId,
   productListings: readonly ListingWithLatest[],
   previousCheapestListingId: ListingId | null,
   rates: FxTable,
@@ -56,7 +69,7 @@ export const newCheapest = (
     .sort(compare);
   const cheapest = ranked[0];
   if (cheapest === undefined) {
-    return { cheapestListingId: previousCheapestListingId, alert: null };
+    return { cheapestListingId: keptCheapest(productListings, previousCheapestListingId), alert: null };
   }
   const cheapestListingId = cheapest.entry.listing.id;
   if (previousCheapestListingId === null || previousCheapestListingId === cheapestListingId) {
@@ -66,7 +79,7 @@ export const newCheapest = (
     cheapestListingId,
     alert: {
       kind: AlertKind.NewCheapest,
-      productId: listing.productId,
+      productId,
       listingId: cheapestListingId,
       beforeSnapshotId: null,
       afterSnapshotId: cheapest.entry.latest.id,
