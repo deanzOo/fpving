@@ -31,4 +31,4 @@ A typed `plugins.config.ts` lists plugin package names or local folder paths. Se
 
 ## Secrets
 
-The Anthropic API key used for matching is bring-your-own. `ANTHROPIC_API_KEY` is read from a local `.env` and is optional; error text and logs never contain it. The Anthropic `LlmJudge` adapter uses it, and `pnpm eval:matcher` reads it from the environment to run the matcher eval against the real model, which costs API credits; without it the eval is skipped. The app does not wire the adapter in yet. Once it does, candidates are saved unjudged without a key and adding products still works.
+The Anthropic API key used for matching is bring-your-own and optional. `pnpm eval:matcher` reads `ANTHROPIC_API_KEY` from the environment or from a `.env` in the working directory, and runs the matcher eval against the real model, which costs API credits; with the key unset or blank it skips. `parseEnv` accepts the key and its error text never contains it, and the Anthropic adapter never logs it. The app does not load `.env` or wire the adapter in yet; both arrive with the app wiring.
