@@ -183,7 +183,8 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
           const ranked = db.select({
             ...getTableColumns(priceSnapshots),
             rank: sql<number>`row_number() over (
-              partition by ${priceSnapshots.listingId} order by ${priceSnapshots.observedAt} desc
+              partition by ${priceSnapshots.listingId}
+              order by ${priceSnapshots.observedAt} desc, ${priceSnapshots.id} desc
             )`.as("rank"),
           }).from(priceSnapshots)
             .innerJoin(listings, eq(listings.id, priceSnapshots.listingId))
@@ -279,7 +280,7 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
         settle(() => {
           const row = db.select().from(scanRuns)
             .where(pluginId === undefined ? undefined : eq(scanRuns.pluginId, pluginId))
-            .orderBy(desc(scanRuns.startedAt))
+            .orderBy(desc(scanRuns.startedAt), desc(scanRuns.id))
             .get();
           return row === undefined ? null : scanRunSchema.parse(row);
         }),
