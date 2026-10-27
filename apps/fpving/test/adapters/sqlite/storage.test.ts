@@ -28,6 +28,7 @@ import type {
 import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { migrate } from "../../../src/adapters/sqlite/migrate.ts";
 import { openSqliteRepository } from "../../../src/adapters/sqlite/repository.ts";
 import { cleanUpTemp, tempDir } from "./temp-db.ts";
@@ -284,6 +285,22 @@ describe("SQLite repository storage", () => {
       .toThrow(failed("match_candidates_llm_reason_check"));
     expect(run("insert into settings values (2, 'USD', 'US', 0, 'USD', 0, 'item', 1, 0)"))
       .toThrow(failed("settings_singleton_check"));
+  });
+
+  it("has only the unique indexes the refusal maps rely on: primary keys, listing url, candidate product+url", () => {
+    const uniqueIndexes = ["products", "listings", "price_snapshots", "match_candidates"].flatMap((table) =>
+      z.array(z.looseObject({ name: z.string(), unique: z.number(), origin: z.string() }))
+        .parse(raw.pragma(`index_list(${table})`))
+        .filter((index) => index.unique === 1)
+        .map(({ name, origin }) => ({ table, name, origin })));
+    expect(uniqueIndexes.toSorted((a, b) => a.name.localeCompare(b.name))).toEqual([
+      { table: "listings", name: "listings_url_unique", origin: "c" },
+      { table: "match_candidates", name: "match_candidates_product_id_url_unique", origin: "c" },
+      { table: "listings", name: "sqlite_autoindex_listings_1", origin: "pk" },
+      { table: "match_candidates", name: "sqlite_autoindex_match_candidates_1", origin: "pk" },
+      { table: "price_snapshots", name: "sqlite_autoindex_price_snapshots_1", origin: "pk" },
+      { table: "products", name: "sqlite_autoindex_products_1", origin: "pk" },
+    ]);
   });
 
   it("rejects a stored row that no longer parses as its entity", async () => {
