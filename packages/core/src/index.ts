@@ -13,6 +13,9 @@ export type {
 export { evaluate } from "./alerts/evaluate.js";
 export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
 export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
+export { AddErrorKind } from "./products/errors.js";
+export { normalizeListingUrl } from "./products/normalize-url.js";
+export type { InvalidUrl } from "./products/normalize-url.js";
 export { COUNTRY_PRESETS, presetFor } from "./pricing/country-presets.js";
 export type { CountryPreset, PresetSource } from "./pricing/country-presets.js";
 export { convert } from "./pricing/fx.js";

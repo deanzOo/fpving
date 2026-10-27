@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { PortErrorKind, PricingErrorKind } from "../src/index.ts";
+import { AddErrorKind, PortErrorKind, PricingErrorKind } from "../src/index.ts";
 import type { ShippingUnknownError } from "../src/index.ts";
 
 describe("Error kinds", () => {
@@ -20,6 +20,15 @@ describe("Error kinds", () => {
       RatesUnavailable: "rates_unavailable",
       NotifyFailed: "notify_failed",
       DebugWriteFailed: "debug_write_failed",
+    });
+  });
+
+  it("names every reason adding a product or listing failed by its snake_case kind", () => {
+    expect(AddErrorKind).toEqual({
+      InvalidUrl: "invalid_url",
+      NoPluginForDomain: "no_plugin_for_domain",
+      AlreadyTracked: "already_tracked",
+      FetchFailed: "fetch_failed",
     });
   });
 });
