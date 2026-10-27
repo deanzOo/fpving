@@ -70,7 +70,9 @@ export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHand
     try {
       await scanOnce();
     } catch (error) {
-      logger.error("scheduled scan failed", { detail: String(error) });
+      logger.error("scheduled scan failed", {
+        detail: error instanceof Error ? (error.stack ?? String(error)) : String(error),
+      });
     }
   };
   const { scanIntervalHours } = await repository.settings.get();

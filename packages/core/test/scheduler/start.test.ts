@@ -1,5 +1,5 @@
 import { ShippingKind } from "@fpving/plugin-sdk";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_SETTINGS,
   err,
@@ -16,7 +16,7 @@ import {
   snapshotIdSchema,
   startScheduler,
 } from "../../src/index.ts";
-import type { CurrencyRates, FxTable, Repository, SchedulerDeps } from "../../src/index.ts";
+import type { CurrencyRates, FxTable, Listing, Repository, SchedulerDeps } from "../../src/index.ts";
 import { fakeClock } from "../fakes/fake-clock.ts";
 import { fetchedListing } from "../fakes/fetched-listing.ts";
 import { fakeIdGenerator } from "../fakes/fake-id-generator.ts";
@@ -368,9 +368,8 @@ describe("The scan schedule surviving a failing scan", () => {
     const { deps, scheduler, stores, logger } = await setup({ lastScanAgo: 0, wrap: failingOnce });
     await startScheduler(deps);
     await scheduler.tick();
-    expect(logger.errors).toEqual([
-      { message: "scheduled scan failed", fields: { detail: "Error: database is locked" } },
-    ]);
+    expect(logger.errors).toHaveLength(1);
+    expect(logger.errors[0]?.fields?.["detail"]).toMatch(/^Error: database is locked\n\s+at /u);
     await scheduler.tick();
     expect(stores.fetched).toHaveLength(1);
   });
@@ -382,6 +381,20 @@ describe("The scan schedule surviving a failing scan", () => {
     expect(logger.errors).toHaveLength(1);
     await scheduler.tick();
     expect(stores.fetched).toHaveLength(1);
+  });
+
+  it.each<[string, () => unknown, string]>([
+    ["an error without a stack", () => Object.assign(new Error("no stack"), { stack: undefined }), "Error: no stack"],
+    ["something that is not an error", () => "plain text", "plain text"],
+  ])("logs %s as its text", async (_, thrown, detail) => {
+    const failing = (repository: Repository): Repository => ({
+      ...repository,
+      listings: { ...repository.listings, listToScan: vi.fn<() => Promise<Listing[]>>().mockRejectedValue(thrown()) },
+    });
+    const { deps, scheduler, logger } = await setup({ lastScanAgo: 0, wrap: failing });
+    await startScheduler(deps);
+    await scheduler.tick();
+    expect(logger.errors).toEqual([{ message: "scheduled scan failed", fields: { detail } }]);
   });
 
   it("does not reject stop when the running scan throws", async () => {
