@@ -9,6 +9,7 @@ import type {
   Product,
   ScanRun,
   Settings,
+  Verdict,
 } from "../entities.js";
 import type { AlertId, ListingId, MatchCandidateId, PluginId, ProductId } from "../ids.js";
 import type { FxTable } from "../pricing/fx.js";
@@ -75,10 +76,16 @@ export interface MatchCandidateRepository {
   /** Every pending candidate, highest similarity first. */
   listPending(): Promise<MatchCandidate[]>;
   /**
-   * Marks a candidate accepted and adds its listing in one step, or does neither. Rejects when the listing is not
-   * for the candidate's product.
+   * Marks a candidate accepted and adds its listing with the listing's first snapshot in one step, or does none of
+   * it. Rejects when the listing is not for the candidate's product or the snapshot not the listing's.
    */
-  accept(id: MatchCandidateId, listing: Listing): Promise<Result<void, NotFound | DuplicateUrl>>;
+  accept(
+    id: MatchCandidateId,
+    listing: Listing,
+    firstSnapshot: PriceSnapshot,
+  ): Promise<Result<void, NotFound | DuplicateUrl>>;
+  /** Replaces a candidate's verdict and reason with the ones the LLM gave. */
+  recordVerdict(id: MatchCandidateId, verdict: Verdict): Promise<Result<void, NotFound>>;
   /** Marks a candidate rejected, so its url is never suggested for the product again. */
   reject(id: MatchCandidateId): Promise<Result<void, NotFound>>;
   /** Whether `url` was already suggested for the product, whatever its status, or is tracked by any listing. */

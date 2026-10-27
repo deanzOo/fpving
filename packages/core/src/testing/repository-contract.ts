@@ -298,35 +298,77 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         const accepted = candidate("c4", p1.id, url("c4"), HIGH_SIMILARITY);
         expect(await repo.matchCandidates.save([low, high, rejected, accepted])).toEqual(ok);
         expect(await repo.matchCandidates.reject(rejected.id)).toEqual(ok);
-        expect(await repo.matchCandidates.accept(accepted.id, listing("l3", p1.id, accepted.url))).toEqual(ok);
+        const l3 = listing("l3", p1.id, accepted.url);
+        expect(await repo.matchCandidates.accept(accepted.id, l3, snapshot("s3", l3.id, JAN_2))).toEqual(ok);
         expect(await repo.matchCandidates.listPending()).toEqual([high, low]);
       });
 
-      it("accepts a candidate by storing its listing in the same step", async () => {
+      it("accepts a candidate by storing its listing and first snapshot in the same step", async () => {
         const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
         const matched = { ...listing("l3", p1.id, found.url), origin: ListingOrigin.Matched };
+        const first = snapshot("s3", matched.id, JAN_2);
         await repo.matchCandidates.save([found]);
-        expect(await repo.matchCandidates.accept(found.id, matched)).toEqual(ok);
+        expect(await repo.matchCandidates.accept(found.id, matched, first)).toEqual(ok);
         expect(await repo.listings.findByUrl(found.url)).toEqual(matched);
+        expect(await repo.snapshots.listSince(matched.id, JAN_1)).toEqual([first]);
       });
 
-      it("refuses to accept a candidate whose listing url is already tracked and leaves it pending", async () => {
+      it("refuses accepting a tracked url, storing nothing and leaving the candidate pending", async () => {
         const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const tracked = listing("l3", p1.id, l2.url);
         await repo.matchCandidates.save([found]);
-        expect(await repo.matchCandidates.accept(found.id, listing("l3", p1.id, l2.url))).toEqual(duplicateUrl);
+        expect(await repo.matchCandidates.accept(found.id, tracked, snapshot("s3", tracked.id, JAN_2))).toEqual(
+          duplicateUrl,
+        );
+        expect(await repo.snapshots.listSince(tracked.id, JAN_1)).toEqual([]);
         expect(await repo.matchCandidates.listPending()).toEqual([found]);
       });
 
       it("reports not_found when accepting or rejecting a candidate that does not exist", async () => {
         const missing = matchCandidateIdSchema.parse("missing");
-        expect(await repo.matchCandidates.accept(missing, listing("l3", p1.id, url("three")))).toEqual(notFound);
+        const l3 = listing("l3", p1.id, url("three"));
+        expect(await repo.matchCandidates.accept(missing, l3, snapshot("s3", l3.id, JAN_2))).toEqual(notFound);
         expect(await repo.matchCandidates.reject(missing)).toEqual(notFound);
+        expect(await repo.listings.findByUrl(l3.url)).toBeNull();
       });
 
-      it("rejects accepting a candidate with a listing of another product as a bug", async () => {
+      it("rejects accepting with a listing of another product or a snapshot of another listing as a bug", async () => {
         const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const foreign = listing("l3", p2.id, found.url);
+        const own = listing("l3", p1.id, found.url);
         await repo.matchCandidates.save([found]);
-        await expect(repo.matchCandidates.accept(found.id, listing("l3", p2.id, found.url))).rejects.toThrow();
+        const foreignFirst = snapshot("s3", foreign.id, JAN_2);
+        await expect(repo.matchCandidates.accept(found.id, foreign, foreignFirst)).rejects.toThrow();
+        await expect(repo.matchCandidates.accept(found.id, own, snapshot("s3", l1.id, JAN_2))).rejects.toThrow();
+        expect(await repo.listings.findByUrl(found.url)).toBeNull();
+      });
+
+      it("rejects accepting with a listing or snapshot id already stored as a bug", async () => {
+        const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const reused = listing("l1", p1.id, found.url);
+        const fresh = listing("l3", p1.id, found.url);
+        await repo.matchCandidates.save([found]);
+        const reusedFirst = snapshot("s3", reused.id, JAN_2);
+        await expect(repo.matchCandidates.accept(found.id, reused, reusedFirst)).rejects.toThrow();
+        await expect(repo.matchCandidates.accept(found.id, fresh, snapshot("s1", fresh.id, JAN_2))).rejects.toThrow();
+        expect(await repo.matchCandidates.listPending()).toEqual([found]);
+      });
+
+      it("records a verdict on a candidate, replacing its earlier one", async () => {
+        const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const judged = { verdict: LlmVerdict.Variant, reason: "Different battery size." };
+        await repo.matchCandidates.save([found]);
+        expect(await repo.matchCandidates.recordVerdict(found.id, judged)).toEqual(ok);
+        expect(await repo.matchCandidates.listPending()).toEqual([
+          { ...found, llmVerdict: judged.verdict, llmReason: judged.reason },
+        ]);
+      });
+
+      it("reports not_found when recording a verdict on a candidate that does not exist", async () => {
+        const judged = { verdict: LlmVerdict.Same, reason: "Same model." };
+        expect(await repo.matchCandidates.recordVerdict(matchCandidateIdSchema.parse("missing"), judged)).toEqual(
+          notFound,
+        );
       });
 
       it("refuses a batch repeating a url already suggested for the same product and saves none of it", async () => {

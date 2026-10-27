@@ -163,22 +163,26 @@ export const inMemoryRepository = (): Repository => {
               .toSorted((a, b) => b.similarityScore - a.similarityScore),
           ),
         ),
-      accept: async (id, listing) => {
+      accept: async (id, listing, firstSnapshot) => {
         const row = candidates.get(id);
         if (row === undefined) {
           return Promise.resolve(notFound);
         }
-        if (listing.productId !== row.productId) {
-          return bug("listing is not for the candidate's product");
+        if (listing.productId !== row.productId || firstSnapshot.listingId !== listing.id) {
+          return bug("listing or snapshot belongs to another row");
         }
-        if (listings.has(listing.id)) {
-          return bug("duplicate listing id");
+        const inserted = await insertListing(listing, [firstSnapshot]);
+        if (inserted.ok) {
+          candidates.set(id, { ...row, status: CandidateStatus.Accepted });
         }
-        if (urlTracked(listing.url)) {
-          return Promise.resolve(duplicateUrl);
+        return inserted;
+      },
+      recordVerdict: async (id, { verdict, reason }) => {
+        const row = candidates.get(id);
+        if (row === undefined) {
+          return Promise.resolve(notFound);
         }
-        listings.set(listing.id, copy(listing));
-        candidates.set(id, { ...row, status: CandidateStatus.Accepted });
+        candidates.set(id, { ...row, llmVerdict: verdict, llmReason: reason });
         return Promise.resolve(done);
       },
       reject: async (id) => {
