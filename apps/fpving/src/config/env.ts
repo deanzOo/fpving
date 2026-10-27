@@ -32,7 +32,7 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-export interface EnvIssue {
+interface EnvIssue {
   readonly variable: string;
   readonly message: string;
 }
