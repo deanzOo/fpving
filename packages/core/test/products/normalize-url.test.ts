@@ -43,6 +43,11 @@ describe("Normalizing a listing URL", () => {
     expect(normalized("https://shop.example")).toEqual(ok("https://shop.example/"));
   });
 
+  it("drops a username and password so they never reach a stored URL", () => {
+    expect(normalized("https://user:pass@shop.example/item")).toEqual(ok("https://shop.example/item"));
+    expect(normalized("https://user@shop.example/item")).toEqual(ok("https://shop.example/item"));
+  });
+
   it("drops the default port", () => {
     expect(normalized("https://shop.example:443/item")).toEqual(ok("https://shop.example/item"));
   });

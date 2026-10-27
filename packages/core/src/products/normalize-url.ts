@@ -24,7 +24,7 @@ const isTracking = (name: string): boolean =>
  * listing already tracking it. Pure.
  *
  * @remarks
- * - The scheme and host are lowercased, the default port and the fragment dropped.
+ * - The scheme and host are lowercased; the username, password, default port and fragment are dropped.
  * - Tracking parameters are dropped: `utm_*`, `aff_*`, `gclid`, `fbclid`, `msclkid`, `spm` and `scm`. The rest are
  *   sorted by name.
  * - Trailing slashes are stripped from the path, except the root `/`.
@@ -44,6 +44,8 @@ export const normalizeListingUrl = (url: string, declaredDomains: readonly strin
   if (declaredDomains.includes(bareHost)) {
     parsed.hostname = bareHost;
   }
+  parsed.username = "";
+  parsed.password = "";
   parsed.hash = "";
   for (const name of [...parsed.searchParams.keys()].filter(isTracking)) {
     parsed.searchParams.delete(name);
