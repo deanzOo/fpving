@@ -1,5 +1,4 @@
-import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
-import type { FetchedListing, SearchCandidate, StoreResult } from "@fpving/plugin-sdk";
+import { StoreErrorKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import {
   addListing,
@@ -7,78 +6,36 @@ import {
   CandidateStatus,
   err,
   findMatches,
-  LlmErrorKind,
   LlmVerdict,
   matchCandidateIdSchema,
   MatchErrorKind,
   ok,
-  pluginIdSchema,
   productIdSchema,
   RepositoryErrorKind,
   rejudgeUnjudged,
 } from "../../src/index.ts";
-import type { LlmError, MatchDeps, ProductIdentity, Repository, Result, Verdict } from "../../src/index.ts";
+import type { Repository } from "../../src/index.ts";
 import { similarity } from "../../src/matching/similarity.ts";
-import { fakeClock } from "../fakes/fake-clock.ts";
-import { fakeIdGenerator } from "../fakes/fake-id-generator.ts";
 import { fakeLlmJudge } from "../fakes/fake-llm.ts";
-import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
-import { fakeStoreGateway } from "../fakes/fake-store-gateway.ts";
+import {
+  EXACT,
+  gateway,
+  IDENTITY,
+  NOW,
+  OLDER,
+  OTHER_STORE,
+  REFERENCE,
+  result,
+  SAME,
+  setup,
+  SHOP_A,
+  SHOP_B,
+  SOURCE_TITLE,
+  SOURCE_URL,
+  UNAVAILABLE,
+} from "./fixture.ts";
 
-const PRICE = 3299;
 const PER_STORE = 5;
-const SOURCE = pluginIdSchema.parse("source-shop");
-const SHOP_A = pluginIdSchema.parse("shop-a");
-const SHOP_B = pluginIdSchema.parse("shop-b");
-const NOW = new Date("2026-10-27T10:00:00.000Z");
-const SOURCE_URL = "https://source.example/f60";
-const SOURCE_TITLE = "T-Motor F60 Pro V 2207 1950KV Brushless Motor";
-const IDENTITY: ProductIdentity = { brand: "T-Motor", model: "F60 Pro V", variantAttributes: ["1950KV"] };
-const REFERENCE = "T-Motor F60 Pro V 1950KV";
-const SAME: Verdict = { verdict: LlmVerdict.Same, reason: "Same motor and KV." };
-const UNAVAILABLE: LlmError = { kind: LlmErrorKind.Unavailable, detail: "no key" };
-
-const fetched = (title: string): FetchedListing => ({
-  title,
-  itemPrice: { amountMinor: PRICE, currency: "USD" },
-  shipping: { kind: ShippingKind.Known, amountMinor: 0, currency: "USD" },
-  inStock: true,
-  images: [],
-});
-
-const result = (url: string, title: string): SearchCandidate => ({ url, title });
-
-const EXACT = result("https://a.example/f60?utm_source=feed", "T-Motor F60 Pro V 1950KV");
-const OLDER = result("https://a.example/f60-iv", "T-Motor F60 Pro IV 2207 2550KV");
-const OTHER_STORE = result("https://b.example/item/7", "F60 Pro V 1950KV motor T-Motor");
-
-interface Options {
-  readonly identity?: Result<ProductIdentity, LlmError>;
-  readonly verdict?: Result<Verdict, LlmError>;
-  readonly a?: StoreResult<SearchCandidate[]>;
-  readonly b?: StoreResult<SearchCandidate[]>;
-}
-
-const gateway = (a: StoreResult<SearchCandidate[]>, b: StoreResult<SearchCandidate[]>) =>
-  fakeStoreGateway([
-    { id: SOURCE, domains: ["source.example"], listing: ok(fetched(SOURCE_TITLE)), search: ok([]) },
-    { id: SHOP_A, domains: ["a.example"], listing: ok(fetched(EXACT.title)), search: a },
-    { id: SHOP_B, domains: ["b.example"], listing: ok(fetched(OTHER_STORE.title)), search: b },
-    { id: pluginIdSchema.parse("no-search"), domains: ["n.example"], listing: ok(fetched("unused")) },
-  ]);
-
-const setup = async (options: Options = {}) => {
-  const repository = inMemoryRepository();
-  const stores = gateway(options.a ?? ok([EXACT, OLDER]), options.b ?? ok([OTHER_STORE]));
-  const llm = fakeLlmJudge({ identity: options.identity ?? ok(IDENTITY), verdict: options.verdict ?? ok(SAME) });
-  const clock = fakeClock(NOW);
-  const deps: MatchDeps = { repository, stores, llm, ids: fakeIdGenerator(), clock };
-  const added = await addProduct(deps, SOURCE_URL);
-  if (!added.ok) {
-    throw new Error("could not add the source product");
-  }
-  return { deps, repository, stores, llm, clock, productId: added.value.product.id };
-};
 
 const forgetful = (repository: Repository): Repository => ({
   ...repository,
