@@ -112,3 +112,5 @@ export type { Scheduler } from "./ports/scheduler.js";
 export type { StoreGateway } from "./ports/store-gateway.js";
 export { scanListings } from "./scan/scan.js";
 export type { ListingTransition, PluginScan, ScanDeps, ScanReport } from "./scan/scan.js";
+export { nextScanDue, RatesRefresh, refreshRatesIfStale } from "./scheduler/policy.js";
+export type { RefreshRatesDeps } from "./scheduler/policy.js";
