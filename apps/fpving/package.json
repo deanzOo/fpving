@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "exports": {
-    ".": "./dist/index.js"
-  },
+  "exports": { ".": "./dist/index.js" },
   "types": "./dist/index.d.ts",
   "scripts": {
     "db:generate": "node --conditions=@fpving/source node_modules/drizzle-kit/bin.cjs generate"
