@@ -164,6 +164,16 @@ const setup = async (options: Options = {}) => {
   return { deps, repository: base, stores, clock, notifier, logger };
 };
 
+const cheapestGoesGone = async (bases: PriceSnapshot[]) => {
+  const cheapest = { ...l1, notFoundStreak: 1 };
+  return setup({
+    products: [product("p1", { cheapestListingId: l1.id })],
+    listings: [cheapest, l2],
+    bases,
+    answers: [[cheapest, NOT_FOUND], [l2, TIMEOUT]],
+  });
+};
+
 const state = (status: ListingStatus, failureStreak: number, notFoundStreak: number) => ({
   status,
   failureStreak,
@@ -530,25 +540,14 @@ describe("Scanning listings", () => {
     });
 
     it("clears the product's cheapest listing when it is gone and no other listing qualifies", async () => {
-      const cheapest = { ...l1, notFoundStreak: 1 };
-      const { deps, repository } = await setup({
-        products: [product("p1", { cheapestListingId: l1.id })],
-        listings: [cheapest, l2],
-        bases: [snapshot(l2, LOWER, { inStock: false })],
-        answers: [[cheapest, NOT_FOUND], [l2, TIMEOUT]],
-      });
+      const { deps, repository } = await cheapestGoesGone([snapshot(l2, LOWER, { inStock: false })]);
       const report = await scanListings(deps);
       expect(report.alerts).toEqual([]);
       expect((await repository.products.get(P1))?.cheapestListingId).toBeNull();
     });
 
     it("moves the cheapest to another listing when the cheapest goes gone, even if nothing fetched", async () => {
-      const cheapest = { ...l1, notFoundStreak: 1 };
-      const { deps, repository } = await setup({
-        products: [product("p1", { cheapestListingId: l1.id })],
-        listings: [cheapest, l2],
-        answers: [[cheapest, NOT_FOUND], [l2, TIMEOUT]],
-      });
+      const { deps, repository } = await cheapestGoesGone([]);
       const report = await scanListings(deps);
       expect(report.alerts.map(({ kind, listingId }) => ({ kind, listingId }))).toEqual([
         { kind: AlertKind.NewCheapest, listingId: l2.id },
