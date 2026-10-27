@@ -20,7 +20,7 @@ export { acceptCandidate, rejectCandidate } from "./matching/review.js";
 export type { AcceptCandidateError, NotPending } from "./matching/review.js";
 export { addListing, addProduct } from "./products/add.js";
 export type {
-  AddDeps,
+  CoreDeps,
   AddedListing,
   AddedProduct,
   AddListingError,

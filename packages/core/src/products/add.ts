@@ -12,8 +12,8 @@ import { AddErrorKind } from "./errors.js";
 import { normalizeListingUrl } from "./normalize-url.js";
 import type { InvalidUrl } from "./normalize-url.js";
 
-/** The ports adding a product or a listing uses. */
-export interface AddDeps {
+/** The ports every core use case builds on: storage, the store gateway, ids and the clock. */
+export interface CoreDeps {
   /** Where the product, listing and snapshot are stored. */
   readonly repository: Repository;
   /** Resolves the plugin for a URL and fetches the listing. */
@@ -78,7 +78,7 @@ export const alreadyTracked = async (repository: Repository, url: string): Promi
   return err({ kind: AddErrorKind.AlreadyTracked, listing });
 };
 
-const fetchNew = async ({ repository, stores }: AddDeps, input: string): Promise<Result<Target, AddProductError>> => {
+const fetchNew = async ({ repository, stores }: CoreDeps, input: string): Promise<Result<Target, AddProductError>> => {
   const normalized = normalizeListingUrl(input, stores.declaredDomains());
   if (!normalized.ok) {
     return normalized;
@@ -100,7 +100,7 @@ const fetchNew = async ({ repository, stores }: AddDeps, input: string): Promise
 
 /** An active listing of `target` with no failures and its first snapshot, quoted for the saved ship-to country. */
 export const newListing = async (
-  deps: AddDeps,
+  deps: CoreDeps,
   productId: ProductId,
   target: Target,
   origin: ListingOrigin,
@@ -145,7 +145,7 @@ export const newListing = async (
  * @param url - The URL as the user pasted it.
  * @returns What was stored, or why nothing was.
  */
-export const addProduct = async (deps: AddDeps, url: string): Promise<Result<AddedProduct, AddProductError>> => {
+export const addProduct = async (deps: CoreDeps, url: string): Promise<Result<AddedProduct, AddProductError>> => {
   const target = await fetchNew(deps, url);
   if (!target.ok) {
     return target;
@@ -176,7 +176,7 @@ export const addProduct = async (deps: AddDeps, url: string): Promise<Result<Add
  * @returns What was stored, or why nothing was.
  */
 export const addListing = async (
-  deps: AddDeps,
+  deps: CoreDeps,
   productId: ProductId,
   url: string,
 ): Promise<Result<AddedListing, AddListingError>> => {

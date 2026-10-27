@@ -6,7 +6,7 @@ import { matchCandidateIdSchema } from "../ids.js";
 import type { PluginId, ProductId } from "../ids.js";
 import type { LlmError, LlmJudge, ProductIdentity } from "../ports/llm-judge.js";
 import type { DuplicateUrl, Repository } from "../ports/repository.js";
-import type { AddDeps } from "../products/add.js";
+import type { CoreDeps } from "../products/add.js";
 import { normalizeListingUrl } from "../products/normalize-url.js";
 import { MatchErrorKind } from "./errors.js";
 import { similarity } from "./similarity.js";
@@ -14,7 +14,7 @@ import { similarity } from "./similarity.js";
 const CANDIDATES_PER_STORE = 5;
 
 /** The ports assisted matching uses: those of adding a product, and the LLM that judges candidates. */
-export interface MatchDeps extends AddDeps {
+export interface MatchDeps extends CoreDeps {
   /** Extracts the product identity and judges each candidate. */
   readonly llm: LlmJudge;
 }

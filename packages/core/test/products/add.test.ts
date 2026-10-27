@@ -16,7 +16,7 @@ import {
   RepositoryErrorKind,
   snapshotIdSchema,
 } from "../../src/index.ts";
-import type { AddDeps, Repository } from "../../src/index.ts";
+import type { CoreDeps, Repository } from "../../src/index.ts";
 import { fakeClock } from "../fakes/fake-clock.ts";
 import { fakeIdGenerator } from "../fakes/fake-id-generator.ts";
 import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
@@ -43,7 +43,7 @@ const blocked = { kind: StoreErrorKind.Blocked, detail: "captcha" } as const;
 const setup = (answer: StoreResult<FetchedListing> = ok(fetched), onFetch?: () => Promise<void>) => {
   const repository = inMemoryRepository();
   const stores = fakeStoreGateway([{ id: SHOP, domains: ["shop.example"], listing: answer }], onFetch);
-  const deps: AddDeps = { repository, stores, ids: fakeIdGenerator(), clock: fakeClock(NOW) };
+  const deps: CoreDeps = { repository, stores, ids: fakeIdGenerator(), clock: fakeClock(NOW) };
   return { deps, repository, stores };
 };
 

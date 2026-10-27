@@ -6,7 +6,7 @@ import type { MatchCandidateId } from "../ids.js";
 import type { Repository } from "../ports/repository.js";
 import { RepositoryErrorKind } from "../ports/repository.js";
 import { alreadyTracked, newListing } from "../products/add.js";
-import type { AddDeps, AddedListing, AlreadyTracked, FetchFailed, Target } from "../products/add.js";
+import type { CoreDeps, AddedListing, AlreadyTracked, FetchFailed, Target } from "../products/add.js";
 import { AddErrorKind } from "../products/errors.js";
 import { MatchErrorKind } from "./errors.js";
 
@@ -45,7 +45,7 @@ const pendingCandidate = async (
  * @returns What was stored, or why nothing was.
  */
 export const acceptCandidate = async (
-  deps: AddDeps,
+  deps: CoreDeps,
   id: MatchCandidateId,
 ): Promise<Result<AddedListing, AcceptCandidateError>> => {
   const candidate = await pendingCandidate(deps.repository, id);
@@ -74,7 +74,7 @@ export const acceptCandidate = async (
  * @returns Nothing, or `not_pending`.
  */
 export const rejectCandidate = async (
-  { repository }: Pick<AddDeps, "repository">,
+  { repository }: Pick<CoreDeps, "repository">,
   id: MatchCandidateId,
 ): Promise<Result<void, NotPending>> => {
   const rejected = await repository.matchCandidates.reject(id);

@@ -10,7 +10,7 @@ import type { ListingId, PluginId, ProductId } from "../ids.js";
 import type { Notifier } from "../ports/notifier.js";
 import type { ListingStatusUpdate, NotFound } from "../ports/repository.js";
 import type { FxTable } from "../pricing/fx.js";
-import type { AddDeps } from "../products/add.js";
+import type { CoreDeps } from "../products/add.js";
 
 const STALE_AFTER_FAILURES = 3;
 const GONE_AFTER_NOT_FOUND = 2;
@@ -27,7 +27,7 @@ const MESSAGES: Readonly<Record<AlertKind, string>> = {
 };
 
 /** The ports a scan uses: those of adding a product, plus the notifier for alerts and the logger. */
-export interface ScanDeps extends AddDeps {
+export interface ScanDeps extends CoreDeps {
   /** Shows each raised alert. */
   readonly notifier: Notifier;
   /** Records alerts that could not be shown. */
