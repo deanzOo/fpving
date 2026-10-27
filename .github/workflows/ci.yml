@@ -28,7 +28,12 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm build
       - run: pnpm lint
+      - name: Install Chromium for the browser driver test
+        if: runner.os == 'Linux'
+        run: pnpm --filter @fpving/app exec playwright install --with-deps chromium
       - run: pnpm test:coverage
+        env:
+          FPVING_REQUIRE_BROWSER: ${{ runner.os == 'Linux' && '1' || '0' }}
 
   dup:
     runs-on: ubuntu-latest
