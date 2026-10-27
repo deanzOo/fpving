@@ -32,4 +32,7 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - Scanning: re-fetching every tracked listing, recording prices, marking listings stale or gone, backing off blocked stores, and raising and notifying alerts.
 - The scan schedule policy: a scan every interval, one catch-up scan on boot, stale exchange rates refreshed first, and no overlapping scans. The timer that drives it is not built yet.
 
+- Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
+- `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
+
 None of it is wired into a running app yet. To work on it, follow the setup in [Contributing](../contributing/).
