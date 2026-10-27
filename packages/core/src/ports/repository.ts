@@ -86,7 +86,7 @@ export interface SnapshotRepository {
 export interface MatchCandidateRepository {
   /** Saves all candidates, or none when any url was already suggested for its product. */
   save(candidates: readonly MatchCandidate[]): Promise<Result<void, DuplicateUrl>>;
-  /** Every pending candidate, highest similarity first. */
+  /** Every pending candidate, highest similarity first, equal similarities by id in code point order. */
   listPending(): Promise<MatchCandidate[]>;
   /**
    * Marks a pending candidate accepted and adds its listing with the listing's first snapshot in one step, or does
@@ -133,9 +133,9 @@ export interface ScanRunRepository {
 
 /** Stores exchange rates. */
 export interface FxRateRepository {
-  /** Stores a rate table, which becomes the latest. */
+  /** Stores a rate table, which becomes the latest whatever its date. */
   save(table: FxTable): Promise<void>;
-  /** The last saved rate table, or null. */
+  /** The last saved rate table, not the one with the newest date, or null. */
   latest(): Promise<FxTable | null>;
 }
 

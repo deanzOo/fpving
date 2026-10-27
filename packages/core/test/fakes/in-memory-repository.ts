@@ -184,7 +184,7 @@ export const inMemoryRepository = (): Repository => {
           copy(
             [...candidates.values()]
               .filter((row) => row.status === CandidateStatus.Pending)
-              .toSorted((a, b) => b.similarityScore - a.similarityScore),
+              .toSorted((a, b) => b.similarityScore - a.similarityScore || byCodePoint(a.id, b.id)),
           ),
         ),
       accept: async (id, listing, firstSnapshot) => {

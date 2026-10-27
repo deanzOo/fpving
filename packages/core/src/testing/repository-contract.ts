@@ -330,6 +330,14 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.matchCandidates.listPending()).toEqual([high, low]);
       });
 
+      it("breaks similarity ties by candidate id, comparing ids by code point", async () => {
+        const first = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const second = candidate("c2", p1.id, url("c2"), HIGH_SIMILARITY);
+        const third = candidate("c3", p1.id, url("c3"), HIGH_SIMILARITY);
+        expect(await repo.matchCandidates.save([third, first, second])).toEqual(ok);
+        expect(await repo.matchCandidates.listPending()).toEqual([first, second, third]);
+      });
+
       it("accepts a candidate by storing its listing and first snapshot in the same step", async () => {
         const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
         const matched = { ...listing("l3", p1.id, found.url), origin: ListingOrigin.Matched };
@@ -546,6 +554,12 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await repo.fxRates.save(table("2026-01-01"));
         await repo.fxRates.save(table("2026-01-02"));
         expect(await repo.fxRates.latest()).toEqual(table("2026-01-02"));
+      });
+
+      it("returns the last saved table even when its date is older than an earlier one's", async () => {
+        await repo.fxRates.save(table("2026-01-02"));
+        await repo.fxRates.save(table("2026-01-01"));
+        expect(await repo.fxRates.latest()).toEqual(table("2026-01-01"));
       });
     });
 
