@@ -5,8 +5,16 @@ import type { LlmJudge } from "../packages/core/src/index.ts";
 
 export const MATCHER_EVAL_THRESHOLD = 0.9;
 
+export const MATCHER_EVAL_SKIPPED = "Matcher eval skipped: no ANTHROPIC_API_KEY.";
+
 const PERCENT = 100;
 const PERCENT_DIGITS = 1;
+
+/** The trimmed `ANTHROPIC_API_KEY`, or null when it is unset or blank. */
+export const matcherEvalKey = (env: Readonly<Record<string, string | undefined>>): string | null => {
+  const key = env["ANTHROPIC_API_KEY"]?.trim() ?? "";
+  return key === "" ? null : key;
+};
 
 export interface MatcherEvalOutcome {
   readonly lines: string[];

@@ -1,11 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { anthropicMessages, createAnthropicLlmJudge } from "../apps/fpving/src/adapters/anthropic/llm-judge.ts";
 import { matcherEvalFileSchema } from "../packages/core/eval/matcher-eval.ts";
-import { evaluateMatcher } from "./matcher-eval.ts";
+import { evaluateMatcher, MATCHER_EVAL_SKIPPED, matcherEvalKey } from "./matcher-eval.ts";
 
-const apiKey = process.env["ANTHROPIC_API_KEY"] ?? "";
-if (apiKey === "") {
-  console.log("Matcher eval skipped: no ANTHROPIC_API_KEY.");
+const apiKey = matcherEvalKey(process.env);
+if (apiKey === null) {
+  console.log(MATCHER_EVAL_SKIPPED);
 } else {
   const file = matcherEvalFileSchema.parse(
     JSON.parse(await readFile(new URL("../packages/core/eval/pairs.json", import.meta.url), "utf8")),

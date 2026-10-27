@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MatcherPair } from "../packages/core/eval/matcher-eval.ts";
 import { err, LlmErrorKind, LlmVerdict, ok } from "../packages/core/src/index.ts";
 import type { LlmJudge, Verdict } from "../packages/core/src/index.ts";
-import { evaluateMatcher, MATCHER_EVAL_THRESHOLD } from "./matcher-eval.ts";
+import { evaluateMatcher, MATCHER_EVAL_THRESHOLD, matcherEvalKey } from "./matcher-eval.ts";
 
 const PAIRS = 10;
 const MISSES_AT_THRESHOLD = Math.round(PAIRS * (1 - MATCHER_EVAL_THRESHOLD));
@@ -53,5 +53,19 @@ describe("Matcher eval run", () => {
 
   it("fails when there are no pairs to score", async () => {
     expect((await evaluateMatcher(sameFor(0), [])).passed).toBe(false);
+  });
+});
+
+describe("Matcher eval key", () => {
+  it.each([
+    ["unset", {}],
+    ["empty", { ANTHROPIC_API_KEY: "" }],
+    ["whitespace only", { ANTHROPIC_API_KEY: " \t\n" }],
+  ])("is missing when ANTHROPIC_API_KEY is %s", (_, env) => {
+    expect(matcherEvalKey(env)).toBeNull();
+  });
+
+  it("is ANTHROPIC_API_KEY without surrounding whitespace", () => {
+    expect(matcherEvalKey({ ANTHROPIC_API_KEY: " test-key-not-a-real-secret\n" })).toBe("test-key-not-a-real-secret");
   });
 });
