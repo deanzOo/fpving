@@ -113,6 +113,9 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
           if (firstListing.productId !== product.id) {
             bug("first listing belongs to another product");
           }
+          if (product.cheapestListingId !== null) {
+            bug("a new product has no cheapest listing yet");
+          }
           tx.insert(products).values(product).run();
           return insertListing(tx, firstListing, firstSnapshot);
         }, urlRefusals),
