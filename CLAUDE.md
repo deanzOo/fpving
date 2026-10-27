@@ -25,7 +25,7 @@ Local-first, AGPL-3.0 pnpm monorepo that watches FPV gear prices. Human guide: C
 Write the missing failing test, scan the codebase for the same bug class, fix every instance with tests.
 
 ## Worktree and env isolation
-- One worktree per branch. Run `pnpm worktree:init` once per worktree: it writes `.env` from `.env.example` with `PORT=4000 + fnv1a(absolute worktree path) % 1000` and `DATA_DIR=.data/<worktree dir name>`, and never overwrites an existing `.env`. A hash collision between two worktrees means editing `PORT` by hand. Config is parsed by `apps/fpving/src/config/env.ts` (`PORT`, `DATA_DIR`, optional `ANTHROPIC_API_KEY`, `LOG_LEVEL`); error text never contains the key. Planned, not built: a per-worktree Playwright profile and logs, which arrive with the E2E suite.
+- One worktree per branch. Run `pnpm worktree:init` once per worktree: it writes `.env` from `.env.example` with `PORT=4000 + fnv1a(absolute worktree path) % 1000` and `DATA_DIR=<absolute worktree path>/.data/<worktree dir name>` (absolute so it never depends on the CWD; `parseEnv` rejects a relative one), and never overwrites an existing `.env`. A hash collision between two worktrees means editing `PORT` in `.env`. Config is parsed by `apps/fpving/src/config/env.ts` (`PORT`, `DATA_DIR`, optional `ANTHROPIC_API_KEY`, `LOG_LEVEL`); error text never contains the key. Planned, not built: a per-worktree Playwright profile and logs, which arrive with the E2E suite.
 - Never share a DB or port across worktrees. Never commit `.env` or `.data`.
 
 ## Commits and PRs

@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { EnvErrorKind, LogLevel, parseEnv } from "../../src/config/env.ts";
 
 const FAKE_KEY = "test-key-not-a-real-secret";
-const valid = { PORT: "4321", DATA_DIR: ".data/main" };
+const DATA = "/var/fpving/data";
+const valid = { PORT: "4321", DATA_DIR: DATA };
 
 describe("Environment config", () => {
   it("parses a minimal environment and defaults the log level to info", () => {
     expect(parseEnv(valid)).toEqual({
       ok: true,
-      value: { PORT: 4321, DATA_DIR: ".data/main", LOG_LEVEL: LogLevel.Info },
+      value: { PORT: 4321, DATA_DIR: DATA, LOG_LEVEL: LogLevel.Info },
     });
   });
 
@@ -16,7 +17,7 @@ describe("Environment config", () => {
     const parsed = parseEnv({ ...valid, ANTHROPIC_API_KEY: FAKE_KEY, LOG_LEVEL: "debug" });
     expect(parsed).toEqual({
       ok: true,
-      value: { PORT: 4321, DATA_DIR: ".data/main", ANTHROPIC_API_KEY: FAKE_KEY, LOG_LEVEL: LogLevel.Debug },
+      value: { PORT: 4321, DATA_DIR: DATA, ANTHROPIC_API_KEY: FAKE_KEY, LOG_LEVEL: LogLevel.Debug },
     });
   });
 
@@ -50,6 +51,14 @@ describe("Environment config", () => {
         "DATA_DIR",
         "LOG_LEVEL",
       ]);
+    }
+  });
+
+  it.each([".data/main", "data", "./data", "../data"])("rejects the relative data dir %j", (DATA_DIR) => {
+    const parsed = parseEnv({ ...valid, DATA_DIR });
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) {
+      expect(parsed.error.issues).toEqual([{ variable: "DATA_DIR", message: "must be an absolute path" }]);
     }
   });
 

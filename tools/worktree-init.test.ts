@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseEnv } from "../apps/fpving/src/config/env.ts";
 import { fnv1a, initWorktree, portFor, renderEnv } from "./worktree-init.ts";
@@ -42,9 +42,20 @@ describe("Worktree port", () => {
 
 describe("Env rendering", () => {
   it("replaces the port and data dir and keeps every other line", () => {
-    expect(renderEnv(TEMPLATE, { port: 4123, dataDir: ".data/adapters" })).toBe(
-      "PORT=4123\nDATA_DIR=.data/adapters\n# ANTHROPIC_API_KEY=\nLOG_LEVEL=info\n",
+    expect(renderEnv(TEMPLATE, { port: 4123, dataDir: "/w/adapters/.data/adapters" })).toBe(
+      "PORT=4123\nDATA_DIR=/w/adapters/.data/adapters\n# ANTHROPIC_API_KEY=\nLOG_LEVEL=info\n",
     );
+  });
+});
+
+describe("Env rendering safety", () => {
+  it("writes replacement patterns in a directory name literally", () => {
+    const dataDir = "/w/$&-$1/.data/x";
+    expect(renderEnv(TEMPLATE, { port: 4123, dataDir })).toContain(`DATA_DIR=${dataDir}\n`);
+  });
+
+  it.each(["DATA_DIR=.data/main\n", "PORT=4000\n"])("fails when the template lacks a line (%j only)", (template) => {
+    expect(() => renderEnv(template, { port: 4123, dataDir: "/w/.data/x" })).toThrow(/PORT=|DATA_DIR=/);
   });
 });
 
@@ -64,9 +75,10 @@ describe("Worktree init", () => {
   it("writes a valid .env with the hashed port and a data dir named after the worktree", async () => {
     const result = await initWorktree(root);
     const text = await readFile(join(root, ".env"), "utf8");
-    expect(result).toEqual({ status: "created", port: portFor(root), dataDir: ".data/my-tree" });
+    const dataDir = join(resolve(root), ".data", "my-tree");
+    expect(result).toEqual({ status: "created", port: portFor(root), dataDir });
     expect(text).toContain(`PORT=${String(portFor(root))}\n`);
-    expect(text).toContain("DATA_DIR=.data/my-tree\n");
+    expect(text).toContain(`DATA_DIR=${dataDir}\n`);
     const values = Object.fromEntries(
       text
         .split("\n")

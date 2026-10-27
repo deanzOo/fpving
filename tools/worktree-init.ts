@@ -22,10 +22,16 @@ export interface EnvValues {
   readonly dataDir: string;
 }
 
+const replaceLine = (template: string, name: string, value: string): string => {
+  const line = new RegExp(`^${name}=.*$`, "m");
+  if (!line.test(template)) {
+    throw new Error(`.env.example has no ${name}= line`);
+  }
+  return template.replace(line, () => `${name}=${value}`);
+};
+
 export const renderEnv = (template: string, values: EnvValues): string =>
-  template
-    .replace(/^PORT=.*$/m, `PORT=${String(values.port)}`)
-    .replace(/^DATA_DIR=.*$/m, `DATA_DIR=${values.dataDir}`);
+  replaceLine(replaceLine(template, "PORT", String(values.port)), "DATA_DIR", values.dataDir);
 
 export type WorktreeInitResult
   = | { readonly status: "created"; readonly port: number; readonly dataDir: string }
@@ -39,7 +45,7 @@ export const initWorktree = async (root: string): Promise<WorktreeInitResult> =>
     return { status: "exists" };
   }
   const template = await readFile(join(absolute, ".env.example"), "utf8");
-  const values = { port: portFor(absolute), dataDir: `.data/${basename(absolute)}` };
+  const values = { port: portFor(absolute), dataDir: join(absolute, ".data", basename(absolute)) };
   await writeFile(target, renderEnv(template, values), { flag: "wx" });
   return { status: "created", ...values };
 };

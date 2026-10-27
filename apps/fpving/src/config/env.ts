@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { z } from "zod";
 import { err, ok } from "@fpving/plugin-sdk";
 import type { Result } from "@fpving/plugin-sdk";
@@ -25,7 +26,10 @@ const envSchema = z.object({
     .regex(/^\d+$/, "must be a whole number")
     .transform(Number)
     .pipe(z.int().min(MIN_PORT, `must be >= ${String(MIN_PORT)}`).max(MAX_PORT, `must be <= ${String(MAX_PORT)}`)),
-  DATA_DIR: z.string().min(1, "must not be empty"),
+  DATA_DIR: z
+    .string()
+    .min(1, "must not be empty")
+    .pipe(z.string().refine(isAbsolute, "must be an absolute path")),
   ANTHROPIC_API_KEY: z.string().min(1, "must not be empty when set").optional(),
   LOG_LEVEL: z.enum(LogLevel).default(LogLevel.Info),
 });
