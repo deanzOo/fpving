@@ -32,3 +32,7 @@ A typed `plugins.config.ts` lists plugin package names or local folder paths. Se
 ## Secrets
 
 The Anthropic API key used for matching is bring-your-own and optional. `pnpm eval:matcher` reads `ANTHROPIC_API_KEY` from the environment or from a `.env` in the working directory, and runs the matcher eval against the real model, which costs API credits; with the key unset or blank it skips. A variable already set in the shell takes precedence over `.env`, because Node's `--env-file` does not override it. `parseEnv` accepts the key and its error text never contains it, and the Anthropic adapter never logs it. The app does not load `.env` or wire the adapter in yet; both arrive with the app wiring.
+
+## Logging
+
+`LOG_LEVEL` (`fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`, default `info`) sets the minimum level the pino logger writes. The logger takes its file path as an argument; the app will pass `DATA_DIR/logs/fpving.log` when it is wired in. Any logged field whose name contains `key`, `token`, `secret`, `password`, `authorization` or `cookie` is written as `[redacted]`. Exchange rates need no key: they come from the Frankfurter API, and a notification needs `notify-send` on Linux.

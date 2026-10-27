@@ -6,8 +6,7 @@ import { z } from "zod";
 /** The Frankfurter endpoint for the latest European Central Bank reference rates; free, no key. */
 export const FRANKFURTER_URL = "https://api.frankfurter.dev/v1/latest";
 
-/** How long a rates request may take before it is abandoned. */
-export const FX_TIMEOUT_MS = 10_000;
+const FX_TIMEOUT_MS = 10_000;
 
 /** The part of `fetch` the adapter uses, so tests can inject a fake. */
 export type FetchFx = (url: string, init: RequestInit) => Promise<Response>;

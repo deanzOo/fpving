@@ -4,7 +4,7 @@ description: Components, ports and adapters, the plugin system and the data flow
 ---
 
 :::note
-This is the target design. The workspace, the public plugin SDK contract (types, schemas, error taxonomy and contract test kit), core pricing, the core entities and ports, the alert evaluator, the add-product and add-listing use cases, assisted matching, the scan use case and the scan schedule policy exist; the SQLite and Anthropic adapters and the matcher eval runner exist; the host app, the timer adapter, the plugin host, the other adapters and the rest of the domain logic are still being built.
+This is the target design. The workspace, the public plugin SDK contract (types, schemas, error taxonomy and contract test kit), core pricing, the core entities and ports, the alert evaluator, the add-product and add-listing use cases, assisted matching, the scan use case and the scan schedule policy exist; the SQLite, Anthropic, exchange rates, notifier and logger adapters and the matcher eval runner exist; the host app, the timer adapter, the plugin host, the other adapters and the rest of the domain logic are still being built.
 :::
 
 ## Shape
@@ -42,24 +42,26 @@ Every runtime or integration dependency sits behind an interface the domain defi
 | --- | --- |
 | `BrowserDriver` | Playwright |
 | `LlmJudge` | Anthropic SDK |
-| `CurrencyRates` | Public FX API |
-| `Notifier` | OS-native notifications |
+| `CurrencyRates` | Frankfurter (ECB rates) |
+| `Notifier` | node-notifier |
 | `Repository` | SQLite |
 | `HttpClient` | Node fetch |
 | `Clock` | System clock |
 | `Scheduler` | In-process timer |
-| `Logger` | Structured logger |
+| `Logger` | pino |
 | `IdGenerator` | Random UUIDs |
 | `DebugSink` | Files under `.data/debug/<plugin>/` |
 | `StoreGateway` | The plugin host |
 
-`BrowserDriver`, `HttpClient`, `Clock` and `Logger` are defined in `@fpving/plugin-sdk` as the capabilities the host hands to plugins; `@fpving/core` re-exports all four. `LlmJudge`, `CurrencyRates`, `Notifier`, `Repository`, `Scheduler`, `IdGenerator`, `DebugSink` and `StoreGateway` are defined in `@fpving/core`. Only `Repository` and `LlmJudge` have adapters so far. `IdGenerator` and `DebugSink` are explained in [ADR 0013](../adr/0013-id-generator-and-debug-sink-ports/). `StoreGateway` is how core reaches the store plugins: the declared domains, the plugin for a URL, fetch and search. See [ADR 0014](../adr/0014-store-gateway-port/).
+`BrowserDriver`, `HttpClient`, `Clock` and `Logger` are defined in `@fpving/plugin-sdk` as the capabilities the host hands to plugins; `@fpving/core` re-exports all four. `LlmJudge`, `CurrencyRates`, `Notifier`, `Repository`, `Scheduler`, `IdGenerator`, `DebugSink` and `StoreGateway` are defined in `@fpving/core`. `Repository`, `LlmJudge`, `CurrencyRates`, `Notifier` and `Logger` have adapters so far. `IdGenerator` and `DebugSink` are explained in [ADR 0013](../adr/0013-id-generator-and-debug-sink-ports/). `StoreGateway` is how core reaches the store plugins: the declared domains, the plugin for a URL, fetch and search. See [ADR 0014](../adr/0014-store-gateway-port/).
 
 `Repository` groups one repository per aggregate: products, listings, price snapshots, match candidates, the LLM verdict cache, alerts, scan runs, exchange rates, plugin health and settings. Expected refusals, such as a url that is already tracked, resolve to a `Result`. Ordering is part of the contract: pending candidates come highest similarity first, ties by id, and the latest exchange rates are the last table saved, whatever its date. Every implementation must pass the shared repository contract suite, `describeRepositoryContract` from `@fpving/core/testing`, which an adapter runs against its own repository; core runs it against an in-memory fake. Vitest is an optional peer dependency needed only by that entry, as it is for `@fpving/plugin-sdk/contract`.
 
 The SQLite adapter in `apps/fpving/src/adapters/sqlite` passes that suite against a real database file. It uses `better-sqlite3` and Drizzle, enforces foreign keys, and runs each method in one transaction. `migrate` backs up an existing database before applying pending migrations. See [ADR 0016](../adr/0016-sqlite-persistence-with-better-sqlite3-and-drizzle/).
 
 The Anthropic adapter in `apps/fpving/src/adapters/anthropic` implements `LlmJudge` with `claude-haiku-5-5` at low effort and a JSON schema output built from the core Zod schemas. Its compare prompt lists the core `MATCHING_RULES`. It keeps at most four calls in flight, maps refusals, cut-off answers, invalid output and SDK errors to `LlmError`s, and logs each failure without the API key. See [ADR 0017](../adr/0017-anthropic-sdk-and-haiku-for-the-llm-judge/). Nothing wires it into the app yet.
+
+The exchange rates adapter in `apps/fpving/src/adapters/fx` implements `CurrencyRates` on Frankfurter with an injected `fetch`. It returns a table based on EUR validated by `fxTableSchema`, and maps network failures, non-2xx statuses and bad bodies to `rates_unavailable`. `refreshRatesIfStale` does not save a fetched table dated the same as or before the stored one. The notifier adapter in `apps/fpving/src/adapters/notifier` implements `Notifier` on an injected backend, `node-notifier` by default, and maps failures to `notify_failed`. The logger adapter in `apps/fpving/src/adapters/logger` implements `Logger` on pino, writing JSON lines to an injected file at the `LOG_LEVEL` level and masking fields named like secrets. See [ADR 0018](../adr/0018-frankfurter-node-notifier-and-pino/). Nothing wires them into the app yet.
 
 Zod, React, Fastify and dev tooling are not wrapped: they are framework or type-system level and swapping them has no value.
 
