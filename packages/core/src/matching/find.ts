@@ -8,6 +8,7 @@ import type { LlmError, LlmJudge, ProductIdentity } from "../ports/llm-judge.js"
 import type { DuplicateUrl, Repository } from "../ports/repository.js";
 import type { CoreDeps } from "../products/add.js";
 import { normalizeListingUrl } from "../products/normalize-url.js";
+import { settleAll } from "../settle.js";
 import { MatchErrorKind } from "./errors.js";
 import { similarity } from "./similarity.js";
 
@@ -100,7 +101,7 @@ const searchTerms = (
 
 const searchAll = async ({ stores }: MatchDeps, plugins: PluginId[], query: SearchQuery): Promise<Searched> => {
   const domains = stores.declaredDomains();
-  const searches = await Promise.all(
+  const searches = await settleAll(
     plugins.map(async (pluginId) => ({ pluginId, results: await stores.search(pluginId, query) })),
   );
   const found: Found[] = [];
@@ -156,7 +157,7 @@ export const findMatches = async (
   const { query, reference } = searchTerms(identity, title);
   const plugins = deps.stores.searchablePlugins().filter((id) => id !== sourcePlugin);
   const { found, failedSearches } = await searchAll(deps, plugins, query);
-  const known = await Promise.all(
+  const known = await settleAll(
     found.map(async (row) => deps.repository.matchCandidates.isKnownUrl(productId, row.url)),
   );
   const scored = found
@@ -168,7 +169,7 @@ export const findMatches = async (
       .toSorted((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, CANDIDATES_PER_STORE),
   );
-  const candidates = await Promise.all(
+  const candidates = await settleAll(
     kept.map(async (row): Promise<MatchCandidate> => {
       const id = matchCandidateIdSchema.parse(deps.ids.next());
       const verdict = await judge(deps, source.value, row);
@@ -208,7 +209,7 @@ export const rejudgeUnjudged = async (
   }
   const pending = await deps.repository.matchCandidates.listPending();
   const unjudged = pending.filter((row) => row.productId === productId && row.llmVerdict === LlmVerdict.Unjudged);
-  const judged = await Promise.all(
+  const judged = await settleAll(
     unjudged.map(async (row): Promise<MatchCandidate | null> => {
       const verdict = await judge(deps, source.value, row);
       if (verdict === null) {

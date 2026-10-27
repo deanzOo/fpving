@@ -37,6 +37,29 @@ import {
 
 const PER_STORE = 5;
 
+const gate = (): { closed: Promise<void>; open: () => void } => {
+  let open: () => void = () => undefined;
+  const closed = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { closed, open };
+};
+
+const rejectsOnlyAfterOpen = async (run: Promise<unknown>, open: () => void, message: string): Promise<void> => {
+  let settled = false;
+  const rejected = expect(
+    run.finally(() => {
+      settled = true;
+    }),
+  ).rejects.toThrow(message);
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+  expect(settled).toBe(false);
+  open();
+  await rejected;
+};
+
 const forgetful = (repository: Repository): Repository => ({
   ...repository,
   matchCandidates: { ...repository.matchCandidates, isKnownUrl: async () => Promise.resolve(false) },
@@ -193,6 +216,54 @@ describe("Finding matches for a product", () => {
   });
 });
 
+describe("Finding matches while a branch fails", () => {
+  it("rejects only after every known-url check has settled", async () => {
+    const { deps, repository, productId } = await setup();
+    const { closed, open } = gate();
+    const checking: Repository = {
+      ...repository,
+      matchCandidates: {
+        ...repository.matchCandidates,
+        isKnownUrl: async (id, url) => {
+          if (url === "https://a.example/f60") {
+            return Promise.reject(new Error("db locked"));
+          }
+          if (url === OTHER_STORE.url) {
+            await closed;
+          }
+          return repository.matchCandidates.isKnownUrl(id, url);
+        },
+      },
+    };
+    await rejectsOnlyAfterOpen(findMatches({ ...deps, repository: checking }, productId), open, "db locked");
+  });
+
+  it("rejects only after every candidate has been judged and cached", async () => {
+    const { deps, repository, productId } = await setup();
+    const { closed, open } = gate();
+    const llm: LlmJudge = {
+      extractIdentity: async () => Promise.resolve(ok(IDENTITY)),
+      compare: async (_, candidateTitle) => {
+        if (candidateTitle === OTHER_STORE.title) {
+          await closed;
+        }
+        return ok(SAME);
+      },
+    };
+    const caching: Repository = {
+      ...repository,
+      verdictCache: {
+        ...repository.verdictCache,
+        put: async (entry) =>
+          entry.candidateUrl === OLDER.url
+            ? Promise.reject(new Error("db locked"))
+            : repository.verdictCache.put(entry),
+      },
+    };
+    await rejectsOnlyAfterOpen(findMatches({ ...deps, repository: caching, llm }, productId), open, "db locked");
+  });
+});
+
 describe("Judging unjudged candidates again", () => {
   const unjudgedFirst = async () => {
     const context = await setup({ verdict: err(UNAVAILABLE), b: ok([]) });
@@ -242,6 +313,32 @@ describe("Judging unjudged candidates again", () => {
     expect(await rejudgeUnjudged(deps, productIdSchema.parse("missing"))).toEqual(
       err({ kind: MatchErrorKind.NoSourceListing }),
     );
+  });
+
+  it("rejects only after every candidate has been judged and recorded", async () => {
+    const { deps, repository, productId } = await unjudgedFirst();
+    const [exact, older] = await repository.matchCandidates.listPending();
+    const { closed, open } = gate();
+    const llm: LlmJudge = {
+      extractIdentity: async () => Promise.resolve(ok(IDENTITY)),
+      compare: async (_, candidateTitle) => {
+        if (candidateTitle === older?.title) {
+          await closed;
+        }
+        return ok(SAME);
+      },
+    };
+    const recording: Repository = {
+      ...repository,
+      matchCandidates: {
+        ...repository.matchCandidates,
+        recordVerdict: async (id, verdict) =>
+          id === exact?.id
+            ? Promise.reject(new Error("db locked"))
+            : repository.matchCandidates.recordVerdict(id, verdict),
+      },
+    };
+    await rejectsOnlyAfterOpen(rejudgeUnjudged({ ...deps, repository: recording, llm }, productId), open, "db locked");
   });
 
   it("skips a candidate decided while it was being judged", async () => {
