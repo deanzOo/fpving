@@ -128,6 +128,44 @@ describe("The scan schedule", () => {
     expect(scheduler.intervals).toEqual([INTERVAL_HOURS * HOUR_MS]);
   });
 
+  it("waits for the first tick until the last scan's interval is up, then repeats every interval", async () => {
+    const { deps, scheduler } = await setup({ lastScanAgo: HOUR_MS });
+    await startScheduler(deps);
+    expect(scheduler.firstDelays).toEqual([(INTERVAL_HOURS - 1) * HOUR_MS]);
+    expect(scheduler.intervals).toEqual([INTERVAL_HOURS * HOUR_MS]);
+  });
+
+  it("waits a full interval for the first tick after a boot scan, overdue or first ever", async () => {
+    const overdue = await setup({ lastScanAgo: OFFLINE_DAYS * DAY_MS });
+    await startScheduler(overdue.deps);
+    const never = await setup();
+    await startScheduler(never.deps);
+    expect([overdue.scheduler.firstDelays, never.scheduler.firstDelays]).toEqual([
+      [INTERVAL_HOURS * HOUR_MS],
+      [INTERVAL_HOURS * HOUR_MS],
+    ]);
+  });
+
+  it("pushes the next tick a full interval out when a scan is run on demand", async () => {
+    const { deps, scheduler } = await setup({ lastScanAgo: HOUR_MS });
+    const handle = await startScheduler(deps);
+    await handle.scanNow();
+    expect(scheduler.firstDelays).toEqual([(INTERVAL_HOURS - 1) * HOUR_MS, INTERVAL_HOURS * HOUR_MS]);
+    expect(scheduler.intervals).toEqual([INTERVAL_HOURS * HOUR_MS, INTERVAL_HOURS * HOUR_MS]);
+  });
+
+  it("keeps a single schedule after scans on demand and cancels it when stopped", async () => {
+    const { deps, scheduler, stores } = await setup({ lastScanAgo: 0 });
+    const handle = await startScheduler(deps);
+    await handle.scanNow();
+    await scheduler.tick();
+    expect(stores.fetched).toHaveLength(TWICE);
+    await handle.stop();
+    expect(scheduler.active()).toBe(false);
+    await handle.scanNow();
+    expect(scheduler.intervals).toHaveLength(TWICE);
+  });
+
   it("scans once on boot when there was never a scan", async () => {
     const { deps, stores } = await setup();
     await startScheduler(deps);

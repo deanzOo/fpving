@@ -37,7 +37,9 @@ export interface SchedulerHandle {
 
 /**
  * Starts scanning on a schedule. A scan runs every `scanIntervalHours` while the app is up, and once on boot when
- * the last scan started at least one interval ago or never ran; after weeks offline that is still one scan. Each
+ * the last scan started at least one interval ago or never ran; after weeks offline that is still one scan. The
+ * timer is anchored to the last scan, not to the boot: the first tick comes when that scan's interval is up, or one
+ * interval after the boot scan, and a scan on demand pushes the next tick a full interval out. Each
  * scan refreshes stale exchange rates first. A scan that throws is logged and the schedule keeps ticking. The
  * interval is read from the settings here, so a change applies after a restart. The boot scan runs in the
  * background; `scanNow` joins it. A boot where every plugin is backing off still counts as a scan, because blocked
@@ -50,7 +52,7 @@ export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHand
   const { repository, clock, logger, scheduler } = deps;
   let running: Promise<ScanReport> | null = null;
   let stopped = false;
-  const scanNow = async (): Promise<Result<ScanReport, SchedulerStopped>> => {
+  const scanOnce = async (): Promise<Result<ScanReport, SchedulerStopped>> => {
     if (stopped) {
       return err({ kind: SchedulerErrorKind.Stopped });
     }
@@ -66,20 +68,31 @@ export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHand
   };
   const scanInBackground = async (): Promise<void> => {
     try {
-      await scanNow();
+      await scanOnce();
     } catch (error) {
       logger.error("scheduled scan failed", { detail: String(error) });
     }
   };
   const { scanIntervalHours } = await repository.settings.get();
+  const intervalMs = scanIntervalHours * MS_PER_HOUR;
   const last = await repository.scanRuns.latest();
-  const cancel = scheduler.every(scanIntervalHours * MS_PER_HOUR, scanInBackground);
+  const now = clock.now();
+  const due = nextScanDue(last?.startedAt ?? null, scanIntervalHours, now);
+  const overdue = due <= now;
+  let cancel = scheduler.every(intervalMs, scanInBackground, overdue ? intervalMs : due.getTime() - now.getTime());
+  const scanNow = async (): Promise<Result<ScanReport, SchedulerStopped>> => {
+    if (!stopped) {
+      cancel();
+      cancel = scheduler.every(intervalMs, scanInBackground, intervalMs);
+    }
+    return scanOnce();
+  };
   const stop = async (): Promise<void> => {
     stopped = true;
     cancel();
     await running?.catch(() => undefined);
   };
-  if (nextScanDue(last?.startedAt ?? null, scanIntervalHours, clock.now()) <= clock.now()) {
+  if (overdue) {
     void scanInBackground();
   }
   return { scanNow, stop };
