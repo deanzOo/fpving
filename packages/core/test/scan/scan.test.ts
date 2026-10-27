@@ -280,35 +280,23 @@ describe("Scanning listings", () => {
       const { deps } = await setup({ listings: [l1, failing, stale], answers: [[failing, TIMEOUT]] });
       const report = await scanListings(deps);
       expect(report.transitions).toEqual([
-        { listingId: failing.id, from: ListingStatus.Active, to: ListingStatus.Stale },
-        { listingId: stale.id, from: ListingStatus.Stale, to: ListingStatus.Active },
+        { listingId: failing.id, productId: P1, from: ListingStatus.Active, to: ListingStatus.Stale },
+        { listingId: stale.id, productId: P1, from: ListingStatus.Stale, to: ListingStatus.Active },
       ]);
     });
 
-    it("skips a listing removed while the scan runs: no status change and no alert", async () => {
-      const failing = { ...l2, failureStreak: STREAK.two };
-      const wrap = (repository: Repository): Repository => ({
+    it("rejects as a bug when a fetched listing's snapshot or status cannot be stored", async () => {
+      const missing = async () => Promise.resolve(err({ kind: RepositoryErrorKind.NotFound }));
+      const noSnapshot = (repository: Repository): Repository => ({
         ...repository,
-        snapshots: {
-          ...repository.snapshots,
-          append: async (row) =>
-            row.listingId === l1.id
-              ? Promise.resolve(err({ kind: RepositoryErrorKind.NotFound }))
-              : repository.snapshots.append(row),
-        },
-        listings: {
-          ...repository.listings,
-          updateStatus: async () => Promise.resolve(err({ kind: RepositoryErrorKind.NotFound })),
-        },
+        snapshots: { ...repository.snapshots, append: missing },
       });
-      const { deps } = await setup({
-        listings: [l1, failing, l3],
-        answers: [[l1, fetched(LOWER)], [failing, TIMEOUT], [l3, fetched(LOWER)]],
-        wrap,
+      const noStatus = (repository: Repository): Repository => ({
+        ...repository,
+        listings: { ...repository.listings, updateStatus: missing },
       });
-      const report = await scanListings(deps);
-      expect(report.transitions).toEqual([]);
-      expect(report.alerts).toEqual([]);
+      await expect(scanListings((await setup({ wrap: noSnapshot })).deps)).rejects.toThrow();
+      await expect(scanListings((await setup({ wrap: noStatus, answers: [[l1, TIMEOUT]] })).deps)).rejects.toThrow();
     });
   });
 
@@ -322,8 +310,16 @@ describe("Scanning listings", () => {
         consecutiveBlocks: 1,
         backoffUntil: later(BLOCK_MINUTES.first * MINUTE_MS),
       });
-      expect(await statusOf(repository, l1)).toEqual(state(ListingStatus.Active, 1, 0));
+      expect(await statusOf(repository, l1)).toEqual(state(ListingStatus.Active, 0, 0));
       expect(await repository.snapshots.listSince(l2.id, NOW)).toEqual([]);
+    });
+
+    it("leaves a blocked listing's status and streaks as they were", async () => {
+      const failing = { ...l1, failureStreak: STREAK.two, notFoundStreak: 1 };
+      const { deps, repository } = await setup({ listings: [failing], answers: [[failing, BLOCKED]] });
+      const report = await scanListings(deps);
+      expect(await statusOf(repository, failing)).toEqual(state(ListingStatus.Active, STREAK.two, 1));
+      expect(report.transitions).toEqual([]);
     });
 
     it("doubles the backoff with each consecutive block", async () => {
@@ -531,6 +527,56 @@ describe("Scanning listings", () => {
       const report = await scanListings(deps);
       expect(report.alerts.map((row) => row.kind)).toEqual([AlertKind.PriceDrop]);
       expect((await repository.products.get(P1))?.cheapestListingId).toBe(l1.id);
+    });
+
+    it("clears the product's cheapest listing when it is gone and no other listing qualifies", async () => {
+      const cheapest = { ...l1, notFoundStreak: 1 };
+      const { deps, repository } = await setup({
+        products: [product("p1", { cheapestListingId: l1.id })],
+        listings: [cheapest, l2],
+        bases: [snapshot(l2, LOWER, { inStock: false })],
+        answers: [[cheapest, NOT_FOUND], [l2, TIMEOUT]],
+      });
+      const report = await scanListings(deps);
+      expect(report.alerts).toEqual([]);
+      expect((await repository.products.get(P1))?.cheapestListingId).toBeNull();
+    });
+
+    it("moves the cheapest to another listing when the cheapest goes gone, even if nothing fetched", async () => {
+      const cheapest = { ...l1, notFoundStreak: 1 };
+      const { deps, repository } = await setup({
+        products: [product("p1", { cheapestListingId: l1.id })],
+        listings: [cheapest, l2],
+        answers: [[cheapest, NOT_FOUND], [l2, TIMEOUT]],
+      });
+      const report = await scanListings(deps);
+      expect(report.alerts.map(({ kind, listingId }) => ({ kind, listingId }))).toEqual([
+        { kind: AlertKind.NewCheapest, listingId: l2.id },
+      ]);
+      expect((await repository.products.get(P1))?.cheapestListingId).toBe(l2.id);
+    });
+
+    it("keeps a cheapest listing that went stale when no other listing qualifies", async () => {
+      const cheapest = { ...l1, failureStreak: STREAK.two };
+      const { deps, repository } = await setup({
+        products: [product("p1", { cheapestListingId: l1.id })],
+        listings: [cheapest],
+        answers: [[cheapest, TIMEOUT]],
+      });
+      await scanListings(deps);
+      expect((await repository.products.get(P1))?.cheapestListingId).toBe(l1.id);
+    });
+
+    it("rejects as a bug when the product's cheapest listing cannot be stored", async () => {
+      const wrap = (repository: Repository): Repository => ({
+        ...repository,
+        products: {
+          ...repository.products,
+          setCheapest: async () => Promise.resolve(err({ kind: RepositoryErrorKind.NotFound })),
+        },
+      });
+      const { deps } = await setup({ wrap });
+      await expect(scanListings(deps)).rejects.toThrow();
     });
 
     it("rejects as a bug when the product of a scanned listing is missing", async () => {
