@@ -13,6 +13,35 @@ export type {
 export { evaluate } from "./alerts/evaluate.js";
 export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
 export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
+export { MatchErrorKind } from "./matching/errors.js";
+export { findMatches, rejudgeUnjudged } from "./matching/find.js";
+export type {
+  AlreadySuggested,
+  FailedSearch,
+  FindMatchesError,
+  ForeignResults,
+  MatchDeps,
+  MatchReport,
+  NoSourceListing,
+  SourceListingError,
+} from "./matching/find.js";
+export { acceptCandidate, rejectCandidate } from "./matching/review.js";
+export type { AcceptCandidateError, NotPending } from "./matching/review.js";
+export { addListing, addProduct } from "./products/add.js";
+export type {
+  CoreDeps,
+  AddedListing,
+  AddedProduct,
+  AddListingError,
+  AddProductError,
+  AlreadyTracked,
+  FetchFailed,
+  NoPluginForDomain,
+  ProductNotFound,
+} from "./products/add.js";
+export { AddErrorKind } from "./products/errors.js";
+export { normalizeListingUrl } from "./products/normalize-url.js";
+export type { InvalidUrl } from "./products/normalize-url.js";
 export { COUNTRY_PRESETS, presetFor } from "./pricing/country-presets.js";
 export type { CountryPreset, PresetSource } from "./pricing/country-presets.js";
 export { convert } from "./pricing/fx.js";
@@ -90,3 +119,11 @@ export type {
   VerdictCacheRepository,
 } from "./ports/repository.js";
 export type { Scheduler } from "./ports/scheduler.js";
+export type { StoreGateway } from "./ports/store-gateway.js";
+export { scanListings } from "./scan/scan.js";
+export type { ListingTransition, PluginScan, ScanDeps, ScanReport } from "./scan/scan.js";
+export { nextScanDue, RatesRefresh, refreshRatesIfStale } from "./scheduler/policy.js";
+export type { RefreshRatesDeps } from "./scheduler/policy.js";
+export { SchedulerErrorKind } from "./scheduler/errors.js";
+export { startScheduler } from "./scheduler/start.js";
+export type { SchedulerDeps, SchedulerHandle, SchedulerStopped } from "./scheduler/start.js";

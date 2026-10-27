@@ -1,15 +1,18 @@
 import { err, ok } from "@fpving/plugin-sdk";
-import { CandidateStatus, DEFAULT_SETTINGS, RepositoryErrorKind } from "../../src/index.ts";
+import { CandidateStatus, DEFAULT_SETTINGS, ListingStatus, RepositoryErrorKind } from "../../src/index.ts";
 import type {
   Alert,
   CachedVerdict,
+  DuplicateUrl,
   FxTable,
   Listing,
   MatchCandidate,
+  NotFound,
   PluginHealth,
   PriceSnapshot,
   Product,
   Repository,
+  Result,
   ScanRun,
   Settings,
 } from "../../src/index.ts";
@@ -20,6 +23,8 @@ const done = ok(undefined);
 const copy = structuredClone;
 
 const bug = async (message: string): Promise<never> => Promise.reject(new Error(message));
+
+const byCodePoint = (a: string, b: string): number => Number(a > b) - Number(a < b);
 
 const newestFirst = <T>(rows: Iterable<T>, at: (row: T) => Date): T[] =>
   [...rows].toSorted((a, b) => at(b).getTime() - at(a).getTime());
@@ -41,6 +46,24 @@ export const inMemoryRepository = (): Repository => {
   const suggested = (row: Pick<MatchCandidate, "productId" | "url">, pool: Iterable<MatchCandidate>): boolean =>
     [...pool].some((other) => other.productId === row.productId && other.url === row.url);
 
+  const insertListing = async (
+    listing: Listing,
+    firstSnapshot: PriceSnapshot,
+  ): Promise<Result<void, NotFound | DuplicateUrl>> => {
+    if (listings.has(listing.id) || snapshots.has(firstSnapshot.id)) {
+      return bug("duplicate id");
+    }
+    if (!products.has(listing.productId)) {
+      return Promise.resolve(notFound);
+    }
+    if (urlTracked(listing.url)) {
+      return Promise.resolve(duplicateUrl);
+    }
+    listings.set(listing.id, copy(listing));
+    snapshots.set(firstSnapshot.id, copy(firstSnapshot));
+    return Promise.resolve(done);
+  };
+
   return {
     products: {
       add: async (product, firstListing, firstSnapshot) => {
@@ -58,21 +81,24 @@ export const inMemoryRepository = (): Repository => {
         snapshots.set(firstSnapshot.id, copy(firstSnapshot));
         return Promise.resolve(done);
       },
-    },
-    listings: {
-      add: async (listing) => {
-        if (listings.has(listing.id)) {
-          return bug("duplicate listing id");
-        }
-        if (!products.has(listing.productId)) {
+      get: async (id) => Promise.resolve(copy(products.get(id) ?? null)),
+      setCheapest: async (id, cheapestListingId) => {
+        const row = products.get(id);
+        if (row === undefined) {
           return Promise.resolve(notFound);
         }
-        if (urlTracked(listing.url)) {
-          return Promise.resolve(duplicateUrl);
+        if (cheapestListingId !== null && listings.get(cheapestListingId)?.productId !== id) {
+          return bug("cheapest listing is missing or another product's");
         }
-        listings.set(listing.id, copy(listing));
+        products.set(id, { ...row, cheapestListingId });
         return Promise.resolve(done);
       },
+    },
+    listings: {
+      addWithSnapshot: async (listing, firstSnapshot) =>
+        firstSnapshot.listingId === listing.id
+          ? insertListing(listing, firstSnapshot)
+          : bug("first snapshot belongs to another listing"),
       findByUrl: async (url) => Promise.resolve(copy([...listings.values()].find((row) => row.url === url) ?? null)),
       listByProduct: async (productId) =>
         Promise.resolve(
@@ -80,6 +106,19 @@ export const inMemoryRepository = (): Repository => {
             [...listings.values()]
               .filter((row) => row.productId === productId)
               .toSorted((a, b) => a.addedAt.getTime() - b.addedAt.getTime()),
+          ),
+        ),
+      listToScan: async () =>
+        Promise.resolve(
+          copy(
+            [...listings.values()]
+              .filter((row) => row.status !== ListingStatus.Gone && products.get(row.productId)?.archivedAt === null)
+              .toSorted(
+                (a, b) =>
+                  byCodePoint(a.pluginId, b.pluginId)
+                  || byCodePoint(a.productId, b.productId)
+                  || a.addedAt.getTime() - b.addedAt.getTime(),
+              ),
           ),
         ),
       updateStatus: async (id, update) => {
@@ -145,30 +184,34 @@ export const inMemoryRepository = (): Repository => {
           copy(
             [...candidates.values()]
               .filter((row) => row.status === CandidateStatus.Pending)
-              .toSorted((a, b) => b.similarityScore - a.similarityScore),
+              .toSorted((a, b) => b.similarityScore - a.similarityScore || byCodePoint(a.id, b.id)),
           ),
         ),
-      accept: async (id, listing) => {
+      accept: async (id, listing, firstSnapshot) => {
         const row = candidates.get(id);
-        if (row === undefined) {
+        if (row?.status !== CandidateStatus.Pending) {
           return Promise.resolve(notFound);
         }
-        if (listing.productId !== row.productId) {
-          return bug("listing is not for the candidate's product");
+        if (listing.productId !== row.productId || firstSnapshot.listingId !== listing.id) {
+          return bug("listing or snapshot belongs to another row");
         }
-        if (listings.has(listing.id)) {
-          return bug("duplicate listing id");
+        const inserted = await insertListing(listing, firstSnapshot);
+        if (inserted.ok) {
+          candidates.set(id, { ...row, status: CandidateStatus.Accepted });
         }
-        if (urlTracked(listing.url)) {
-          return Promise.resolve(duplicateUrl);
+        return inserted;
+      },
+      recordVerdict: async (id, { verdict, reason }) => {
+        const row = candidates.get(id);
+        if (row?.status !== CandidateStatus.Pending) {
+          return Promise.resolve(notFound);
         }
-        listings.set(listing.id, copy(listing));
-        candidates.set(id, { ...row, status: CandidateStatus.Accepted });
+        candidates.set(id, { ...row, llmVerdict: verdict, llmReason: reason });
         return Promise.resolve(done);
       },
       reject: async (id) => {
         const row = candidates.get(id);
-        if (row === undefined) {
+        if (row?.status !== CandidateStatus.Pending) {
           return Promise.resolve(notFound);
         }
         candidates.set(id, { ...row, status: CandidateStatus.Rejected });

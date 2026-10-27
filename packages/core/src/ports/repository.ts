@@ -9,6 +9,7 @@ import type {
   Product,
   ScanRun,
   Settings,
+  Verdict,
 } from "../entities.js";
 import type { AlertId, ListingId, MatchCandidateId, PluginId, ProductId } from "../ids.js";
 import type { FxTable } from "../pricing/fx.js";
@@ -36,6 +37,13 @@ export interface ProductRepository {
    * tracked. Rejects when the listing is not the product's or the snapshot not the listing's.
    */
   add(product: Product, firstListing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, DuplicateUrl>>;
+  /** The product with id `id`, or null. */
+  get(id: ProductId): Promise<Product | null>;
+  /**
+   * Replaces a product's cheapest listing, or clears it with null. Rejects when the listing does not exist or is
+   * another product's.
+   */
+  setCheapest(id: ProductId, listingId: ListingId | null): Promise<Result<void, NotFound>>;
 }
 
 /** The fields of a listing that a fetch outcome changes. */
@@ -43,12 +51,20 @@ export type ListingStatusUpdate = Pick<Listing, "status" | "failureStreak" | "no
 
 /** Stores listings. Urls are compared exactly, so callers pass them normalized. */
 export interface ListingRepository {
-  /** Adds a listing to an existing product. */
-  add(listing: Listing): Promise<Result<void, NotFound | DuplicateUrl>>;
+  /**
+   * Adds a listing to an existing product together with its first snapshot, or neither of them. Rejects when the
+   * snapshot is not the listing's.
+   */
+  addWithSnapshot(listing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, NotFound | DuplicateUrl>>;
   /** The listing tracking `url`, or null. */
   findByUrl(url: string): Promise<Listing | null>;
   /** A product's listings, oldest first. */
   listByProduct(productId: ProductId): Promise<Listing[]>;
+  /**
+   * The listings a scan fetches: the active and stale ones of products that are not archived, ordered by plugin id,
+   * then product id, then oldest first. Ids compare by code point.
+   */
+  listToScan(): Promise<Listing[]>;
   /** Replaces a listing's status and streaks. */
   updateStatus(id: ListingId, update: ListingStatusUpdate): Promise<Result<void, NotFound>>;
 }
@@ -63,18 +79,27 @@ export interface SnapshotRepository {
   latestPerListing(productId: ProductId): Promise<PriceSnapshot[]>;
 }
 
-/** Stores match candidates. A url is suggested at most once per product. */
+/**
+ * Stores match candidates. A url is suggested at most once per product. Only a pending candidate can be accepted,
+ * rejected or given a verdict; a decided one is refused with `not_found`, like a missing one.
+ */
 export interface MatchCandidateRepository {
   /** Saves all candidates, or none when any url was already suggested for its product. */
   save(candidates: readonly MatchCandidate[]): Promise<Result<void, DuplicateUrl>>;
-  /** Every pending candidate, highest similarity first. */
+  /** Every pending candidate, highest similarity first, equal similarities by id in code point order. */
   listPending(): Promise<MatchCandidate[]>;
   /**
-   * Marks a candidate accepted and adds its listing in one step, or does neither. Rejects when the listing is not
-   * for the candidate's product.
+   * Marks a pending candidate accepted and adds its listing with the listing's first snapshot in one step, or does
+   * none of it. Rejects when the listing is not for the candidate's product or the snapshot not the listing's.
    */
-  accept(id: MatchCandidateId, listing: Listing): Promise<Result<void, NotFound | DuplicateUrl>>;
-  /** Marks a candidate rejected, so its url is never suggested for the product again. */
+  accept(
+    id: MatchCandidateId,
+    listing: Listing,
+    firstSnapshot: PriceSnapshot,
+  ): Promise<Result<void, NotFound | DuplicateUrl>>;
+  /** Replaces a pending candidate's verdict and reason with the ones the LLM gave. */
+  recordVerdict(id: MatchCandidateId, verdict: Verdict): Promise<Result<void, NotFound>>;
+  /** Marks a pending candidate rejected, so its url is never suggested for the product again. */
   reject(id: MatchCandidateId): Promise<Result<void, NotFound>>;
   /** Whether `url` was already suggested for the product, whatever its status, or is tracked by any listing. */
   isKnownUrl(productId: ProductId, url: string): Promise<boolean>;
@@ -108,9 +133,9 @@ export interface ScanRunRepository {
 
 /** Stores exchange rates. */
 export interface FxRateRepository {
-  /** Stores a rate table, which becomes the latest. */
+  /** Stores a rate table, which becomes the latest whatever its date. */
   save(table: FxTable): Promise<void>;
-  /** The last saved rate table, or null. */
+  /** The last saved rate table, not the one with the newest date, or null. */
   latest(): Promise<FxTable | null>;
 }
 
