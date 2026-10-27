@@ -20,6 +20,12 @@ describe("Normalizing a listing URL", () => {
     expect(normalized(tracked)).toEqual(ok("https://shop.example/item?sku=42"));
   });
 
+  it("re-serializes the query: a bare name gets an equals sign, %20 becomes a plus, and the result is stable", () => {
+    const once = normalizeListingUrl("https://shop.example/item?foo&q=red%20motor", DOMAINS);
+    expect(once).toEqual(ok("https://shop.example/item?foo=&q=red+motor"));
+    expect(once.ok && normalizeListingUrl(once.value, DOMAINS)).toEqual(once);
+  });
+
   it("keeps parameters that only resemble tracking ones", () => {
     expect(normalized("https://shop.example/item?utm=1&spmx=2&affiliate=3")).toEqual(
       ok("https://shop.example/item?affiliate=3&spmx=2&utm=1"),

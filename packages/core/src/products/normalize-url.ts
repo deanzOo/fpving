@@ -26,7 +26,7 @@ const isTracking = (name: string): boolean =>
  * @remarks
  * - The scheme and host are lowercased; the username, password, default port and fragment are dropped.
  * - Tracking parameters are dropped: `utm_*`, `aff_*`, `gclid`, `fbclid`, `msclkid`, `spm` and `scm`. The rest are
- *   sorted by name.
+ *   sorted by name and re-serialized, so a bare `?foo` becomes `?foo=` and `%20` becomes `+`.
  * - Trailing slashes are stripped from the path, except the root `/`.
  * - A `www.` or `m.` subdomain is stripped only when the host left over is one of `declaredDomains`, the hostnames
  *   plugins declare, so `m.example.com` becomes `example.com` when a plugin declares `example.com`.
