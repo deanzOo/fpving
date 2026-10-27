@@ -62,13 +62,15 @@ export interface AddedProduct extends AddedListing {
   readonly product: Product;
 }
 
-interface Target {
+/** A fetched store page about to become a listing. */
+export interface Target {
   readonly url: string;
   readonly pluginId: PluginId;
   readonly fetched: FetchedListing;
 }
 
-const alreadyTracked = async (repository: Repository, url: string): Promise<Result<never, AlreadyTracked>> => {
+/** The `already_tracked` error for a url the repository refused as tracked, naming the listing tracking it. */
+export const alreadyTracked = async (repository: Repository, url: string): Promise<Result<never, AlreadyTracked>> => {
   const listing = await repository.listings.findByUrl(url);
   if (listing === null) {
     throw new Error(`the repository reported ${url} as tracked but has no listing for it`);
@@ -96,7 +98,14 @@ const fetchNew = async ({ repository, stores }: AddDeps, input: string): Promise
   return ok({ url, pluginId, fetched: fetched.value });
 };
 
-const newListing = async (deps: AddDeps, productId: ProductId, target: Target, now: Date): Promise<AddedListing> => {
+/** An active listing of `target` with no failures and its first snapshot, quoted for the saved ship-to country. */
+export const newListing = async (
+  deps: AddDeps,
+  productId: ProductId,
+  target: Target,
+  origin: ListingOrigin,
+  now: Date,
+): Promise<AddedListing> => {
   const { shipToCountry } = await deps.repository.settings.get();
   const listing: Listing = {
     id: listingIdSchema.parse(deps.ids.next()),
@@ -105,7 +114,7 @@ const newListing = async (deps: AddDeps, productId: ProductId, target: Target, n
     url: target.url,
     title: target.fetched.title,
     status: ListingStatus.Active,
-    origin: ListingOrigin.Manual,
+    origin,
     addedAt: now,
     failureStreak: 0,
     notFoundStreak: 0,
@@ -148,7 +157,7 @@ export const addProduct = async (deps: AddDeps, url: string): Promise<Result<Add
     createdAt: now,
     archivedAt: null,
   };
-  const { listing, snapshot } = await newListing(deps, product.id, target.value, now);
+  const { listing, snapshot } = await newListing(deps, product.id, target.value, ListingOrigin.Manual, now);
   const stored = await deps.repository.products.add(product, listing, snapshot);
   return stored.ok ? ok({ product, listing, snapshot }) : alreadyTracked(deps.repository, listing.url);
 };
@@ -174,7 +183,7 @@ export const addListing = async (
   if (!target.ok) {
     return target;
   }
-  const added = await newListing(deps, productId, target.value, deps.clock.now());
+  const added = await newListing(deps, productId, target.value, ListingOrigin.Manual, deps.clock.now());
   const stored = await deps.repository.listings.addWithSnapshot(added.listing, added.snapshot);
   if (stored.ok) {
     return ok(added);

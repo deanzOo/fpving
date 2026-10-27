@@ -16,6 +16,8 @@ export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draf
 export { MatchErrorKind } from "./matching/errors.js";
 export { findMatches, rejudgeUnjudged } from "./matching/find.js";
 export type { FailedSearch, FindMatchesError, MatchDeps, MatchReport, NoSourceListing } from "./matching/find.js";
+export { acceptCandidate, rejectCandidate } from "./matching/review.js";
+export type { AcceptCandidateError, NotPending } from "./matching/review.js";
 export { addListing, addProduct } from "./products/add.js";
 export type {
   AddDeps,
