@@ -21,3 +21,21 @@ jobs:
       pull-requests: read
       security-events: write
     uses: ./.github/workflows/ci.yml
+
+  matcher-eval:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - if: env.HAS_ANTHROPIC_KEY == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: env.HAS_ANTHROPIC_KEY == 'true'
+        uses: ./.github/actions/setup
+      - if: env.HAS_ANTHROPIC_KEY == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pnpm eval:matcher
