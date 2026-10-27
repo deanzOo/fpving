@@ -56,6 +56,13 @@ describe("Fetching exchange rates over HTTP", () => {
     expect(detailOf(result)).toBe("request failed: TypeError: fetch failed");
   });
 
+  it("reports a timed out request as rates unavailable", async () => {
+    const rates = createHttpFxRates(() => Promise.reject(new DOMException("The operation timed out", "TimeoutError")));
+    const result = await rates.fetchLatest();
+    expect(result.ok ? undefined : result.error.kind).toBe(PortErrorKind.RatesUnavailable);
+    expect(detailOf(result)).toContain("TimeoutError");
+  });
+
   it("reports a body that is not JSON as rates unavailable", async () => {
     const { rates } = replying("<html>");
     const result = await rates.fetchLatest();
