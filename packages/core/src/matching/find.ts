@@ -225,8 +225,10 @@ export const findMatches = async (
  * unavailable, and records each verdict it gives.
  *
  * @remarks
- * Judges exactly like {@link findMatches}, cache first. A candidate the LLM still cannot judge stays `unjudged`, and
- * one accepted or rejected while it was being judged is skipped.
+ * Nothing in core calls this: like {@link findMatches}, the host triggers it, for example when the user opens the
+ * review list or the LLM becomes available again. It judges exactly like {@link findMatches}, cache first. A
+ * candidate the LLM still cannot judge stays `unjudged`, and one accepted or rejected while it was being judged is
+ * skipped.
  *
  * @param deps - The ports to use.
  * @param productId - The product whose candidates to judge.
