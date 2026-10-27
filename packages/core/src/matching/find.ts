@@ -31,12 +31,20 @@ export interface FailedSearch {
   readonly error: StoreError;
 }
 
+/** How many results a store's search returned on hosts that store does not serve, which were dropped. */
+export interface ForeignResults {
+  readonly pluginId: PluginId;
+  readonly count: number;
+}
+
 /** What {@link findMatches} did. */
 export interface MatchReport {
   /** The candidates it saved as pending, each store's most similar first. */
   readonly candidates: MatchCandidate[];
   /** The stores whose search failed, which added no candidates. */
   readonly failedSearches: FailedSearch[];
+  /** The stores that returned results on hosts they do not serve, which are not candidates. */
+  readonly foreignResults: ForeignResults[];
 }
 
 /**
@@ -54,6 +62,7 @@ interface Found {
 interface Searched {
   readonly found: Found[];
   readonly failedSearches: FailedSearch[];
+  readonly foreignResults: ForeignResults[];
 }
 
 const sourceListing = async (
@@ -107,20 +116,30 @@ const searchAll = async ({ stores }: MatchDeps, plugins: PluginId[], query: Sear
   const found: Found[] = [];
   const seen = new Set<string>();
   const failedSearches: FailedSearch[] = [];
+  const foreignResults: ForeignResults[] = [];
   for (const { pluginId, results } of searches) {
     if (!results.ok) {
       failedSearches.push({ pluginId, error: results.error });
       continue;
     }
+    let foreign = 0;
     for (const row of results.value) {
       const url = normalizeListingUrl(row.url, domains);
-      if (url.ok && !seen.has(url.value)) {
+      if (!url.ok) {
+        continue;
+      }
+      if (stores.pluginFor(url.value) !== pluginId) {
+        foreign += 1;
+      } else if (!seen.has(url.value)) {
         seen.add(url.value);
         found.push({ pluginId, url: url.value, title: row.title });
       }
     }
+    if (foreign > 0) {
+      foreignResults.push({ pluginId, count: foreign });
+    }
   }
-  return { found, failedSearches };
+  return { found, failedSearches, foreignResults };
 };
 
 /**
@@ -133,7 +152,9 @@ const searchAll = async ({ stores }: MatchDeps, plugins: PluginId[], query: Sear
  *   stores are searched for the source title instead, and candidates are scored against it.
  * - A failed search is reported in `failedSearches` and does not stop the others.
  * - Result urls are normalized with {@link normalizeListingUrl}; invalid ones and repeats are dropped, and so is any
- *   url a listing tracks or that was already suggested for the product, rejected included.
+ *   url a listing tracks or that was already suggested for the product, rejected included. A result whose host is
+ *   not served by the plugin that returned it is dropped too and counted in `foreignResults`, so a plugin can only
+ *   suggest pages it can fetch.
  * - The rest are scored with a similarity of model numbers and shared words, and the five most similar of each
  *   store are kept.
  * - Each is judged against the source title, from the verdict cache by source and candidate url when it holds the
@@ -156,7 +177,7 @@ export const findMatches = async (
   const identity = await deps.llm.extractIdentity(title);
   const { query, reference } = searchTerms(identity, title);
   const plugins = deps.stores.searchablePlugins().filter((id) => id !== sourcePlugin);
-  const { found, failedSearches } = await searchAll(deps, plugins, query);
+  const { found, failedSearches, foreignResults } = await searchAll(deps, plugins, query);
   const known = await settleAll(
     found.map(async (row) => deps.repository.matchCandidates.isKnownUrl(productId, row.url)),
   );
@@ -184,7 +205,7 @@ export const findMatches = async (
     }),
   );
   const saved = await deps.repository.matchCandidates.save(candidates);
-  return saved.ok ? ok({ candidates, failedSearches }) : saved;
+  return saved.ok ? ok({ candidates, failedSearches, foreignResults }) : saved;
 };
 
 /**

@@ -89,7 +89,7 @@ describe("Finding matches for a product", () => {
       { ...older, similarityScore: similarity(REFERENCE, OLDER.title) },
       { ...other, title: OTHER_STORE.title, similarityScore: similarity(REFERENCE, OTHER_STORE.title) },
     ];
-    expect(found).toEqual(ok({ candidates: expected, failedSearches: [] }));
+    expect(found).toEqual(ok({ candidates: expected, failedSearches: [], foreignResults: [] }));
     expect(await repository.matchCandidates.listPending()).toEqual(
       expected.toSorted((x, y) => y.similarityScore - x.similarityScore),
     );
@@ -148,6 +148,18 @@ describe("Finding matches for a product", () => {
       ["https://a.example/f60", EXACT.title],
       [OTHER_STORE.url, OTHER_STORE.title],
     ]);
+  });
+
+  it("drops results on a host its plugin does not declare and reports how many per store", async () => {
+    const otherStores = result("https://b.example/item/7", "T-Motor F60 Pro V 1950KV twin");
+    const undeclared = result("https://elsewhere.example/f60", "T-Motor F60 Pro V 1950KV");
+    const { deps, productId } = await setup({ a: ok([otherStores, undeclared, EXACT]), b: ok([OTHER_STORE]) });
+    const found = await findMatches(deps, productId);
+    expect(found.ok && found.value.candidates.map((row) => [row.pluginId, row.url])).toEqual([
+      [SHOP_A, "https://a.example/f60"],
+      [SHOP_B, OTHER_STORE.url],
+    ]);
+    expect(found.ok && found.value.foreignResults).toEqual([{ pluginId: SHOP_A, count: 2 }]);
   });
 
   it("reports each store whose search failed and still saves the other stores' candidates", async () => {
