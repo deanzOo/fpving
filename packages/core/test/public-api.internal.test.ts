@@ -32,6 +32,7 @@ describe("Core public API", () => {
       "evaluate",
       "findMatches",
       "importTax",
+      "importTaxRuleSchema",
       "landedCost",
       "listingIdSchema",
       "listingSchema",
