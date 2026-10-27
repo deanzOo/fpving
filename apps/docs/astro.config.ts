@@ -15,7 +15,7 @@ export default defineConfig({
       plugins: [
         starlightTypeDoc({
           entryPoints: ["../../packages/plugin-sdk", "../../packages/core"],
-          typeDoc: { entryPointStrategy: "packages", outputFileStrategy: "modules" },
+          typeDoc: { entryPointStrategy: "packages", outputFileStrategy: "modules", entryFileName: "index" },
           output: "api",
           sidebar: { label: "API reference", collapsed: true },
         }),

@@ -1,8 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/core" },
     { "path": "packages/plugin-sdk" },
+    { "path": "packages/core" },
     { "path": "apps/fpving" },
     { "path": "tsconfig.tools.json" }
   ]

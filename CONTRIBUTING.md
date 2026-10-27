@@ -27,7 +27,8 @@ Planned, not built yet: tooling that gives each worktree its own port, SQLite fi
 ## Tests first
 
 - Write a failing test before the implementation, for every feature and bug fix.
-- Test names read as requirements: `describe("Price drop alert")` and `it("fires when ...")`.
+- Test names read as requirements: `describe("Price drop alert")` and `it("fires when ...")`. Describe names are sentence case, because they become headings in the behaviour specification.
+- Name a test file `*.internal.test.ts` when it checks implementation detail rather than behaviour a user or plugin author relies on (test fakes, the shape of a public entry, wiring). The behaviour specification leaves those files out.
 - Coverage is a hard 100% gate on lines, branches, functions and statements. Exclusions live in `vitest.config.ts` only.
 
 ### Bug protocol

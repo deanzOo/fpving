@@ -4,4 +4,4 @@ offline = true
 no_progress = true
 include_fragments = "full"
 remap = ["^file://(.*)/dist/fpving(/|$) file://$1/dist/"]
-exclude = ["/api/fpving/[^/]+#"]
+exclude = ["/api/fpving/.+[^/]#"]

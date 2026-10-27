@@ -4,6 +4,39 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "exports": { ".": "./dist/index.js" },
-  "types": "./dist/index.d.ts"
+  "exports": {
+    ".": {
+      "@fpving/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./contract": {
+      "@fpving/source": "./src/contract/index.ts",
+      "types": "./dist/contract/index.d.ts",
+      "import": "./dist/contract/index.js"
+    },
+    "./contract/check": {
+      "@fpving/source": "./src/contract/check.ts",
+      "types": "./dist/contract/check.d.ts",
+      "import": "./dist/contract/check.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "semver": "7.8.5",
+    "zod": "4.6.7"
+  },
+  "peerDependencies": {
+    "vitest": "^5.0.4"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/semver": "7.8.0",
+    "vitest": "5.0.4"
+  }
 }

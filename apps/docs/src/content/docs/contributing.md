@@ -14,7 +14,7 @@ The full guide is [CONTRIBUTING.md](https://github.com/deanzoo/fpving/blob/main/
 
 ## Rules in brief
 
-- Write a failing test before the implementation. Test names read as requirements.
+- Write a failing test before the implementation. Test names read as requirements, and describe names are sentence case. Name a test file `*.internal.test.ts` when it checks implementation detail such as a test fake or the shape of a public entry; the behaviour specification leaves it out.
 - Coverage is a hard 100% gate on lines, branches, functions and statements.
 - Formatting is ESLint-enforced (`@stylistic`), with no Prettier.
 - Strict TypeScript: no `any`, no `as` except `as const`, no `!`, no `@ts-*`, no `eslint-disable`.

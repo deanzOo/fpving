@@ -21,4 +21,11 @@ If no plugin handles a URL's domain, adding a product fails with a clear message
 
 ## What exists today
 
-The monorepo, build tooling, CI and the first public SDK types. To work on it, follow the setup in [Contributing](../contributing/).
+The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and the plugin contract in `@fpving/plugin-sdk`:
+
+- The public plugin SDK: types, schemas, the error taxonomy and the contract test kit.
+- Pricing: exchange rate conversion, import tax, landed cost and the Israel country preset.
+- The domain entities and the ports the host and adapters will implement, with a shared repository contract suite.
+- The alert evaluator: price drop, back in stock and new cheapest, as a pure function.
+
+None of it is wired into a running app yet. To work on it, follow the setup in [Contributing](../contributing/).
