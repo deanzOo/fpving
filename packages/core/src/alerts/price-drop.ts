@@ -7,7 +7,8 @@ const HOURS_PER_DAY = 24;
 const MS_PER_HOUR = 3_600_000;
 const BASIS_POINTS_FULL = 10_000n;
 
-const PRICE_DROP_WINDOW_MS = WINDOW_DAYS * HOURS_PER_DAY * MS_PER_HOUR;
+/** How far back a price drop looks for the previous low, 30 days in milliseconds. */
+export const PRICE_DROP_WINDOW_MS = WINDOW_DAYS * HOURS_PER_DAY * MS_PER_HOUR;
 
 /**
  * Raises a price drop alert when the incoming item price is lower than every earlier snapshot in the window and at
