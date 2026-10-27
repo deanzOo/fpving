@@ -218,6 +218,8 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         const tracked = listing("l4", p1.id, l2.url);
         expect(await repo.listings.addWithSnapshot(tracked, snapshot("s4", tracked.id, JAN_2))).toEqual(duplicateUrl);
         expect(await repo.snapshots.append(snapshot("s5", orphan.id, JAN_2))).toEqual(notFound);
+        expect(await repo.snapshots.listSince(orphan.id, JAN_1)).toEqual([]);
+        expect(await repo.snapshots.listSince(tracked.id, JAN_1)).toEqual([]);
         expect(await repo.snapshots.append(snapshot("s6", tracked.id, JAN_2))).toEqual(notFound);
         expect(await repo.listings.listByProduct(p1.id)).toEqual([l1]);
       });
