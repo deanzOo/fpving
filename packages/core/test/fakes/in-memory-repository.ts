@@ -79,6 +79,15 @@ export const inMemoryRepository = (): Repository => {
         snapshots.set(firstSnapshot.id, copy(firstSnapshot));
         return Promise.resolve(done);
       },
+      get: async (id) => Promise.resolve(copy(products.get(id) ?? null)),
+      setCheapest: async (id, cheapestListingId) => {
+        const row = products.get(id);
+        if (row === undefined) {
+          return Promise.resolve(notFound);
+        }
+        products.set(id, { ...row, cheapestListingId });
+        return Promise.resolve(done);
+      },
     },
     listings: {
       addWithSnapshot: async (listing, firstSnapshot) =>

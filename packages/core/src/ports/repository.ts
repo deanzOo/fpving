@@ -37,6 +37,10 @@ export interface ProductRepository {
    * tracked. Rejects when the listing is not the product's or the snapshot not the listing's.
    */
   add(product: Product, firstListing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, DuplicateUrl>>;
+  /** The product with id `id`, or null. */
+  get(id: ProductId): Promise<Product | null>;
+  /** Replaces a product's cheapest listing, or clears it with null. */
+  setCheapest(id: ProductId, listingId: ListingId | null): Promise<Result<void, NotFound>>;
 }
 
 /** The fields of a listing that a fetch outcome changes. */

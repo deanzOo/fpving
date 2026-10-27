@@ -60,6 +60,7 @@ const product = (id: string): Product => ({
   name: `Product ${id}`,
   createdAt: JAN_1,
   archivedAt: null,
+  cheapestListingId: null,
 });
 
 const listing = (id: string, productId: ProductId, url: string): Listing => ({
@@ -171,6 +172,24 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       it("rejects a first listing of another product or a first snapshot of another listing as a bug", async () => {
         await expect(repo.products.add(p1, { ...l1, productId: p2.id }, s1)).rejects.toThrow();
         await expect(repo.products.add(p1, l1, { ...s1, listingId: l2.id })).rejects.toThrow();
+      });
+
+      it("reads a stored product, and none for an id that is not stored", async () => {
+        await repo.products.add(p1, l1, s1);
+        expect(await repo.products.get(p1.id)).toEqual(p1);
+        expect(await repo.products.get(missingProduct)).toBeNull();
+      });
+
+      it("sets and clears a product's cheapest listing", async () => {
+        await repo.products.add(p1, l1, s1);
+        expect(await repo.products.setCheapest(p1.id, l1.id)).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual({ ...p1, cheapestListingId: l1.id });
+        expect(await repo.products.setCheapest(p1.id, null)).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual(p1);
+      });
+
+      it("reports not_found when setting the cheapest listing of a product that does not exist", async () => {
+        expect(await repo.products.setCheapest(missingProduct, null)).toEqual(notFound);
       });
 
       it("rejects a product id that is already stored as a bug", async () => {

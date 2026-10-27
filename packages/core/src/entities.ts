@@ -68,12 +68,16 @@ export const ScanOutcome = { Ok: "ok", Failed: "failed", Blocked: "blocked" } as
 /** One of the {@link ScanOutcome} values. */
 export type ScanOutcome = (typeof ScanOutcome)[keyof typeof ScanOutcome];
 
-/** A watched product. `name` starts as the first listing's title and is editable. */
+/**
+ * A watched product. `name` starts as the first listing's title and is editable. `cheapestListingId` is the listing
+ * the last alert evaluation found cheapest, null until one was found.
+ */
 export const productSchema = z.object({
   id: productIdSchema,
   name: textSchema,
   createdAt: z.date(),
   archivedAt: z.date().nullable(),
+  cheapestListingId: listingIdSchema.nullable(),
 });
 
 /** A product as {@link productSchema} accepts it. */

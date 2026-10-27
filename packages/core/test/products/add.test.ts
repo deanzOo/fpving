@@ -78,7 +78,8 @@ const forgetfulAboutUrls = (repository: Repository): Repository => ({
 describe("Adding a product", () => {
   it("stores a product named after the listing title with an active manual listing and a first snapshot", async () => {
     const { deps, repository } = setup();
-    const product = { id: productIdSchema.parse("id-1"), name: fetched.title, createdAt: NOW, archivedAt: null };
+    const id = productIdSchema.parse("id-1");
+    const product = { id, name: fetched.title, createdAt: NOW, archivedAt: null, cheapestListingId: null };
     const listing = expectedListing("id-2", "id-1", CANONICAL);
     const snapshot = expectedSnapshot("id-3", "id-2");
     expect(await addProduct(deps, PASTED)).toEqual(ok({ product, listing, snapshot }));

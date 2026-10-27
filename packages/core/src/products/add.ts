@@ -156,6 +156,7 @@ export const addProduct = async (deps: AddDeps, url: string): Promise<Result<Add
     name: target.value.fetched.title,
     createdAt: now,
     archivedAt: null,
+    cheapestListingId: null,
   };
   const { listing, snapshot } = await newListing(deps, product.id, target.value, ListingOrigin.Manual, now);
   const stored = await deps.repository.products.add(product, listing, snapshot);
