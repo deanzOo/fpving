@@ -155,7 +155,7 @@ describe("Anthropic LLM judge", () => {
   it("calls the real client without ever logging the api key", async () => {
     const sentHeaders: string[] = [];
     const body = { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } };
-    const client = new Anthropic({
+    const createMessage = anthropicMessages({
       apiKey: FAKE_KEY,
       maxRetries: 0,
       fetch: (_url, init) => {
@@ -165,7 +165,7 @@ describe("Anthropic LLM judge", () => {
       },
     });
     const { logger, logged } = recordingLogger();
-    const judge = createAnthropicLlmJudge(anthropicMessages(client), logger);
+    const judge = createAnthropicLlmJudge(createMessage, logger);
     expect(failure(await judge.compare(SOURCE, CANDIDATE))?.detail).toContain("authentication failed");
     expect(sentHeaders.join()).toContain(FAKE_KEY);
     expect(logged).toHaveLength(1);

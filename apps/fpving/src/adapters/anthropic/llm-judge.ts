@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { ClientOptions } from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { Message, MessageCreateParamsNonStreaming } from "@anthropic-ai/sdk/resources/messages";
 import { err, LlmErrorKind, ok, productIdentitySchema, verdictSchema } from "@fpving/core";
@@ -24,10 +25,13 @@ export type CreateMessage = (params: MessageCreateParamsNonStreaming) => Promise
 /**
  * The {@link CreateMessage} of a real client. The client's own retries cover 429 and 5xx replies.
  *
- * @param client - The Anthropic client.
- * @returns The function that sends a request through it.
+ * @param options - The client options, at least the API key.
+ * @returns The function that sends a request through the client.
  */
-export const anthropicMessages = (client: Anthropic): CreateMessage => async (params) => client.messages.create(params);
+export const anthropicMessages = (options: ClientOptions): CreateMessage => {
+  const client = new Anthropic(options);
+  return async (params) => client.messages.create(params);
+};
 
 const API_FAILURES = [
   [Anthropic.RateLimitError, "rate limited"],
