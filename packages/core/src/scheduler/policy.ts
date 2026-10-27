@@ -22,10 +22,17 @@ export const nextScanDue = (lastScanAt: Date | null, intervalHours: number, now:
   lastScanAt === null ? now : new Date(lastScanAt.getTime() + intervalHours * MS_PER_HOUR);
 
 /**
- * What {@link refreshRatesIfStale} did. `fresh`: the stored rates are recent enough. `refreshed`: new rates were
- * fetched and saved. `failed`: the fetch failed and the last stored rates, if any, stay in use.
+ * What {@link refreshRatesIfStale} did. `fresh`: the stored rates are recent enough, so nothing was fetched.
+ * `unchanged`: the stored rates were stale but the fetch returned the date already stored, so nothing was saved.
+ * `refreshed`: new rates were fetched and saved. `failed`: the fetch failed and the last stored rates, if any, stay
+ * in use.
  */
-export const RatesRefresh = { Fresh: "fresh", Refreshed: "refreshed", Failed: "failed" } as const;
+export const RatesRefresh = {
+  Fresh: "fresh",
+  Unchanged: "unchanged",
+  Refreshed: "refreshed",
+  Failed: "failed",
+} as const;
 
 /** One of the {@link RatesRefresh} values. */
 export type RatesRefresh = (typeof RatesRefresh)[keyof typeof RatesRefresh];
@@ -63,7 +70,7 @@ export const refreshRatesIfStale = async (deps: RefreshRatesDeps): Promise<Rates
     return RatesRefresh.Failed;
   }
   if (stored?.fetchedOn === fetched.value.fetchedOn) {
-    return RatesRefresh.Fresh;
+    return RatesRefresh.Unchanged;
   }
   await repository.fxRates.save(fetched.value);
   return RatesRefresh.Refreshed;
