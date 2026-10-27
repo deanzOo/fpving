@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { AddErrorKind, PortErrorKind, PricingErrorKind } from "../src/index.ts";
+import { AddErrorKind, MatchErrorKind, PortErrorKind, PricingErrorKind } from "../src/index.ts";
 import type { ShippingUnknownError } from "../src/index.ts";
 
 describe("Error kinds", () => {
@@ -30,5 +30,9 @@ describe("Error kinds", () => {
       AlreadyTracked: "already_tracked",
       FetchFailed: "fetch_failed",
     });
+  });
+
+  it("names every reason assisted matching did nothing by its snake_case kind", () => {
+    expect(MatchErrorKind).toEqual({ NoSourceListing: "no_source_listing", NotPending: "not_pending" });
   });
 });
