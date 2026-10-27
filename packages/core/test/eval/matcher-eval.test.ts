@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { matcherPairsSchema, MIN_MATCHER_PAIRS, scoreMatcher } from "../../eval/matcher-eval.ts";
+import { matcherEvalFileSchema, MIN_MATCHER_PAIRS, scoreMatcher } from "../../eval/matcher-eval.ts";
 import type { MatcherPair } from "../../eval/matcher-eval.ts";
 import { LlmVerdict } from "../../src/index.ts";
 
@@ -14,21 +14,24 @@ const pair = (label: MatcherPair["label"]): MatcherPair => ({
 });
 
 describe("Matcher eval", () => {
-  it("ships at least 40 labelled pairs covering same, variant and different", () => {
-    const pairs = matcherPairsSchema.parse(JSON.parse(readFileSync(PAIRS_FILE, "utf8")));
+  it("ships labelling rules and at least 40 labelled pairs covering same, variant and different", () => {
+    const { rules, pairs } = matcherEvalFileSchema.parse(JSON.parse(readFileSync(PAIRS_FILE, "utf8")));
+    expect(rules.length).toBeGreaterThan(0);
     expect(pairs.length).toBeGreaterThanOrEqual(MIN_MATCHER_PAIRS);
     expect(new Set(pairs.map((row) => row.label))).toEqual(
       new Set([LlmVerdict.Same, LlmVerdict.Variant, LlmVerdict.Different]),
     );
   });
 
-  it("refuses a pairs file with too few pairs or a label that is not a verdict", () => {
+  it("refuses a pairs file without rules, with too few pairs or with a label that is not a verdict", () => {
+    const rules = ["same: the same item."];
+    const valid = (file: unknown): boolean => matcherEvalFileSchema.safeParse(file).success;
     const few = Array.from({ length: MIN_MATCHER_PAIRS - 1 }, () => pair(LlmVerdict.Same));
-    expect(matcherPairsSchema.safeParse(few).success).toBe(false);
     const many = Array.from({ length: MIN_MATCHER_PAIRS }, () => pair(LlmVerdict.Same));
-    expect(matcherPairsSchema.safeParse(many).success).toBe(true);
-    expect(matcherPairsSchema.safeParse([...many, { ...pair(LlmVerdict.Same), label: LlmVerdict.Unjudged }]).success)
-      .toBe(false);
+    expect(valid({ rules, pairs: many })).toBe(true);
+    expect(valid({ rules: [], pairs: many })).toBe(false);
+    expect(valid({ rules, pairs: few })).toBe(false);
+    expect(valid({ rules, pairs: [...many, { ...pair(LlmVerdict.Same), label: LlmVerdict.Unjudged }] })).toBe(false);
   });
 
   it("scores accuracy per label and overall, counting an unjudged verdict as wrong", () => {

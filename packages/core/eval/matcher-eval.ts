@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { LlmVerdict, verdictSchema } from "../src/index.ts";
-import type { LlmVerdict as Verdict } from "../src/index.ts";
 import { textSchema } from "../src/text.ts";
 
 /** The fewest labelled pairs the matcher eval runs on. */
@@ -16,8 +15,11 @@ const matcherPairSchema = z.object({
 /** One labelled pair: a source and a candidate listing title, the verdict a person gave, and why. */
 export type MatcherPair = z.infer<typeof matcherPairSchema>;
 
-/** The contents of `pairs.json`: at least {@link MIN_MATCHER_PAIRS} labelled pairs. */
-export const matcherPairsSchema = z.array(matcherPairSchema).min(MIN_MATCHER_PAIRS);
+/** The contents of `pairs.json`: the labelling rules, and at least {@link MIN_MATCHER_PAIRS} labelled pairs. */
+export const matcherEvalFileSchema = z.object({
+  rules: z.array(textSchema).min(1),
+  pairs: z.array(matcherPairSchema).min(MIN_MATCHER_PAIRS),
+});
 
 interface Accuracy {
   readonly correct: number;
@@ -33,7 +35,7 @@ export type MatcherScore = Readonly<Record<"overall" | MatcherPair["label"], Acc
 
 interface Judged {
   readonly label: MatcherPair["label"];
-  readonly verdict: Verdict | undefined;
+  readonly verdict: LlmVerdict | undefined;
 }
 
 const accuracyOf = (rows: readonly Judged[]): Accuracy => {
@@ -49,7 +51,7 @@ const accuracyOf = (rows: readonly Judged[]): Accuracy => {
  * @param verdicts - The verdict for each pair, in the same order.
  * @returns The accuracy overall and per label.
  */
-export const scoreMatcher = (pairs: readonly MatcherPair[], verdicts: readonly Verdict[]): MatcherScore => {
+export const scoreMatcher = (pairs: readonly MatcherPair[], verdicts: readonly LlmVerdict[]): MatcherScore => {
   if (pairs.length !== verdicts.length) {
     throw new Error(`${String(verdicts.length)} verdicts for ${String(pairs.length)} pairs`);
   }

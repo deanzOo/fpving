@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { matcherPairsSchema } from "../../eval/matcher-eval.ts";
+import { matcherEvalFileSchema } from "../../eval/matcher-eval.ts";
 import { LlmVerdict } from "../../src/index.ts";
 import { similarity } from "../../src/matching/similarity.ts";
 
@@ -43,10 +43,12 @@ describe("Title similarity", () => {
     expect(similarity("Foxeer Lollipop", "Foxeer antenna")).toBe(HALF);
   });
 
-  it("scores the labelled same pairs higher than the different ones, by median", () => {
-    const pairs = matcherPairsSchema.parse(JSON.parse(readFileSync(PAIRS_FILE, "utf8")));
-    const scores = (label: string): number[] =>
-      pairs.filter((pair) => pair.label === label).map((pair) => similarity(pair.source, pair.candidate));
-    expect(lowerMedian(scores(LlmVerdict.Same))).toBeGreaterThan(lowerMedian(scores(LlmVerdict.Different)));
+  it("scores the labelled pairs that match, same or variant, higher than the different ones, by median", () => {
+    const { pairs } = matcherEvalFileSchema.parse(JSON.parse(readFileSync(PAIRS_FILE, "utf8")));
+    const scores = (matching: boolean): number[] =>
+      pairs
+        .filter((pair) => (pair.label !== LlmVerdict.Different) === matching)
+        .map((pair) => similarity(pair.source, pair.candidate));
+    expect(lowerMedian(scores(true))).toBeGreaterThan(lowerMedian(scores(false)));
   });
 });
