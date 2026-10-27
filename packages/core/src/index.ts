@@ -110,3 +110,5 @@ export type {
 } from "./ports/repository.js";
 export type { Scheduler } from "./ports/scheduler.js";
 export type { StoreGateway } from "./ports/store-gateway.js";
+export { scanListings } from "./scan/scan.js";
+export type { ListingTransition, PluginScan, ScanDeps, ScanReport } from "./scan/scan.js";

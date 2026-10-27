@@ -46,6 +46,7 @@ describe("Core public API", () => {
       "productSchema",
       "rejectCandidate",
       "rejudgeUnjudged",
+      "scanListings",
       "scanRunIdSchema",
       "scanRunSchema",
       "settingsSchema",
