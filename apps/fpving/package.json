@@ -5,5 +5,13 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "exports": { ".": "./dist/index.js" },
-  "types": "./dist/index.d.ts"
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@fpving/plugin-sdk": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "vitest": "5.0.4"
+  }
 }
