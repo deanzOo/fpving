@@ -1,7 +1,10 @@
+import { err, ok } from "@fpving/plugin-sdk";
+import type { Result } from "@fpving/plugin-sdk";
 import { scanListings } from "../scan/scan.js";
 import type { ScanDeps, ScanReport } from "../scan/scan.js";
 import type { CurrencyRates } from "../ports/currency-rates.js";
 import type { Scheduler } from "../ports/scheduler.js";
+import { SchedulerErrorKind } from "./errors.js";
 import { MS_PER_HOUR, nextScanDue, refreshRatesIfStale } from "./policy.js";
 
 /** The ports the scheduler uses: those of a scan, plus the rates source and the timer. */
@@ -12,15 +15,24 @@ export interface SchedulerDeps extends ScanDeps {
   readonly scheduler: Scheduler;
 }
 
+/** A scan was asked for after the schedule was stopped. */
+export interface SchedulerStopped {
+  readonly kind: typeof SchedulerErrorKind.Stopped;
+}
+
 /** A running scan schedule. */
 export interface SchedulerHandle {
   /**
    * Refreshes stale exchange rates, then scans. Scans never overlap: when one is already running, this joins it
-   * and resolves to its report instead of starting another. Rejects when the scan throws.
+   * and resolves to its report instead of starting another. Rejects when the scan throws. After {@link stop} it
+   * starts nothing, not even when a scan is still finishing, and resolves to a `stopped` error.
    */
-  scanNow(): Promise<ScanReport>;
-  /** Cancels the schedule. A scan already running finishes. */
-  stop(): void;
+  scanNow(): Promise<Result<ScanReport, SchedulerStopped>>;
+  /**
+   * Cancels the schedule and resolves once a scan that was running has finished, so the host can then close the
+   * database. It does not reject when that scan threw.
+   */
+  stop(): Promise<void>;
 }
 
 /**
@@ -28,7 +40,8 @@ export interface SchedulerHandle {
  * the last scan started at least one interval ago or never ran; after weeks offline that is still one scan. Each
  * scan refreshes stale exchange rates first. A scan that throws is logged and the schedule keeps ticking. The
  * interval is read from the settings here, so a change applies after a restart. The boot scan runs in the
- * background; `scanNow` joins it.
+ * background; `scanNow` joins it. A boot where every plugin is backing off still counts as a scan, because blocked
+ * runs are recorded, so the next boot within the interval does not catch up.
  *
  * @param deps - The ports to use.
  * @returns A handle to scan on demand and to stop the schedule.
@@ -36,7 +49,11 @@ export interface SchedulerHandle {
 export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHandle> => {
   const { repository, clock, logger, scheduler } = deps;
   let running: Promise<ScanReport> | null = null;
-  const scanNow = async (): Promise<ScanReport> => {
+  let stopped = false;
+  const scanNow = async (): Promise<Result<ScanReport, SchedulerStopped>> => {
+    if (stopped) {
+      return err({ kind: SchedulerErrorKind.Stopped });
+    }
     running ??= (async () => {
       try {
         await refreshRatesIfStale(deps);
@@ -45,7 +62,7 @@ export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHand
         running = null;
       }
     })();
-    return running;
+    return ok(await running);
   };
   const scanInBackground = async (): Promise<void> => {
     try {
@@ -56,7 +73,12 @@ export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHand
   };
   const { scanIntervalHours } = await repository.settings.get();
   const last = await repository.scanRuns.latest();
-  const stop = scheduler.every(scanIntervalHours * MS_PER_HOUR, scanInBackground);
+  const cancel = scheduler.every(scanIntervalHours * MS_PER_HOUR, scanInBackground);
+  const stop = async (): Promise<void> => {
+    stopped = true;
+    cancel();
+    await running?.catch(() => undefined);
+  };
   if (nextScanDue(last?.startedAt ?? null, scanIntervalHours, clock.now()) <= clock.now()) {
     void scanInBackground();
   }

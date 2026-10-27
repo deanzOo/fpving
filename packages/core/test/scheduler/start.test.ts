@@ -12,6 +12,7 @@ import {
   productIdSchema,
   ScanOutcome,
   scanRunIdSchema,
+  SchedulerErrorKind,
   snapshotIdSchema,
   startScheduler,
 } from "../../src/index.ts";
@@ -37,6 +38,8 @@ const P1 = productIdSchema.parse("p1");
 const L1 = listingIdSchema.parse("l1");
 const FRESH_RATES: FxTable = { base: "USD", ratesPerBase: {}, fetchedOn: "2026-10-27" };
 const STALE_RATES: FxTable = { base: "USD", ratesPerBase: {}, fetchedOn: "2026-10-20" };
+
+const drain = async (): Promise<void> => new Promise((resolve) => void setImmediate(resolve));
 
 const ago = (ms: number): Date => new Date(NOW.getTime() - ms);
 
@@ -127,30 +130,59 @@ describe("The scan schedule", () => {
 
   it("scans once on boot when there was never a scan", async () => {
     const { deps, stores } = await setup();
-    const handle = await startScheduler(deps);
-    await handle.scanNow();
+    await startScheduler(deps);
+    await drain();
     expect(stores.fetched).toHaveLength(1);
   });
 
   it("scans once on boot when the last scan is older than the interval", async () => {
     const { deps, stores } = await setup({ lastScanAgo: INTERVAL_HOURS * HOUR_MS });
-    const handle = await startScheduler(deps);
-    await handle.scanNow();
+    await startScheduler(deps);
+    await drain();
     expect(stores.fetched).toHaveLength(1);
   });
 
   it("does not scan on boot when the last scan is within the interval", async () => {
     const { deps, stores } = await setup({ lastScanAgo: INTERVAL_HOURS * HOUR_MS - 1 });
     await startScheduler(deps);
+    await drain();
     expect(stores.fetched).toHaveLength(0);
   });
 
   it("catches up with exactly one scan on boot after weeks offline, not one per missed interval", async () => {
     const { deps, stores, scheduler } = await setup({ lastScanAgo: OFFLINE_DAYS * DAY_MS });
-    const handle = await startScheduler(deps);
-    await handle.scanNow();
+    await startScheduler(deps);
+    await drain();
+    expect(stores.fetched).toHaveLength(1);
+    await drain();
     expect(stores.fetched).toHaveLength(1);
     expect(scheduler.intervals).toHaveLength(1);
+  });
+
+  it("counts a boot scan of only backing-off plugins as a scan, so the next boot does not catch up", async () => {
+    let recorded = 0;
+    const countRuns = (repository: Repository): Repository => ({
+      ...repository,
+      scanRuns: {
+        ...repository.scanRuns,
+        record: async (run) => {
+          recorded += 1;
+          return repository.scanRuns.record(run);
+        },
+      },
+    });
+    const { deps, base, stores } = await setup({ wrap: countRuns });
+    await base.pluginHealth.upsert({
+      pluginId: SHOP,
+      consecutiveBlocks: 1,
+      backoffUntil: new Date(NOW.getTime() + HOUR_MS),
+    });
+    await startScheduler(deps);
+    await drain();
+    await startScheduler({ ...deps, scheduler: fakeScheduler() });
+    await drain();
+    expect(recorded).toBe(1);
+    expect(stores.fetched).toHaveLength(0);
   });
 
   it("refreshes stale exchange rates before each scheduled scan", async () => {
@@ -183,17 +215,25 @@ describe("The scan schedule", () => {
   it("stops scheduling when stopped", async () => {
     const { deps, scheduler, stores } = await setup({ lastScanAgo: 0 });
     const handle = await startScheduler(deps);
-    handle.stop();
+    await handle.stop();
     await scheduler.tick();
     expect(scheduler.active()).toBe(false);
+    expect(stores.fetched).toHaveLength(0);
+  });
+
+  it("starts no scan on scanNow after it was stopped and says it was stopped", async () => {
+    const { deps, stores } = await setup({ lastScanAgo: 0 });
+    const handle = await startScheduler(deps);
+    await handle.stop();
+    expect(await handle.scanNow()).toEqual(err({ kind: SchedulerErrorKind.Stopped }));
     expect(stores.fetched).toHaveLength(0);
   });
 
   it("scans immediately on scanNow and returns the report", async () => {
     const { deps, stores } = await setup({ lastScanAgo: 0 });
     const handle = await startScheduler(deps);
-    const report = await handle.scanNow();
-    expect(report.plugins).toHaveLength(1);
+    const result = await handle.scanNow();
+    expect(result.ok && result.value.plugins).toHaveLength(1);
     expect(stores.fetched).toHaveLength(1);
   });
 });
@@ -214,11 +254,12 @@ describe("The scan schedule never overlapping scans", () => {
     const first = handle.scanNow();
     const second = handle.scanNow();
     open();
-    expect(await second).toBe(await first);
+    const [firstResult, secondResult] = [await first, await second];
+    expect(firstResult.ok && secondResult.ok && secondResult.value === firstResult.value).toBe(true);
     expect(stores.fetched).toHaveLength(1);
   });
 
-  it("skips a tick that fires during a running scan", async () => {
+  it("joins a tick that fires during a running scan to it instead of starting a second", async () => {
     const { handle, scheduler, stores, open } = await gated();
     const running = handle.scanNow();
     const tick = scheduler.tick();
@@ -237,6 +278,23 @@ describe("The scan schedule never overlapping scans", () => {
     const joined = handle.scanNow();
     open();
     await joined;
+    expect(stores.fetched).toHaveLength(1);
+  });
+
+  it("waits for a running scan to finish when stopped and starts no scan after it", async () => {
+    const { handle, stores, scheduler, open } = await gated();
+    const running = handle.scanNow();
+    let stopped = false;
+    const stopping = handle.stop().then(() => {
+      stopped = true;
+    });
+    await drain();
+    expect(stopped).toBe(false);
+    expect((await handle.scanNow()).ok).toBe(false);
+    open();
+    await Promise.all([running, stopping]);
+    expect(stopped).toBe(true);
+    await scheduler.tick();
     expect(stores.fetched).toHaveLength(1);
   });
 
@@ -281,11 +339,17 @@ describe("The scan schedule surviving a failing scan", () => {
 
   it("logs a boot catch-up that throws and still schedules the ticks", async () => {
     const { deps, scheduler, stores, logger } = await setup({ wrap: failingOnce });
-    const handle = await startScheduler(deps);
-    await expect(handle.scanNow()).rejects.toThrow("database is locked");
+    await startScheduler(deps);
+    await drain();
     expect(logger.errors).toHaveLength(1);
     await scheduler.tick();
     expect(stores.fetched).toHaveLength(1);
+  });
+
+  it("does not reject stop when the running scan throws", async () => {
+    const { deps } = await setup({ wrap: failingOnce });
+    const handle = await startScheduler(deps);
+    await expect(handle.stop()).resolves.toBeUndefined();
   });
 
   it("rejects scanNow when the scan throws", async () => {

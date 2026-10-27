@@ -19,6 +19,7 @@ describe("Core public API", () => {
       "RatesRefresh",
       "RepositoryErrorKind",
       "ScanOutcome",
+      "SchedulerErrorKind",
       "ThresholdBasis",
       "acceptCandidate",
       "addListing",

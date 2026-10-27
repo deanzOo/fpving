@@ -114,5 +114,6 @@ export { scanListings } from "./scan/scan.js";
 export type { ListingTransition, PluginScan, ScanDeps, ScanReport } from "./scan/scan.js";
 export { nextScanDue, RatesRefresh, refreshRatesIfStale } from "./scheduler/policy.js";
 export type { RefreshRatesDeps } from "./scheduler/policy.js";
+export { SchedulerErrorKind } from "./scheduler/errors.js";
 export { startScheduler } from "./scheduler/start.js";
-export type { SchedulerDeps, SchedulerHandle } from "./scheduler/start.js";
+export type { SchedulerDeps, SchedulerHandle, SchedulerStopped } from "./scheduler/start.js";
