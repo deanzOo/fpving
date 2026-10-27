@@ -46,9 +46,9 @@ export const inMemoryRepository = (): Repository => {
 
   const insertListing = async (
     listing: Listing,
-    firstSnapshots: PriceSnapshot[],
+    firstSnapshot: PriceSnapshot,
   ): Promise<Result<void, NotFound | DuplicateUrl>> => {
-    if (listings.has(listing.id) || firstSnapshots.some((row) => snapshots.has(row.id))) {
+    if (listings.has(listing.id) || snapshots.has(firstSnapshot.id)) {
       return bug("duplicate id");
     }
     if (!products.has(listing.productId)) {
@@ -58,9 +58,7 @@ export const inMemoryRepository = (): Repository => {
       return Promise.resolve(duplicateUrl);
     }
     listings.set(listing.id, copy(listing));
-    for (const row of firstSnapshots) {
-      snapshots.set(row.id, copy(row));
-    }
+    snapshots.set(firstSnapshot.id, copy(firstSnapshot));
     return Promise.resolve(done);
   };
 
@@ -83,10 +81,9 @@ export const inMemoryRepository = (): Repository => {
       },
     },
     listings: {
-      add: async (listing) => insertListing(listing, []),
       addWithSnapshot: async (listing, firstSnapshot) =>
         firstSnapshot.listingId === listing.id
-          ? insertListing(listing, [firstSnapshot])
+          ? insertListing(listing, firstSnapshot)
           : bug("first snapshot belongs to another listing"),
       findByUrl: async (url) => Promise.resolve(copy([...listings.values()].find((row) => row.url === url) ?? null)),
       listByProduct: async (productId) =>
@@ -171,7 +168,7 @@ export const inMemoryRepository = (): Repository => {
         if (listing.productId !== row.productId || firstSnapshot.listingId !== listing.id) {
           return bug("listing or snapshot belongs to another row");
         }
-        const inserted = await insertListing(listing, [firstSnapshot]);
+        const inserted = await insertListing(listing, firstSnapshot);
         if (inserted.ok) {
           candidates.set(id, { ...row, status: CandidateStatus.Accepted });
         }

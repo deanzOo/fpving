@@ -162,7 +162,8 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       it("refuses a product whose first listing url is already tracked and stores none of the three", async () => {
         await repo.products.add(p1, l1, s1);
         expect(await repo.products.add(p2, { ...l2, url: l1.url }, s2)).toEqual(duplicateUrl);
-        expect(await repo.listings.add(listing("l3", p2.id, url("three")))).toEqual(notFound);
+        const l3 = listing("l3", p2.id, url("three"));
+        expect(await repo.listings.addWithSnapshot(l3, snapshot("s3", l3.id, JAN_2))).toEqual(notFound);
         expect(await repo.snapshots.append(snapshot("s3", l2.id, JAN_2))).toEqual(notFound);
         expect(await repo.snapshots.append(s2)).toEqual(notFound);
       });
@@ -186,22 +187,10 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.listings.findByUrl(url("unknown"))).toBeNull();
       });
 
-      it("adds a listing to an existing product and lists a product's listings oldest first", async () => {
+      it("lists a product's listings oldest first", async () => {
         const later = { ...listing("l3", p1.id, url("three")), origin: ListingOrigin.Matched, addedAt: JAN_2 };
-        expect(await repo.listings.add(later)).toEqual(ok);
+        expect(await repo.listings.addWithSnapshot(later, snapshot("s3", later.id, JAN_2))).toEqual(ok);
         expect(await repo.listings.listByProduct(p1.id)).toEqual([l1, later]);
-      });
-
-      it("refuses a listing for a product that does not exist", async () => {
-        expect(await repo.listings.add(listing("l3", missingProduct, url("three")))).toEqual(notFound);
-      });
-
-      it("refuses a listing whose url is already tracked", async () => {
-        expect(await repo.listings.add(listing("l3", p1.id, l2.url))).toEqual(duplicateUrl);
-      });
-
-      it("rejects a listing id that is already stored as a bug", async () => {
-        await expect(repo.listings.add(listing("l1", p1.id, url("three")))).rejects.toThrow();
       });
 
       it("adds a listing with its first snapshot in one step", async () => {
@@ -275,12 +264,11 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await expect(repo.snapshots.append(snapshot("s1", l1.id, JAN_2))).rejects.toThrow();
       });
 
-      it("returns the latest snapshot of each of a product's listings that has one", async () => {
+      it("returns the latest snapshot of each of a product's listings", async () => {
         const l3 = listing("l3", p1.id, url("three"));
-        await repo.listings.add(l3);
-        await repo.listings.add(listing("l4", p1.id, url("four")));
         const latest = [snapshot("s3", l1.id, JAN_2), snapshot("s4", l3.id, JAN_1)];
-        for (const row of [...latest, snapshot("s5", l2.id, JAN_3)]) {
+        await repo.listings.addWithSnapshot(l3, snapshot("s4", l3.id, JAN_1));
+        for (const row of [snapshot("s3", l1.id, JAN_2), snapshot("s5", l2.id, JAN_3)]) {
           await repo.snapshots.append(row);
         }
         const found = await repo.snapshots.latestPerListing(p1.id);

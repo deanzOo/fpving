@@ -44,8 +44,6 @@ export type ListingStatusUpdate = Pick<Listing, "status" | "failureStreak" | "no
 
 /** Stores listings. Urls are compared exactly, so callers pass them normalized. */
 export interface ListingRepository {
-  /** Adds a listing to an existing product. */
-  add(listing: Listing): Promise<Result<void, NotFound | DuplicateUrl>>;
   /**
    * Adds a listing to an existing product together with its first snapshot, or neither of them. Rejects when the
    * snapshot is not the listing's.
