@@ -1,17 +1,18 @@
 import { StoreErrorKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import {
+  AddErrorKind,
   addListing,
   addProduct,
   CandidateStatus,
   err,
   findMatches,
+  ListingOrigin,
   LlmVerdict,
   matchCandidateIdSchema,
   MatchErrorKind,
   ok,
   productIdSchema,
-  RepositoryErrorKind,
   rejudgeUnjudged,
 } from "../../src/index.ts";
 import type { LlmJudge, Repository } from "../../src/index.ts";
@@ -59,6 +60,15 @@ const rejectsOnlyAfterOpen = async (run: Promise<unknown>, open: () => void, mes
   open();
   await rejected;
 };
+
+const withoutManualListing = (repository: Repository): Repository => ({
+  ...repository,
+  listings: {
+    ...repository.listings,
+    listByProduct: async (id) =>
+      (await repository.listings.listByProduct(id)).map((row) => ({ ...row, origin: ListingOrigin.Matched })),
+  },
+});
 
 const forgetful = (repository: Repository): Repository => ({
   ...repository,
@@ -213,18 +223,25 @@ describe("Finding matches for a product", () => {
     ]);
   });
 
-  it("refuses a product without a manual listing", async () => {
+  it("refuses a product that does not exist", async () => {
     const { deps } = await setup();
     expect(await findMatches(deps, productIdSchema.parse("missing"))).toEqual(
+      err({ kind: AddErrorKind.ProductNotFound }),
+    );
+  });
+
+  it("refuses a product without a manual listing", async () => {
+    const { deps, productId } = await setup();
+    expect(await findMatches({ ...deps, repository: withoutManualListing(deps.repository) }, productId)).toEqual(
       err({ kind: MatchErrorKind.NoSourceListing }),
     );
   });
 
-  it("saves nothing and reports duplicate_url when another run suggested one of the urls meanwhile", async () => {
+  it("saves nothing and reports already_suggested when another run suggested one of the urls meanwhile", async () => {
     const { deps, repository, productId } = await setup({ b: ok([]) });
     await findMatches(deps, productId);
     const racing = { ...deps, repository: forgetful(repository) };
-    expect(await findMatches(racing, productId)).toEqual(err({ kind: RepositoryErrorKind.DuplicateUrl }));
+    expect(await findMatches(racing, productId)).toEqual(err({ kind: MatchErrorKind.AlreadySuggested }));
   });
 });
 
@@ -320,9 +337,12 @@ describe("Judging unjudged candidates again", () => {
     expect(llm.compared).toEqual([[SOURCE_TITLE, OLDER.title]]);
   });
 
-  it("refuses a product without a manual listing", async () => {
-    const { deps } = await unjudgedFirst();
+  it("refuses a product that does not exist or has no manual listing", async () => {
+    const { deps, productId } = await unjudgedFirst();
     expect(await rejudgeUnjudged(deps, productIdSchema.parse("missing"))).toEqual(
+      err({ kind: AddErrorKind.ProductNotFound }),
+    );
+    expect(await rejudgeUnjudged({ ...deps, repository: withoutManualListing(deps.repository) }, productId)).toEqual(
       err({ kind: MatchErrorKind.NoSourceListing }),
     );
   });

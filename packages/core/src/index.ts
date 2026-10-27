@@ -16,12 +16,14 @@ export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draf
 export { MatchErrorKind } from "./matching/errors.js";
 export { findMatches, rejudgeUnjudged } from "./matching/find.js";
 export type {
+  AlreadySuggested,
   FailedSearch,
   FindMatchesError,
   ForeignResults,
   MatchDeps,
   MatchReport,
   NoSourceListing,
+  SourceListingError,
 } from "./matching/find.js";
 export { acceptCandidate, rejectCandidate } from "./matching/review.js";
 export type { AcceptCandidateError, NotPending } from "./matching/review.js";
@@ -35,6 +37,7 @@ export type {
   AlreadyTracked,
   FetchFailed,
   NoPluginForDomain,
+  ProductNotFound,
 } from "./products/add.js";
 export { AddErrorKind } from "./products/errors.js";
 export { normalizeListingUrl } from "./products/normalize-url.js";

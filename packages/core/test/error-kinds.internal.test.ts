@@ -29,11 +29,16 @@ describe("Error kinds", () => {
       NoPluginForDomain: "no_plugin_for_domain",
       AlreadyTracked: "already_tracked",
       FetchFailed: "fetch_failed",
+      ProductNotFound: "product_not_found",
     });
   });
 
   it("names every reason assisted matching did nothing by its snake_case kind", () => {
-    expect(MatchErrorKind).toEqual({ NoSourceListing: "no_source_listing", NotPending: "not_pending" });
+    expect(MatchErrorKind).toEqual({
+      NoSourceListing: "no_source_listing",
+      NotPending: "not_pending",
+      AlreadySuggested: "already_suggested",
+    });
   });
 
   it("names the reason a scan on demand did nothing by its snake_case kind", () => {

@@ -13,7 +13,6 @@ import {
   ok,
   pluginIdSchema,
   productIdSchema,
-  RepositoryErrorKind,
   snapshotIdSchema,
 } from "../../src/index.ts";
 import type { CoreDeps, Repository } from "../../src/index.ts";
@@ -197,10 +196,10 @@ describe("Adding a listing to a product", () => {
     expect(await repository.listings.findByUrl(OTHER_CANONICAL)).toBeNull();
   });
 
-  it("reports not_found and stores nothing when the product does not exist", async () => {
+  it("reports product_not_found and stores nothing when the product does not exist", async () => {
     const { deps, repository } = setup();
     expect(await addListing(deps, productIdSchema.parse("missing"), OTHER)).toEqual(
-      err({ kind: RepositoryErrorKind.NotFound }),
+      err({ kind: AddErrorKind.ProductNotFound }),
     );
     expect(await repository.listings.findByUrl(OTHER_CANONICAL)).toBeNull();
   });

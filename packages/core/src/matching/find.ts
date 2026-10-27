@@ -5,8 +5,9 @@ import type { Listing, MatchCandidate, Verdict } from "../entities.js";
 import { matchCandidateIdSchema } from "../ids.js";
 import type { PluginId, ProductId } from "../ids.js";
 import type { LlmError, LlmJudge, ProductIdentity } from "../ports/llm-judge.js";
-import type { DuplicateUrl, Repository } from "../ports/repository.js";
-import type { CoreDeps } from "../products/add.js";
+import type { Repository } from "../ports/repository.js";
+import type { CoreDeps, ProductNotFound } from "../products/add.js";
+import { AddErrorKind } from "../products/errors.js";
 import { normalizeListingUrl } from "../products/normalize-url.js";
 import { settleAll } from "../settle.js";
 import { MatchErrorKind } from "./errors.js";
@@ -20,7 +21,7 @@ export interface MatchDeps extends CoreDeps {
   readonly llm: LlmJudge;
 }
 
-/** The product has no manual listing to match from, or does not exist. */
+/** The product has no manual listing to match from. */
 export interface NoSourceListing {
   readonly kind: typeof MatchErrorKind.NoSourceListing;
 }
@@ -47,11 +48,16 @@ export interface MatchReport {
   readonly foreignResults: ForeignResults[];
 }
 
-/**
- * Why {@link findMatches} saved nothing: no source listing, or `duplicate_url` when another run suggested one of the
- * urls between the check and the save.
- */
-export type FindMatchesError = NoSourceListing | DuplicateUrl;
+/** Another run suggested one of the urls between the check and the save. */
+export interface AlreadySuggested {
+  readonly kind: typeof MatchErrorKind.AlreadySuggested;
+}
+
+/** Why {@link rejudgeUnjudged} did nothing: the product does not exist or has no manual listing. */
+export type SourceListingError = ProductNotFound | NoSourceListing;
+
+/** Why {@link findMatches} saved nothing: a {@link SourceListingError}, or `already_suggested`. */
+export type FindMatchesError = SourceListingError | AlreadySuggested;
 
 interface Found {
   readonly pluginId: PluginId;
@@ -68,7 +74,10 @@ interface Searched {
 const sourceListing = async (
   repository: Repository,
   productId: ProductId,
-): Promise<Result<Listing, NoSourceListing>> => {
+): Promise<Result<Listing, SourceListingError>> => {
+  if ((await repository.products.get(productId)) === null) {
+    return err({ kind: AddErrorKind.ProductNotFound });
+  }
   const listings = await repository.listings.listByProduct(productId);
   const source = listings.find((row) => row.origin === ListingOrigin.Manual);
   return source === undefined ? err({ kind: MatchErrorKind.NoSourceListing }) : ok(source);
@@ -205,7 +214,10 @@ export const findMatches = async (
     }),
   );
   const saved = await deps.repository.matchCandidates.save(candidates);
-  return saved.ok ? ok({ candidates, failedSearches, foreignResults }) : saved;
+  if (saved.ok) {
+    return ok({ candidates, failedSearches, foreignResults });
+  }
+  return err({ kind: MatchErrorKind.AlreadySuggested });
 };
 
 /**
@@ -218,12 +230,12 @@ export const findMatches = async (
  *
  * @param deps - The ports to use.
  * @param productId - The product whose candidates to judge.
- * @returns The candidates that are judged now, or `no_source_listing`.
+ * @returns The candidates that are judged now, or `product_not_found` or `no_source_listing`.
  */
 export const rejudgeUnjudged = async (
   deps: MatchDeps,
   productId: ProductId,
-): Promise<Result<MatchCandidate[], NoSourceListing>> => {
+): Promise<Result<MatchCandidate[], SourceListingError>> => {
   const source = await sourceListing(deps.repository, productId);
   if (!source.ok) {
     return source;

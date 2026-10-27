@@ -5,7 +5,7 @@ import type { Listing, PriceSnapshot, Product } from "../entities.js";
 import { listingIdSchema, productIdSchema, snapshotIdSchema } from "../ids.js";
 import type { PluginId, ProductId } from "../ids.js";
 import type { IdGenerator } from "../ports/id-generator.js";
-import type { NotFound, Repository } from "../ports/repository.js";
+import type { Repository } from "../ports/repository.js";
 import { RepositoryErrorKind } from "../ports/repository.js";
 import type { StoreGateway } from "../ports/store-gateway.js";
 import { AddErrorKind } from "./errors.js";
@@ -42,11 +42,16 @@ export interface FetchFailed {
   readonly error: StoreError;
 }
 
+/** The product the operation is about does not exist. */
+export interface ProductNotFound {
+  readonly kind: typeof AddErrorKind.ProductNotFound;
+}
+
 /** Why {@link addProduct} stored nothing. */
 export type AddProductError = InvalidUrl | NoPluginForDomain | AlreadyTracked | FetchFailed;
 
-/** Why {@link addListing} stored nothing: an {@link AddProductError}, or `not_found` for an unknown product. */
-export type AddListingError = AddProductError | NotFound;
+/** Why {@link addListing} stored nothing: an {@link AddProductError}, or `product_not_found` for an unknown product. */
+export type AddListingError = AddProductError | ProductNotFound;
 
 /** What {@link addListing} stored. */
 export interface AddedListing {
@@ -168,7 +173,7 @@ export const addProduct = async (deps: CoreDeps, url: string): Promise<Result<Ad
  *
  * @remarks
  * Normalizes, resolves the plugin, dedupes and fetches exactly like {@link addProduct}. The product is checked when
- * the listing is stored, after the fetch, so an unknown product yields `not_found` and stores nothing.
+ * the listing is stored, after the fetch, so an unknown product yields `product_not_found` and stores nothing.
  *
  * @param deps - The ports to use.
  * @param productId - The product the listing belongs to.
@@ -190,7 +195,7 @@ export const addListing = async (
     return ok(added);
   }
   if (stored.error.kind === RepositoryErrorKind.NotFound) {
-    return err(stored.error);
+    return err({ kind: AddErrorKind.ProductNotFound });
   }
   return alreadyTracked(deps.repository, added.listing.url);
 };
