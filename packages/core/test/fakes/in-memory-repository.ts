@@ -70,6 +70,9 @@ export const inMemoryRepository = (): Repository => {
         if (firstListing.productId !== product.id || firstSnapshot.listingId !== firstListing.id) {
           return bug("first listing or snapshot belongs to another row");
         }
+        if (product.cheapestListingId !== null) {
+          return bug("a new product has no cheapest listing yet");
+        }
         if (products.has(product.id) || listings.has(firstListing.id) || snapshots.has(firstSnapshot.id)) {
           return bug("duplicate id");
         }

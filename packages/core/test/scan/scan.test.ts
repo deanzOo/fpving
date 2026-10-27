@@ -123,10 +123,11 @@ const setup = async (options: Options = {}) => {
     if (head === undefined) {
       throw new Error(`no listing for ${row.id}`);
     }
-    await base.products.add(row, head, first(head));
+    await base.products.add({ ...row, cheapestListingId: null }, head, first(head));
     for (const other of rest) {
       await base.listings.addWithSnapshot(other, first(other));
     }
+    await base.products.setCheapest(row.id, row.cheapestListingId);
   }
   for (const health of options.health ?? []) {
     await base.pluginHealth.upsert(health);

@@ -174,6 +174,12 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await expect(repo.products.add(p1, l1, { ...s1, listingId: l2.id })).rejects.toThrow();
       });
 
+      it("rejects a new product that already names a cheapest listing as a bug and stores nothing", async () => {
+        await expect(repo.products.add({ ...p1, cheapestListingId: l1.id }, l1, s1)).rejects.toThrow();
+        expect(await repo.products.get(p1.id)).toBeNull();
+        expect(await repo.listings.findByUrl(l1.url)).toBeNull();
+      });
+
       it("reads a stored product, and none for an id that is not stored", async () => {
         await repo.products.add(p1, l1, s1);
         expect(await repo.products.get(p1.id)).toEqual(p1);

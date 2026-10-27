@@ -34,7 +34,8 @@ export interface DuplicateUrl {
 export interface ProductRepository {
   /**
    * Stores a product with its first listing and first snapshot, or none of them when the listing url is already
-   * tracked. Rejects when the listing is not the product's or the snapshot not the listing's.
+   * tracked. Rejects when the listing is not the product's, the snapshot not the listing's, or the product already
+   * names a cheapest listing: a new product's `cheapestListingId` must be null.
    */
   add(product: Product, firstListing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, DuplicateUrl>>;
   /** The product with id `id`, or null. */
