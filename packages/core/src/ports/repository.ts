@@ -45,6 +45,11 @@ export type ListingStatusUpdate = Pick<Listing, "status" | "failureStreak" | "no
 export interface ListingRepository {
   /** Adds a listing to an existing product. */
   add(listing: Listing): Promise<Result<void, NotFound | DuplicateUrl>>;
+  /**
+   * Adds a listing to an existing product together with its first snapshot, or neither of them. Rejects when the
+   * snapshot is not the listing's.
+   */
+  addWithSnapshot(listing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, NotFound | DuplicateUrl>>;
   /** The listing tracking `url`, or null. */
   findByUrl(url: string): Promise<Listing | null>;
   /** A product's listings, oldest first. */

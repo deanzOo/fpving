@@ -73,6 +73,23 @@ export const inMemoryRepository = (): Repository => {
         listings.set(listing.id, copy(listing));
         return Promise.resolve(done);
       },
+      addWithSnapshot: async (listing, firstSnapshot) => {
+        if (firstSnapshot.listingId !== listing.id) {
+          return bug("first snapshot belongs to another listing");
+        }
+        if (listings.has(listing.id) || snapshots.has(firstSnapshot.id)) {
+          return bug("duplicate id");
+        }
+        if (!products.has(listing.productId)) {
+          return Promise.resolve(notFound);
+        }
+        if (urlTracked(listing.url)) {
+          return Promise.resolve(duplicateUrl);
+        }
+        listings.set(listing.id, copy(listing));
+        snapshots.set(firstSnapshot.id, copy(firstSnapshot));
+        return Promise.resolve(done);
+      },
       findByUrl: async (url) => Promise.resolve(copy([...listings.values()].find((row) => row.url === url) ?? null)),
       listByProduct: async (productId) =>
         Promise.resolve(

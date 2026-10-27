@@ -204,6 +204,33 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await expect(repo.listings.add(listing("l1", p1.id, url("three")))).rejects.toThrow();
       });
 
+      it("adds a listing with its first snapshot in one step", async () => {
+        const l3 = listing("l3", p1.id, url("three"));
+        const s3 = snapshot("s3", l3.id, JAN_2);
+        expect(await repo.listings.addWithSnapshot(l3, s3)).toEqual(ok);
+        expect(await repo.listings.findByUrl(l3.url)).toEqual(l3);
+        expect(await repo.snapshots.listSince(l3.id, JAN_1)).toEqual([s3]);
+      });
+
+      it("refuses a listing with a snapshot for a missing product or a tracked url and stores neither", async () => {
+        const orphan = listing("l3", missingProduct, url("three"));
+        expect(await repo.listings.addWithSnapshot(orphan, snapshot("s3", orphan.id, JAN_2))).toEqual(notFound);
+        const tracked = listing("l4", p1.id, l2.url);
+        expect(await repo.listings.addWithSnapshot(tracked, snapshot("s4", tracked.id, JAN_2))).toEqual(duplicateUrl);
+        expect(await repo.snapshots.append(snapshot("s5", orphan.id, JAN_2))).toEqual(notFound);
+        expect(await repo.snapshots.append(snapshot("s6", tracked.id, JAN_2))).toEqual(notFound);
+        expect(await repo.listings.listByProduct(p1.id)).toEqual([l1]);
+      });
+
+      it("rejects a snapshot of another listing, or a listing or snapshot id already stored, as a bug", async () => {
+        const l3 = listing("l3", p1.id, url("three"));
+        await expect(repo.listings.addWithSnapshot(l3, snapshot("s3", l1.id, JAN_2))).rejects.toThrow();
+        const reused = listing("l1", p1.id, url("three"));
+        await expect(repo.listings.addWithSnapshot(reused, snapshot("s3", reused.id, JAN_2))).rejects.toThrow();
+        await expect(repo.listings.addWithSnapshot(l3, snapshot("s1", l3.id, JAN_2))).rejects.toThrow();
+        expect(await repo.listings.findByUrl(l3.url)).toBeNull();
+      });
+
       it("updates a listing's status and failure streaks", async () => {
         const update = { status: ListingStatus.Stale, failureStreak: FAILURES, notFoundStreak: 1 };
         expect(await repo.listings.updateStatus(l1.id, update)).toEqual(ok);
