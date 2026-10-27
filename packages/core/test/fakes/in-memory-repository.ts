@@ -26,8 +26,8 @@ const bug = async (message: string): Promise<never> => Promise.reject(new Error(
 
 const byCodePoint = (a: string, b: string): number => Number(a > b) - Number(a < b);
 
-const newestFirst = <T>(rows: Iterable<T>, at: (row: T) => Date): T[] =>
-  [...rows].toSorted((a, b) => at(b).getTime() - at(a).getTime());
+const newestFirst = <T extends { readonly id: string }>(rows: Iterable<T>, at: (row: T) => Date): T[] =>
+  [...rows].toSorted((a, b) => at(b).getTime() - at(a).getTime() || byCodePoint(b.id, a.id));
 
 /** A {@link Repository} held in memory that enforces references and unique ids the way a database would, for tests. */
 export const inMemoryRepository = (): Repository => {

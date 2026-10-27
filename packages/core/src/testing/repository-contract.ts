@@ -301,6 +301,13 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.snapshots.listSince(l1.id, JAN_2)).toEqual([atJan2, unknownShipping]);
       });
 
+      it("picks the snapshot with the greater id by code point when two share an observed instant", async () => {
+        for (const id of ["s4", "s5", "s3"]) {
+          await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
+        }
+        expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot("s5", l1.id, JAN_2)]);
+      });
+
       it("refuses a snapshot for a listing that does not exist", async () => {
         expect(await repo.snapshots.append(snapshot("s3", missingListing, JAN_1))).toEqual(notFound);
       });
@@ -541,6 +548,13 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         }
         expect(await repo.scanRuns.latest()).toEqual(blocked);
         expect(await repo.scanRuns.latest(PLUGIN)).toEqual(scanRun("r2", PLUGIN, JAN_2));
+      });
+
+      it("picks the run with the greater id by code point when two started at the same instant", async () => {
+        for (const run of [scanRun("r2", PLUGIN, JAN_1), scanRun("r3", PLUGIN, JAN_1), scanRun("r1", PLUGIN, JAN_1)]) {
+          await repo.scanRuns.record(run);
+        }
+        expect(await repo.scanRuns.latest(PLUGIN)).toEqual(scanRun("r3", PLUGIN, JAN_1));
       });
 
       it("rejects a scan run id that is already stored as a bug", async () => {

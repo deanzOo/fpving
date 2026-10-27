@@ -76,7 +76,10 @@ export interface SnapshotRepository {
   append(snapshot: PriceSnapshot): Promise<Result<void, NotFound>>;
   /** A listing's snapshots observed at or after `since`, oldest first. */
   listSince(listingId: ListingId, since: Date): Promise<PriceSnapshot[]>;
-  /** The newest snapshot of each of a product's listings that has one, in no particular order. */
+  /**
+   * The newest snapshot of each of a product's listings that has one, in no particular order. Of snapshots observed
+   * at the same instant, the one with the greater id by code point is the newest.
+   */
   latestPerListing(productId: ProductId): Promise<PriceSnapshot[]>;
 }
 
@@ -128,7 +131,10 @@ export interface AlertRepository {
 export interface ScanRunRepository {
   /** Records a finished scan run. */
   record(run: ScanRun): Promise<void>;
-  /** The most recently started run of `pluginId`, or of any plugin when omitted; null when none ran. */
+  /**
+   * The most recently started run of `pluginId`, or of any plugin when omitted; null when none ran. Of runs started
+   * at the same instant, the one with the greater id by code point wins.
+   */
   latest(pluginId?: PluginId): Promise<ScanRun | null>;
 }
 
@@ -167,7 +173,7 @@ export interface SettingsRepository {
  * - Every other broken reference, such as an alert naming a missing snapshot or a candidate for a missing product,
  *   and an id that is already stored are bugs: the promise rejects.
  * - Instants are UTC `Date`s, stored as integer epoch milliseconds, so they round-trip to the millisecond. The
- *   order of rows with equal instants is unspecified.
+ *   order of rows with equal instants is unspecified, except where a method names an id tiebreak.
  */
 export interface Repository {
   /** Products. */
