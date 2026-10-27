@@ -10,7 +10,8 @@ import { priceDrop } from "./price-drop.js";
  * Everything one evaluation reads. `history` is the listing's earlier snapshots, `incoming` the one just observed.
  * `productListings` holds the product's listings with their newest snapshots; the listing's own entry is replaced by
  * the incoming snapshot, or added if absent. History entries that are the incoming snapshot or not older than it are
- * ignored.
+ * ignored. `rates` is null when no exchange rates were ever fetched; then listings are not compared across stores, so
+ * no new cheapest alert is raised and the previous cheapest is kept.
  */
 export interface EvaluateInput {
   listing: Listing;
@@ -18,7 +19,7 @@ export interface EvaluateInput {
   incoming: PriceSnapshot;
   productListings: readonly ListingWithLatest[];
   previousCheapestListingId: ListingId | null;
-  rates: FxTable;
+  rates: FxTable | null;
   settings: AlertSettings;
   now: Date;
 }
@@ -42,14 +43,9 @@ export const evaluate = (input: EvaluateInput): Evaluation => {
     ...input.productListings.filter((entry) => entry.listing.id !== listing.id),
     { listing, latest: incoming },
   ];
-  const cheapest = newCheapest(
-    listing,
-    productListings,
-    input.previousCheapestListingId,
-    input.rates,
-    input.settings,
-    now,
-  );
+  const cheapest = input.rates === null
+    ? { cheapestListingId: input.previousCheapestListingId, alert: null }
+    : newCheapest(listing, productListings, input.previousCheapestListingId, input.rates, input.settings, now);
   const drafts = [
     priceDrop(listing, history, incoming, input.settings.priceDropMinBasisPoints, now),
     backInStock(listing, history, incoming, now),

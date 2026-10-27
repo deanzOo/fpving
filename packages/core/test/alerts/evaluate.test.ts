@@ -373,6 +373,11 @@ describe("New cheapest alert", () => {
     expect(run([unrated], listingA).cheapestListingId).toBe(listingA);
   });
 
+  it("compares nothing and keeps the previous cheapest when no exchange rates were ever fetched", () => {
+    const input = { ...dropInput(arriving("in", HUNDRED), []), previousCheapestListingId: listingB, rates: null };
+    expect(evaluate(input)).toEqual({ alerts: [], cheapestListingId: listingB });
+  });
+
   it("excludes stale and gone listings", () => {
     const result = run([entry("b", 1, {}, ListingStatus.Stale), entry("c", 1, {}, ListingStatus.Gone)], listingA);
     expect(result.cheapestListingId).toBe(listingA);
