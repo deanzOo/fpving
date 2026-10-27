@@ -13,6 +13,7 @@ describe("Core public API", () => {
       "ListingStatus",
       "LlmErrorKind",
       "LlmVerdict",
+      "MATCHING_RULES",
       "MatchErrorKind",
       "PortErrorKind",
       "PricingErrorKind",

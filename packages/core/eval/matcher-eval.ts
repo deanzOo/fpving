@@ -15,9 +15,8 @@ const matcherPairSchema = z.object({
 /** One labelled pair: a source and a candidate listing title, the verdict a person gave, and why. */
 export type MatcherPair = z.infer<typeof matcherPairSchema>;
 
-/** The contents of `pairs.json`: the labelling rules, and at least {@link MIN_MATCHER_PAIRS} labelled pairs. */
+/** The contents of `pairs.json`: at least {@link MIN_MATCHER_PAIRS} pairs labelled by the core `MATCHING_RULES`. */
 export const matcherEvalFileSchema = z.object({
-  rules: z.array(textSchema).min(1),
   pairs: z.array(matcherPairSchema).min(MIN_MATCHER_PAIRS),
 });
 

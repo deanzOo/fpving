@@ -1,4 +1,4 @@
-import evalFile from "@fpving/core/eval/pairs.json" with { type: "json" };
+import { MATCHING_RULES } from "@fpving/core";
 
 /** System prompt for extracting a product identity from a listing title. */
 export const EXTRACT_SYSTEM = [
@@ -8,12 +8,12 @@ export const EXTRACT_SYSTEM = [
   "Use the brand's usual spelling and leave out store filler such as \"FPV\", \"racing\" or \"free shipping\".",
 ].join(" ");
 
-/** System prompt for comparing two listing titles, judged by the matcher eval's labelling rules. */
+/** System prompt for comparing two listing titles, judged by the core matching rules. */
 export const COMPARE_SYSTEM = [
   "You compare two FPV drone gear listing titles: a source item and a candidate from another store.",
   "Answer whether the candidate is the same item, a variant of it, or a different item, with a one-line reason.",
   "Store titles spell, order and pad names differently; judge the item, not the wording. Rules:",
-  ...evalFile.rules.map((rule) => `- ${rule}`),
+  ...MATCHING_RULES.map((rule) => `- ${rule}`),
 ].join("\n");
 
 /**

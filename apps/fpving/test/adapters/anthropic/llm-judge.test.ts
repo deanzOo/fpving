@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageCreateParamsNonStreaming, StopReason } from "@anthropic-ai/sdk/resources/messages";
-import evalFile from "@fpving/core/eval/pairs.json" with { type: "json" };
-import { LlmErrorKind, LlmVerdict } from "@fpving/core";
+import { LlmErrorKind, LlmVerdict, MATCHING_RULES } from "@fpving/core";
 import type { LlmError, Result } from "@fpving/core";
 import type { LogFields, Logger } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
@@ -64,10 +63,10 @@ describe("Anthropic LLM judge", () => {
     expect(logged).toEqual([]);
   });
 
-  it("judges by every labelling rule of the matcher eval", async () => {
+  it("judges by every core matching rule", async () => {
     const { judge, requests } = judgeReplying(() => reply(VERDICT));
     await judge.compare(SOURCE, CANDIDATE);
-    for (const rule of evalFile.rules) {
+    for (const rule of MATCHING_RULES) {
       expect(requests[0]?.system).toContain(rule);
     }
   });

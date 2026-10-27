@@ -1,12 +1,4 @@
 {
-  "rules": [
-    "same: the same item, sold the same way, whatever the store calls it.",
-    "variant: the same item differing only in KV, cell count, colour, antenna polarization, radio protocol, receiver, video system (analog or digital) or pack size.",
-    "variant: a bundle, the item sold with extras such as props, batteries or goggles, versus the item alone.",
-    "variant: a stack versus one of its boards sold alone, such as the flight controller without the ESC.",
-    "different: another size, such as a motor stator, frame or prop size, or another model generation or series.",
-    "different: a clone, including an unbranded listing that copies the model name, and an accessory for the item."
-  ],
   "pairs": [
     {
       "source": "T-Motor F60 Pro V 2207 1950KV Brushless Motor",

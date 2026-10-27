@@ -14,8 +14,7 @@
       "@fpving/source": "./src/testing/index.ts",
       "types": "./dist/testing/index.d.ts",
       "import": "./dist/testing/index.js"
-    },
-    "./eval/pairs.json": "./eval/pairs.json"
+    }
   },
   "types": "./dist/index.d.ts",
   "dependencies": {

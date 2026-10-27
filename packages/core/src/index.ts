@@ -15,6 +15,7 @@ export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
 export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
 export { MatchErrorKind } from "./matching/errors.js";
 export { findMatches, rejudgeUnjudged } from "./matching/find.js";
+export { MATCHING_RULES } from "./matching/rules.js";
 export type {
   AlreadySuggested,
   FailedSearch,
