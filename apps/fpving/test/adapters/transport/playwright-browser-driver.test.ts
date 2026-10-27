@@ -17,6 +17,23 @@ const RELAUNCHED = 2;
 const URL_IN = "https://shop.example/start";
 const URL_OUT = "https://shop.example/final";
 
+const REFUSED_URLS = [
+  "file:///etc/passwd",
+  "ftp://shop.example/file",
+  "data:text/html,hi",
+  "javascript:alert(1)",
+  "http://localhost/",
+  "http://127.0.0.1/",
+  "http://10.1.2.3/",
+  "http://172.16.0.1/",
+  "http://192.168.1.1/",
+  "http://169.254.169.254/latest",
+  "http://0.0.0.0/",
+  "http://[::1]/",
+  "http://[fc00::1]/",
+  "http://[fe80::1]/",
+];
+
 interface FakePageSpec {
   readonly status?: number | null;
   readonly gotoError?: Error;
@@ -24,7 +41,7 @@ interface FakePageSpec {
   readonly closeError?: Error;
 }
 
-const harness = (spec: FakePageSpec = {}, launchError?: Error) => {
+const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Promise<void>) => {
   const log: string[] = [];
   const gotos: { url: string; options: { timeout: number; waitUntil: string } }[] = [];
   let launches = 0;
@@ -60,7 +77,8 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error) => {
   const launch: LaunchContext = (dir) => {
     launches += 1;
     dirs.push(dir);
-    return launchError ? Promise.reject(launchError) : Promise.resolve(context);
+    const settled = launchError ? Promise.reject(launchError) : Promise.resolve(context);
+    return launchGate ? launchGate.then(() => settled) : settled;
   };
   const seen: string[] = [];
   const limiter: DomainLimiter = {
@@ -69,9 +87,11 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error) => {
       return task();
     },
   };
-  const driver = createPlaywrightBrowserDriver({ launch, limiter, profileDir: PROFILE });
+  const driver = createPlaywrightBrowserDriver({ launch, limiter, profileDir: PROFILE, allowPrivateHosts: true });
+  const strict = createPlaywrightBrowserDriver({ launch, limiter, profileDir: PROFILE });
   return {
     driver,
+    strict,
     log,
     gotos,
     dirs,
@@ -181,11 +201,73 @@ describe("Rendering pages in the host browser", () => {
     expect(contextCloses()).toBe(0);
   });
 
-  it("launches a fresh context for a page wanted after close", async () => {
+  it("refuses pages after close and never launches again", async () => {
     const { driver, launches } = harness();
     await driver.fetchPage(URL_IN);
     await driver.close();
-    await driver.fetchPage(URL_IN);
-    expect(launches()).toBe(RELAUNCHED);
+    expect(await driver.fetchPage(URL_IN)).toEqual({ ok: false, error: { kind: "network", detail: "browser closed" } });
+    expect(launches()).toBe(1);
+  });
+
+  it("refuses pages after close even when none was ever loaded", async () => {
+    const { driver, launches } = harness();
+    await driver.close();
+    expect(await driver.fetchPage(URL_IN)).toMatchObject({ ok: false, error: { detail: "browser closed" } });
+    expect(launches()).toBe(0);
+  });
+
+  it("launches once when two first pages are wanted at the same time", async () => {
+    const { driver, launches } = harness();
+    const results = await Promise.all([driver.fetchPage(URL_IN), driver.fetchPage(URL_IN)]);
+    expect(results.map((result) => result.ok)).toEqual([true, true]);
+    expect(launches()).toBe(1);
+  });
+
+  it("closes a context that finishes launching after close was called", async () => {
+    let finish: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const { driver, contextCloses } = harness({}, undefined, gate);
+    const page = driver.fetchPage(URL_IN);
+    const closing = driver.close();
+    finish();
+    await closing;
+    await page;
+    expect(contextCloses()).toBe(1);
+  });
+
+  it("lets close finish when the launch it interrupted fails", async () => {
+    let fail: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      fail = resolve;
+    });
+    const { driver, contextCloses } = harness({}, new Error("executable doesn't exist"), gate);
+    const page = driver.fetchPage(URL_IN);
+    const closing = driver.close();
+    fail();
+    await expect(closing).resolves.toBeUndefined();
+    expect(await page).toMatchObject({ ok: false, error: { kind: "network" } });
+    expect(contextCloses()).toBe(0);
+  });
+
+  it("keeps the original timeout when closing the page fails too", async () => {
+    const { driver } = harness({
+      gotoError: new errors.TimeoutError("Timeout 30000ms exceeded."),
+      closeError: new Error("target closed"),
+    });
+    expect(await driver.fetchPage(URL_IN)).toMatchObject({ ok: false, error: { kind: "timeout" } });
+  });
+
+  it.each(REFUSED_URLS)("refuses %s as a network error before limiting or launching", async (url) => {
+    const { strict, seen, launches } = harness();
+    expect(await strict.fetchPage(url)).toMatchObject({ ok: false, error: { kind: "network" } });
+    expect(seen).toEqual([]);
+    expect(launches()).toBe(0);
+  });
+
+  it("loads a private host only when private hosts are allowed", async () => {
+    const { driver } = harness();
+    expect(await driver.fetchPage("http://127.0.0.1:8080/")).toMatchObject({ ok: true });
   });
 });

@@ -23,7 +23,13 @@ describe("The HTTP client against a local server", () => {
   });
 
   const client = (timeoutMs?: number) =>
-    createFetchHttpClient({ fetch, limiter: instant, userAgent, ...(timeoutMs === undefined ? {} : { timeoutMs }) });
+    createFetchHttpClient({
+      fetch,
+      limiter: instant,
+      userAgent,
+      allowPrivateHosts: true,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    });
 
   it("fetches a page with its status, body and lowercased headers", async () => {
     const result = await client().get(`${server.origin}/page`);
@@ -47,6 +53,11 @@ describe("The HTTP client against a local server", () => {
     const result = await client().get(`${server.origin}/echo-user-agent`);
     expect(result).toMatchObject({ ok: true, value: { body: userAgent } });
     expect(userAgent).toMatch(/^fpving\/\S+ \(\+https:\/\/github\.com\/deanzOo\/fpving\)$/);
+  });
+
+  it("refuses the local server unless private hosts are allowed", async () => {
+    const strict = createFetchHttpClient({ fetch, limiter: instant, userAgent });
+    expect(await strict.get(`${server.origin}/page`)).toMatchObject({ ok: false, error: { kind: "network" } });
   });
 
   it("times out on a server that never answers", async () => {

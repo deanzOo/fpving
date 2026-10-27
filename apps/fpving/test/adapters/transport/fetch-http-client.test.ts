@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFetchHttpClient, HTTP_TIMEOUT_MS } from "../../../src/adapters/transport/fetch-http-client.ts";
 import type { FetchFn } from "../../../src/adapters/transport/fetch-http-client.ts";
 import type { DomainLimiter } from "../../../src/adapters/transport/domain-limiter.ts";
@@ -6,6 +6,7 @@ import type { DomainLimiter } from "../../../src/adapters/transport/domain-limit
 const USER_AGENT = "fpving/9.9.9 (+https://example.test)";
 const NOT_FOUND = 404;
 const OK = 200;
+const CUSTOM_TIMEOUT_MS = 1234;
 
 const passThrough: DomainLimiter = { run: (_url, task) => task() };
 
@@ -19,6 +20,27 @@ const recording = (reply: () => Promise<Response>) => {
 };
 
 const headerOf = (init: RequestInit | undefined, name: string): string | null => new Headers(init?.headers).get(name);
+
+const REFUSED_URLS = [
+  "file:///etc/passwd",
+  "ftp://shop.example/file",
+  "data:text/html,hi",
+  "javascript:alert(1)",
+  "http://localhost/",
+  "http://127.0.0.1/",
+  "http://10.1.2.3/",
+  "http://172.16.0.1/",
+  "http://192.168.1.1/",
+  "http://169.254.169.254/latest",
+  "http://0.0.0.0/",
+  "http://[::1]/",
+  "http://[fc00::1]/",
+  "http://[fe80::1]/",
+];
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("Plain HTTP access for plugins", () => {
   it("returns the status, body and lowercased headers of a response", async () => {
@@ -53,11 +75,64 @@ describe("Plain HTTP access for plugins", () => {
     expect(requests[0]?.url).toBe("https://shop.example/a");
   });
 
-  it("puts a deadline on every request", async () => {
+  it("puts the default deadline on every request", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
     const { client, requests } = recording(() => Promise.resolve(new Response("")));
     await client.get("https://shop.example/a");
+    expect(timeout).toHaveBeenCalledWith(HTTP_TIMEOUT_MS);
     expect(requests[0]?.init.signal).toBeInstanceOf(AbortSignal);
-    expect(HTTP_TIMEOUT_MS).toBeGreaterThan(0);
+  });
+
+  it("uses the deadline it is configured with", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const custom = createFetchHttpClient({
+      fetch: () => Promise.resolve(new Response("")),
+      limiter: passThrough,
+      userAgent: USER_AGENT,
+      timeoutMs: CUSTOM_TIMEOUT_MS,
+    });
+    await custom.get("https://shop.example/a");
+    expect(timeout).toHaveBeenCalledWith(CUSTOM_TIMEOUT_MS);
+  });
+
+  it.each(REFUSED_URLS)("refuses %s as a network error before limiting or fetching", async (url) => {
+    let limited = false;
+    let fetched = false;
+    const client = createFetchHttpClient({
+      fetch: () => {
+        fetched = true;
+        return Promise.resolve(new Response(""));
+      },
+      limiter: {
+        run: (_url, task) => {
+          limited = true;
+          return task();
+        },
+      },
+      userAgent: USER_AGENT,
+    });
+    expect(await client.get(url)).toMatchObject({ ok: false, error: { kind: "network" } });
+    expect(limited).toBe(false);
+    expect(fetched).toBe(false);
+  });
+
+  it("explains why a url was refused", async () => {
+    const { client } = recording(() => Promise.resolve(new Response("")));
+    const result = await client.get("file:///etc/passwd");
+    expect(result).toEqual({
+      ok: false,
+      error: { kind: "network", detail: "refused: only http and https urls are allowed, got file:" },
+    });
+  });
+
+  it("lets a private host through only when private hosts are allowed", async () => {
+    const client = createFetchHttpClient({
+      fetch: () => Promise.resolve(new Response("local")),
+      limiter: passThrough,
+      userAgent: USER_AGENT,
+      allowPrivateHosts: true,
+    });
+    expect(await client.get("http://127.0.0.1:8080/")).toMatchObject({ ok: true, value: { body: "local" } });
   });
 
   it("maps an elapsed deadline to a timeout error", async () => {
@@ -97,7 +172,6 @@ describe("Plain HTTP access for plugins", () => {
       fetch: () => Promise.resolve(new Response("")),
       limiter,
       userAgent: USER_AGENT,
-      timeoutMs: HTTP_TIMEOUT_MS,
     });
     await client.get("https://shop.example/a");
     expect(seen).toEqual(["https://shop.example/a"]);

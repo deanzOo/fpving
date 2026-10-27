@@ -2,6 +2,7 @@ import { ok } from "@fpving/plugin-sdk";
 import type { HttpClient, HttpResponse, Result, TransportError } from "@fpving/plugin-sdk";
 import type { DomainLimiter } from "./domain-limiter.js";
 import { transportFailure } from "./transport-failure.js";
+import { urlRefusal } from "./url-policy.js";
 
 /** How long a request may take before it is a `timeout`: fifteen seconds. */
 export const HTTP_TIMEOUT_MS = 15_000;
@@ -19,6 +20,8 @@ export interface FetchHttpClientOptions {
   readonly userAgent: string;
   /** The request deadline; defaults to {@link HTTP_TIMEOUT_MS}. */
   readonly timeoutMs?: number;
+  /** Lets loopback, private and link-local hosts through; false unless a test needs a local server. */
+  readonly allowPrivateHosts?: boolean;
 }
 
 const isTimeout = (error: unknown): boolean => error instanceof DOMException && error.name === "TimeoutError";
@@ -31,8 +34,12 @@ const isTimeout = (error: unknown): boolean => error instanceof DOMException && 
  * @returns The client.
  */
 export const createFetchHttpClient = (options: FetchHttpClientOptions): HttpClient => ({
-  get: async (url, requestOptions) =>
-    options.limiter.run(url, async (): Promise<Result<HttpResponse, TransportError>> => {
+  get: async (url, requestOptions) => {
+    const refusal = urlRefusal(url, options.allowPrivateHosts ?? false);
+    if (refusal !== undefined) {
+      return transportFailure(false, refusal);
+    }
+    return options.limiter.run(url, async (): Promise<Result<HttpResponse, TransportError>> => {
       const headers = new Headers(requestOptions?.headers);
       headers.set("user-agent", options.userAgent);
       try {
@@ -45,5 +52,6 @@ export const createFetchHttpClient = (options: FetchHttpClientOptions): HttpClie
       } catch (error) {
         return transportFailure(isTimeout(error), error);
       }
-    }),
+    });
+  },
 });

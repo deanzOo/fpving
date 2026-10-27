@@ -15,6 +15,8 @@ const BROWSER_TIMEOUT_MS = 60_000;
 const OK = 200;
 const RENDERED_HTML_MARKER = "<h1 id=\"title\">rendered</h1>";
 
+const instantLimiter = createDomainLimiter({ now: () => Date.now(), sleep: () => Promise.resolve(), random: () => 0 });
+
 const chromiumInstalled = existsSync(chromium.executablePath());
 const browserRequired = process.env["FPVING_REQUIRE_BROWSER"] === "1";
 
@@ -34,8 +36,12 @@ describe.skipIf(!chromiumInstalled)(
     beforeAll(async () => {
       server = await startLocalServer();
       profileDir = await mkdtemp(join(tmpdir(), "fpving-profile-"));
-      const limiter = createDomainLimiter({ now: () => Date.now(), sleep: () => Promise.resolve(), random: () => 0 });
-      driver = createPlaywrightBrowserDriver({ launch: launchChromium, limiter, profileDir });
+      driver = createPlaywrightBrowserDriver({
+        launch: launchChromium,
+        limiter: instantLimiter,
+        profileDir,
+        allowPrivateHosts: true,
+      });
     }, BROWSER_TIMEOUT_MS);
 
     afterAll(async () => {
@@ -53,6 +59,15 @@ describe.skipIf(!chromiumInstalled)(
           value: { status: OK, finalUrl: `${server.origin}/page` },
         });
         expect(result.ok ? result.value.html : "").toContain(RENDERED_HTML_MARKER);
+      },
+      BROWSER_TIMEOUT_MS,
+    );
+
+    it(
+      "refuses a file url instead of reading the file",
+      async () => {
+        const strict = createPlaywrightBrowserDriver({ launch: launchChromium, limiter: instantLimiter, profileDir });
+        expect(await strict.fetchPage("file:///etc/passwd")).toMatchObject({ ok: false, error: { kind: "network" } });
       },
       BROWSER_TIMEOUT_MS,
     );

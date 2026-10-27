@@ -3,6 +3,7 @@ import { ok } from "@fpving/plugin-sdk";
 import type { BrowserDriver, BrowserPage, Result, TransportError } from "@fpving/plugin-sdk";
 import type { DomainLimiter } from "./domain-limiter.js";
 import { transportFailure } from "./transport-failure.js";
+import { urlRefusal } from "./url-policy.js";
 
 /** How long a navigation may take before it is a `timeout`: thirty seconds. */
 export const NAVIGATION_TIMEOUT_MS = 30_000;
@@ -32,25 +33,35 @@ export interface BrowserDriverOptions {
   readonly limiter: DomainLimiter;
   /** Absolute directory for the browser profile: cookies and storage survive restarts. */
   readonly profileDir: string;
+  /** Lets loopback, private and link-local hosts through; false unless a test needs a local server. */
+  readonly allowPrivateHosts?: boolean;
 }
 
 /** A {@link BrowserDriver} that owns a browser the host must shut down. */
 export interface ClosableBrowserDriver extends BrowserDriver {
-  /** Closes the browser context; calling it again, or before any page was loaded, does nothing. */
+  /** Closes the browser context for good: later pages are refused, and calling it again does nothing. */
   close(): Promise<void>;
 }
 
+const navigate = async (page: BrowserPageHandle, url: string): Promise<Result<BrowserPage, TransportError>> => {
+  const response = await page.goto(url, { timeout: NAVIGATION_TIMEOUT_MS, waitUntil: "load" });
+  if (response === null) {
+    return transportFailure(false, "navigation produced no response");
+  }
+  return ok({ status: response.status(), html: await page.content(), finalUrl: page.url() });
+};
+
 const load = async (context: BrowserContextHandle, url: string): Promise<Result<BrowserPage, TransportError>> => {
   const page = await context.newPage();
+  let result: Result<BrowserPage, TransportError>;
   try {
-    const response = await page.goto(url, { timeout: NAVIGATION_TIMEOUT_MS, waitUntil: "load" });
-    if (response === null) {
-      return transportFailure(false, "navigation produced no response");
-    }
-    return ok({ status: response.status(), html: await page.content(), finalUrl: page.url() });
-  } finally {
-    await page.close();
+    result = await navigate(page, url);
+  } catch (error) {
+    await page.close().catch(() => undefined);
+    throw error;
   }
+  await page.close();
+  return result;
 };
 
 /**
@@ -62,30 +73,46 @@ const load = async (context: BrowserContextHandle, url: string): Promise<Result<
  */
 export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): ClosableBrowserDriver => {
   let pending: Promise<BrowserContextHandle> | undefined;
+  let closed = false;
 
   const context = async (): Promise<BrowserContextHandle> => {
-    pending ??= options.launch(options.profileDir).catch((error: unknown) => {
-      pending = undefined;
-      throw error;
-    });
+    if (pending === undefined) {
+      const launching: Promise<BrowserContextHandle> = options.launch(options.profileDir).catch((error: unknown) => {
+        if (pending === launching) {
+          pending = undefined;
+        }
+        throw error;
+      });
+      pending = launching;
+    }
     return pending;
   };
 
   return {
-    fetchPage: async (url) =>
-      options.limiter.run(url, async () => {
+    fetchPage: async (url) => {
+      const refusal = urlRefusal(url, options.allowPrivateHosts ?? false);
+      if (refusal !== undefined) {
+        return transportFailure(false, refusal);
+      }
+      return options.limiter.run(url, async () => {
+        if (closed) {
+          return transportFailure(false, "browser closed");
+        }
         try {
           return await load(await context(), url);
         } catch (error) {
           return transportFailure(error instanceof errors.TimeoutError, error);
         }
-      }),
+      });
+    },
     close: async () => {
+      closed = true;
       const launched = pending;
       pending = undefined;
-      if (launched) {
-        await (await launched).close();
-      }
+      await launched?.then(
+        async (launchedContext) => launchedContext.close(),
+        () => undefined,
+      );
     },
   };
 };
