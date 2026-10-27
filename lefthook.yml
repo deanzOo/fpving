@@ -1,0 +1,13 @@
+pre-commit:
+  jobs:
+    - name: eslint
+      glob: "*.ts"
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+    - name: gitleaks
+      run: gitleaks git --staged --no-banner --redact
+
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: pnpm exec commitlint --edit {1}

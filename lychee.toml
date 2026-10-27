@@ -1,0 +1,7 @@
+# typedoc module links have no trailing slash, which breaks fragment resolution
+
+offline = true
+no_progress = true
+include_fragments = "full"
+remap = ["^file://(.*)/dist/fpving(/|$) file://$1/dist/"]
+exclude = ["/api/fpving/[^/]+#"]

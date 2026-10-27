@@ -1,0 +1,26 @@
+core:
+  - changed-files:
+      - any-glob-to-any-file: packages/core/**
+plugin-sdk:
+  - changed-files:
+      - any-glob-to-any-file: packages/plugin-sdk/**
+app:
+  - changed-files:
+      - any-glob-to-any-file: apps/fpving/**
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - lefthook.yml
+          - commitlint.config.ts
+          - tools/**
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - apps/docs/**
+deps:
+  - changed-files:
+      - any-glob-to-any-file:
+          - pnpm-lock.yaml
+          - "**/package.json"

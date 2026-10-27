@@ -1,0 +1,21 @@
+name: Plugin SDK request
+description: Request a change to the plugin contract or SDK
+labels: [plugin-sdk]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What does your plugin need that the SDK cannot express?
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed API shape
+      description: Types, manifest fields or context members you would like.
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround

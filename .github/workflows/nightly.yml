@@ -1,0 +1,23 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+    uses: ./.github/workflows/ci.yml

@@ -1,0 +1,34 @@
+---
+title: fpving
+description: A local-first companion for people entering the FPV drone hobby, starting with a gear price watcher.
+---
+
+fpving is an open-source companion for people entering the FPV drone hobby. The first piece is a **gear watcher**: track the same product across stores, see the true landed cost in your own currency, and get notified about meaningful deals without checking sites by hand.
+
+:::caution[Pre-alpha]
+Nothing is released yet and interfaces will change. These pages describe the design the code is being built to. Pages mark clearly what is **planned** and what is built.
+:::
+
+## Why
+
+Newcomers compare the same drone, goggles or battery across marketplaces and specialty shops, each with different shipping, import tax and currency. fpving does that arithmetic for you and tells you when a price actually moves.
+
+## What it will do
+
+- Watch products; each product has one listing per store.
+- Paste a URL and LLM-assisted matching suggests the same product in other stores for you to confirm.
+- Alert on price drops, back in stock and a new cheapest listing.
+- Show prices in your display currency, with landed cost for your ship-to country.
+
+It is designed to run locally: a Node server with SQLite on your machine and a React UI in your browser. Nothing is hosted and each machine keeps its own data.
+
+## Plugins
+
+Store support comes exclusively from plugins. This repository ships no store plugins. See [Writing a plugin](./writing-a-plugin/).
+
+## Where to go next
+
+- [Getting started](./getting-started/) and [Configuration](./configuration/)
+- [Architecture](./architecture/) and the [decision records](./adr/0001-record-architecture-decisions/)
+- [Behaviour specification](./reference/behaviour-spec/), generated from the test names
+- [Contributing](./contributing/)
