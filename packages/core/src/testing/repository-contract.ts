@@ -252,6 +252,19 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.listings.updateStatus(missingListing, update)).toEqual(notFound);
       });
 
+      it("lists active and stale listings of live products to scan, by plugin, then product, then age", async () => {
+        const otherPlugin = { ...listing("l3", p1.id, url("three")), pluginId: OTHER_PLUGIN };
+        const stale = { ...listing("l4", p1.id, url("four")), addedAt: JAN_2, status: ListingStatus.Stale };
+        const gone = { ...listing("l5", p2.id, url("five")), status: ListingStatus.Gone };
+        const archived = { ...product("p3"), archivedAt: JAN_2 };
+        const ofArchived = listing("l6", archived.id, url("six"));
+        for (const row of [otherPlugin, stale, gone]) {
+          await repo.listings.addWithSnapshot(row, snapshot(`s-${row.id}`, row.id, JAN_2));
+        }
+        await repo.products.add(archived, ofArchived, snapshot("s6", ofArchived.id, JAN_2));
+        expect(await repo.listings.listToScan()).toEqual([l1, stale, l2, otherPlugin]);
+      });
+
       it("returns copies, so changing a returned row does not change the stored one", async () => {
         for (const row of await repo.listings.listByProduct(p1.id)) {
           row.title = "changed";

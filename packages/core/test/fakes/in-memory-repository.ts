@@ -1,5 +1,5 @@
 import { err, ok } from "@fpving/plugin-sdk";
-import { CandidateStatus, DEFAULT_SETTINGS, RepositoryErrorKind } from "../../src/index.ts";
+import { CandidateStatus, DEFAULT_SETTINGS, ListingStatus, RepositoryErrorKind } from "../../src/index.ts";
 import type {
   Alert,
   CachedVerdict,
@@ -23,6 +23,8 @@ const done = ok(undefined);
 const copy = structuredClone;
 
 const bug = async (message: string): Promise<never> => Promise.reject(new Error(message));
+
+const byCodePoint = (a: string, b: string): number => Number(a > b) - Number(a < b);
 
 const newestFirst = <T>(rows: Iterable<T>, at: (row: T) => Date): T[] =>
   [...rows].toSorted((a, b) => at(b).getTime() - at(a).getTime());
@@ -101,6 +103,19 @@ export const inMemoryRepository = (): Repository => {
             [...listings.values()]
               .filter((row) => row.productId === productId)
               .toSorted((a, b) => a.addedAt.getTime() - b.addedAt.getTime()),
+          ),
+        ),
+      listToScan: async () =>
+        Promise.resolve(
+          copy(
+            [...listings.values()]
+              .filter((row) => row.status !== ListingStatus.Gone && products.get(row.productId)?.archivedAt === null)
+              .toSorted(
+                (a, b) =>
+                  byCodePoint(a.pluginId, b.pluginId)
+                  || byCodePoint(a.productId, b.productId)
+                  || a.addedAt.getTime() - b.addedAt.getTime(),
+              ),
           ),
         ),
       updateStatus: async (id, update) => {

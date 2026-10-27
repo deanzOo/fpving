@@ -57,6 +57,11 @@ export interface ListingRepository {
   findByUrl(url: string): Promise<Listing | null>;
   /** A product's listings, oldest first. */
   listByProduct(productId: ProductId): Promise<Listing[]>;
+  /**
+   * The listings a scan fetches: the active and stale ones of products that are not archived, ordered by plugin id,
+   * then product id, then oldest first. Ids compare by code point.
+   */
+  listToScan(): Promise<Listing[]>;
   /** Replaces a listing's status and streaks. */
   updateStatus(id: ListingId, update: ListingStatusUpdate): Promise<Result<void, NotFound>>;
 }
