@@ -10,6 +10,7 @@
     "db:generate": "node --conditions=@fpving/source node_modules/drizzle-kit/bin.cjs generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
     "@fpving/core": "workspace:*",
     "@fpving/plugin-sdk": "workspace:*",
     "better-sqlite3": "13.0.3",
