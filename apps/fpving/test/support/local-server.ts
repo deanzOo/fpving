@@ -14,11 +14,28 @@ const OK = 200;
 
 export interface LocalServer {
   readonly origin: string;
+  /** The path of every request the server received, in order. */
+  readonly requests: readonly string[];
   close(): Promise<void>;
 }
 
+const leakyPage = (target: string): string => [
+  `<!doctype html><html><body><img src="${target}/pixel"><script src="${target}/script.js"></script>`,
+  `<script>fetch("${target}/fetch").catch(() => undefined);</script></body></html>`,
+].join("");
+
 const respond = (request: IncomingMessage, response: ServerResponse): void => {
-  switch (request.url) {
+  const url = new URL(request.url ?? "/", "http://fixture");
+  const target = url.searchParams.get("target") ?? "";
+  switch (url.pathname) {
+    case "/leaky":
+      response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
+      response.end(leakyPage(target));
+      return;
+    case "/redirect-to":
+      response.writeHead(FOUND, { location: target });
+      response.end();
+      return;
     case "/page":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8", "x-fixture": "yes" });
       response.end(FIXTURE_HTML);
@@ -47,12 +64,20 @@ const listen = async (server: Server): Promise<string> =>
     });
   });
 
-/** Serves the fixture page, a redirect to it, a user agent echo, a 404 and a request that never answers. */
+/**
+ * Serves the fixture page, a redirect to it, a user agent echo, a 404, a request that never answers, a page whose
+ * subresources load from `?target=` and a redirect to `?target=`.
+ */
 export const startLocalServer = async (): Promise<LocalServer> => {
-  const server = createServer(respond);
+  const requests: string[] = [];
+  const server = createServer((request, response) => {
+    requests.push(request.url ?? "");
+    respond(request, response);
+  });
   const origin = await listen(server);
   return {
     origin,
+    requests,
     close: async () =>
       new Promise((resolve, reject) => {
         server.closeAllConnections();

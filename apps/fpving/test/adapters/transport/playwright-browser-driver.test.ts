@@ -9,6 +9,7 @@ import type {
   BrowserContextHandle,
   BrowserPageHandle,
   LaunchContext,
+  RouteHandle,
 } from "../../../src/adapters/transport/playwright-browser-driver.ts";
 
 const PROFILE = "/data/browser-profile";
@@ -39,6 +40,7 @@ interface FakePageSpec {
   readonly gotoError?: Error;
   readonly contentError?: Error;
   readonly closeError?: Error;
+  readonly finalUrl?: string;
 }
 
 const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Promise<void>) => {
@@ -60,13 +62,19 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
       log.push("content");
       return spec.contentError ? Promise.reject(spec.contentError) : Promise.resolve("<html>hi</html>");
     },
-    url: () => URL_OUT,
+    url: () => spec.finalUrl ?? URL_OUT,
     close: () => {
       log.push("page closed");
       return spec.closeError ? Promise.reject(spec.closeError) : Promise.resolve();
     },
   };
+  const routes: { pattern: string; handler: (route: RouteHandle) => Promise<void> }[] = [];
   const context: BrowserContextHandle = {
+    route: (pattern, handler) => {
+      routes.push({ pattern, handler });
+      log.push("route");
+      return Promise.resolve();
+    },
     newPage: () => Promise.resolve(page),
     close: () => {
       contextCloses += 1;
@@ -96,6 +104,7 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
     gotos,
     dirs,
     seen,
+    routes,
     launches: () => launches,
     contextCloses: () => contextCloses,
   };
@@ -134,21 +143,21 @@ describe("Rendering pages in the host browser", () => {
   it("closes the page after a successful load", async () => {
     const { driver, log } = harness();
     await driver.fetchPage(URL_IN);
-    expect(log).toEqual(["goto", "content", "page closed"]);
+    expect(log).toEqual(["route", "goto", "content", "page closed"]);
   });
 
   it("closes the page when navigation fails", async () => {
     const { driver, log } = harness({ gotoError: new Error("net::ERR_CONNECTION_REFUSED") });
     const result = await driver.fetchPage(URL_IN);
     expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
-    expect(log).toEqual(["goto", "page closed"]);
+    expect(log).toEqual(["route", "goto", "page closed"]);
   });
 
   it("closes the page when reading the content fails", async () => {
     const { driver, log } = harness({ contentError: new Error("navigating") });
     const result = await driver.fetchPage(URL_IN);
     expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
-    expect(log).toEqual(["goto", "content", "page closed"]);
+    expect(log).toEqual(["route", "goto", "content", "page closed"]);
   });
 
   it("maps a Playwright timeout to a timeout error", async () => {
@@ -276,5 +285,44 @@ describe("Rendering pages in the host browser", () => {
   it("loads a private host only when private hosts are allowed", async () => {
     const { driver } = harness();
     expect(await driver.fetchPage("http://127.0.0.1:8080/")).toMatchObject({ ok: true });
+  });
+
+  it("routes every request the page makes through the url policy once the context is launched", async () => {
+    const { strict, routes, log } = harness();
+    await strict.fetchPage(URL_IN);
+    expect(routes.map((route) => route.pattern)).toEqual(["**/*"]);
+    expect(log[0]).toBe("route");
+  });
+
+  it.each([
+    ["http://127.0.0.1:9/pixel.gif", false, "aborted"],
+    ["http://[::1]/api", false, "aborted"],
+    ["https://cdn.shop.example/app.js", false, "continued"],
+    ["http://127.0.0.1:9/pixel.gif", true, "continued"],
+  ])("lets a page request to %s through when private hosts allowed is %s: %s", async (url, allow, outcome) => {
+    const { driver, strict, routes } = harness();
+    await (allow ? driver : strict).fetchPage(URL_IN);
+    const calls: string[] = [];
+    const route: RouteHandle = {
+      request: () => ({ url: () => url }),
+      abort: () => {
+        calls.push("aborted");
+        return Promise.resolve();
+      },
+      continue: () => {
+        calls.push("continued");
+        return Promise.resolve();
+      },
+    };
+    await routes[0]?.handler(route);
+    expect(calls).toEqual([outcome]);
+  });
+
+  it("refuses a page whose navigation was redirected to a refused host", async () => {
+    const { strict, log } = harness({ finalUrl: "http://127.0.0.1/admin" });
+    const result = await strict.fetchPage(URL_IN);
+    expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
+    expect(result.ok ? "" : result.error.detail).toMatch(/^refused: .*; redirect to http:\/\/127\.0\.0\.1\/admin$/);
+    expect(log).toEqual(["route", "goto", "page closed"]);
   });
 });

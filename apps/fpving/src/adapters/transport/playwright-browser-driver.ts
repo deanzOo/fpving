@@ -3,7 +3,7 @@ import { ok } from "@fpving/plugin-sdk";
 import type { BrowserDriver, BrowserPage, Result, TransportError } from "@fpving/plugin-sdk";
 import type { DomainLimiter } from "./domain-limiter.js";
 import { transportFailure } from "./transport-failure.js";
-import { guardUrl } from "./url-policy.js";
+import { checkUrl, guardUrl } from "./url-policy.js";
 
 /** How long a navigation may take before it is a `timeout`: thirty seconds. */
 export const NAVIGATION_TIMEOUT_MS = 30_000;
@@ -16,8 +16,16 @@ export interface BrowserPageHandle {
   close(): Promise<void>;
 }
 
+/** The part of a Playwright `Route` the driver uses: one intercepted request the page made. */
+export interface RouteHandle {
+  request(): { url(): string };
+  abort(): Promise<void>;
+  continue(): Promise<void>;
+}
+
 /** The part of a Playwright `BrowserContext` the driver uses. */
 export interface BrowserContextHandle {
+  route(url: string, handler: (route: RouteHandle) => Promise<void>): Promise<unknown>;
   newPage(): Promise<BrowserPageHandle>;
   close(): Promise<void>;
 }
@@ -43,19 +51,32 @@ export interface ClosableBrowserDriver extends BrowserDriver {
   close(): Promise<void>;
 }
 
-const navigate = async (page: BrowserPageHandle, url: string): Promise<Result<BrowserPage, TransportError>> => {
+const navigate = async (
+  page: BrowserPageHandle,
+  url: string,
+  allowPrivateHosts: boolean,
+): Promise<Result<BrowserPage, TransportError>> => {
   const response = await page.goto(url, { timeout: NAVIGATION_TIMEOUT_MS, waitUntil: "load" });
   if (response === null) {
     return transportFailure(false, "navigation produced no response");
   }
-  return ok({ status: response.status(), html: await page.content(), finalUrl: page.url() });
+  const finalUrl = page.url();
+  const landed = checkUrl(finalUrl, allowPrivateHosts);
+  if (!landed.ok) {
+    return transportFailure(false, `${landed.error}; redirect to ${finalUrl}`);
+  }
+  return ok({ status: response.status(), html: await page.content(), finalUrl });
 };
 
-const load = async (context: BrowserContextHandle, url: string): Promise<Result<BrowserPage, TransportError>> => {
+const load = async (
+  context: BrowserContextHandle,
+  url: string,
+  allowPrivateHosts: boolean,
+): Promise<Result<BrowserPage, TransportError>> => {
   const page = await context.newPage();
   let result: Result<BrowserPage, TransportError>;
   try {
-    result = await navigate(page, url);
+    result = await navigate(page, url, allowPrivateHosts);
   } catch (error) {
     await page.close().catch(() => undefined);
     throw error;
@@ -64,9 +85,15 @@ const load = async (context: BrowserContextHandle, url: string): Promise<Result<
   return result;
 };
 
+const refuseBlockedRequests = (allowPrivateHosts: boolean) => async (route: RouteHandle): Promise<void> =>
+  checkUrl(route.request().url(), allowPrivateHosts).ok ? route.continue() : route.abort();
+
 /**
  * Creates the SDK {@link BrowserDriver} on Playwright. One persistent context is launched on the first page and
- * reused; each page opens in a tab that is always closed again.
+ * reused; each page opens in a tab that is always closed again. Every request a page makes (subresources, XHR and
+ * fetch) is routed through the URL policy and aborted when refused, and a navigation that was redirected to a refused
+ * host is a `network` error. Playwright does not route redirect hops, so such a hop is still sent, but its response
+ * never reaches the plugin.
  *
  * @param options - The launcher, limiter and profile directory.
  * @returns The driver, to be closed when the host shuts down.
@@ -74,15 +101,22 @@ const load = async (context: BrowserContextHandle, url: string): Promise<Result<
 export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): ClosableBrowserDriver => {
   let pending: Promise<BrowserContextHandle> | undefined;
   let closed = false;
+  const allowPrivateHosts = options.allowPrivateHosts ?? false;
 
   const context = async (): Promise<BrowserContextHandle> => {
     if (pending === undefined) {
-      const launching: Promise<BrowserContextHandle> = options.launch(options.profileDir).catch((error: unknown) => {
-        if (pending === launching) {
-          pending = undefined;
-        }
-        throw error;
-      });
+      const launching: Promise<BrowserContextHandle> = options
+        .launch(options.profileDir)
+        .then(async (launched) => {
+          await launched.route("**/*", refuseBlockedRequests(allowPrivateHosts));
+          return launched;
+        })
+        .catch((error: unknown) => {
+          if (pending === launching) {
+            pending = undefined;
+          }
+          throw error;
+        });
       pending = launching;
     }
     return pending;
@@ -96,7 +130,7 @@ export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): Cl
             return transportFailure(false, "browser closed");
           }
           try {
-            return await load(await context(), target);
+            return await load(await context(), target, allowPrivateHosts);
           } catch (error) {
             return transportFailure(error instanceof errors.TimeoutError, error);
           }
