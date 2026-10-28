@@ -3,7 +3,7 @@ import { ok } from "@fpving/plugin-sdk";
 import type { BrowserDriver, BrowserPage, Result, TransportError } from "@fpving/plugin-sdk";
 import type { DomainLimiter } from "./domain-limiter.js";
 import { transportFailure } from "./transport-failure.js";
-import { checkUrl } from "./url-policy.js";
+import { guardUrl } from "./url-policy.js";
 
 /** How long a navigation may take before it is a `timeout`: thirty seconds. */
 export const NAVIGATION_TIMEOUT_MS = 30_000;
@@ -89,23 +89,19 @@ export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): Cl
   };
 
   return {
-    fetchPage: async (url) => {
-      const checked = checkUrl(url, options.allowPrivateHosts ?? false);
-      if (!checked.ok) {
-        return transportFailure(false, checked.error);
-      }
-      const target = checked.value;
-      return options.limiter.run(target, async () => {
-        if (closed) {
-          return transportFailure(false, "browser closed");
-        }
-        try {
-          return await load(await context(), target);
-        } catch (error) {
-          return transportFailure(error instanceof errors.TimeoutError, error);
-        }
-      });
-    },
+    fetchPage: async (url) =>
+      guardUrl(url, options.allowPrivateHosts, async (target) =>
+        options.limiter.run(target, async () => {
+          if (closed) {
+            return transportFailure(false, "browser closed");
+          }
+          try {
+            return await load(await context(), target);
+          } catch (error) {
+            return transportFailure(error instanceof errors.TimeoutError, error);
+          }
+        }),
+      ),
     close: async () => {
       closed = true;
       const launched = pending;

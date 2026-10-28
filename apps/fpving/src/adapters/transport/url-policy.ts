@@ -1,5 +1,6 @@
 import { err, ok } from "@fpving/plugin-sdk";
-import type { Result } from "@fpving/plugin-sdk";
+import type { Result, TransportError } from "@fpving/plugin-sdk";
+import { transportFailure } from "./transport-failure.js";
 
 const ALLOWED_PROTOCOLS: readonly string[] = ["http:", "https:"];
 const LOCALHOST = "localhost";
@@ -120,4 +121,21 @@ export const checkUrl = (url: string, allowPrivateHosts: boolean): Result<string
     return err("refused: private, loopback and link-local hosts are not allowed");
   }
   return ok(parsed.href);
+};
+
+/**
+ * Runs a transport request only for an allowed URL, handing it the normalized URL; a refused URL is a `network` error.
+ *
+ * @param url - The URL string from the plugin.
+ * @param allowPrivateHosts - Lets private hosts through; defaults to false.
+ * @param run - The request, given the normalized URL.
+ * @returns What `run` returns, or the refusal.
+ */
+export const guardUrl = async <T>(
+  url: string,
+  allowPrivateHosts: boolean | undefined,
+  run: (target: string) => Promise<Result<T, TransportError>>,
+): Promise<Result<T, TransportError>> => {
+  const checked = checkUrl(url, allowPrivateHosts ?? false);
+  return checked.ok ? run(checked.value) : transportFailure(false, checked.error);
 };

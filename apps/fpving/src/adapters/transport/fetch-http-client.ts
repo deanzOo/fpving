@@ -2,7 +2,7 @@ import { ok } from "@fpving/plugin-sdk";
 import type { HttpClient, HttpResponse, Result, TransportError } from "@fpving/plugin-sdk";
 import type { DomainLimiter } from "./domain-limiter.js";
 import { transportFailure } from "./transport-failure.js";
-import { checkUrl } from "./url-policy.js";
+import { guardUrl } from "./url-policy.js";
 
 /** How long a request may take before it is a `timeout`: fifteen seconds. */
 export const HTTP_TIMEOUT_MS = 15_000;
@@ -34,25 +34,21 @@ const isTimeout = (error: unknown): boolean => error instanceof DOMException && 
  * @returns The client.
  */
 export const createFetchHttpClient = (options: FetchHttpClientOptions): HttpClient => ({
-  get: async (url, requestOptions) => {
-    const checked = checkUrl(url, options.allowPrivateHosts ?? false);
-    if (!checked.ok) {
-      return transportFailure(false, checked.error);
-    }
-    const target = checked.value;
-    return options.limiter.run(target, async (): Promise<Result<HttpResponse, TransportError>> => {
-      const headers = new Headers(requestOptions?.headers);
-      headers.set("user-agent", options.userAgent);
-      try {
-        const response = await options.fetch(target, {
-          headers,
-          signal: AbortSignal.timeout(options.timeoutMs ?? HTTP_TIMEOUT_MS),
-        });
-        const body = await response.text();
-        return ok({ status: response.status, body, headers: Object.fromEntries(response.headers.entries()) });
-      } catch (error) {
-        return transportFailure(isTimeout(error), error);
-      }
-    });
-  },
+  get: async (url, requestOptions) =>
+    guardUrl(url, options.allowPrivateHosts, async (target) =>
+      options.limiter.run(target, async (): Promise<Result<HttpResponse, TransportError>> => {
+        const headers = new Headers(requestOptions?.headers);
+        headers.set("user-agent", options.userAgent);
+        try {
+          const response = await options.fetch(target, {
+            headers,
+            signal: AbortSignal.timeout(options.timeoutMs ?? HTTP_TIMEOUT_MS),
+          });
+          const body = await response.text();
+          return ok({ status: response.status, body, headers: Object.fromEntries(response.headers.entries()) });
+        } catch (error) {
+          return transportFailure(isTimeout(error), error);
+        }
+      }),
+    ),
 });
