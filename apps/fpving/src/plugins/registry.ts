@@ -9,8 +9,7 @@ export interface CompatiblePlugin {
   readonly domains: Readonly<PluginManifest["domains"]>;
 }
 
-/** The hostname lookups of the `StoreGateway` port, with the port's semantics. */
-export type DomainRegistry = Pick<StoreGateway, "declaredDomains" | "pluginFor">;
+type DomainRegistry = Pick<StoreGateway, "declaredDomains" | "pluginFor">;
 
 export interface RegisteredPlugins {
   readonly registry: DomainRegistry;
