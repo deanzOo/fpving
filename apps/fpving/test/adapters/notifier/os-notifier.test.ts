@@ -1,8 +1,20 @@
 import { alertIdSchema, PortErrorKind } from "@fpving/core";
 import type { AlertNotification } from "@fpving/core";
 import { describe, expect, it } from "vitest";
-import { callbackBackend, createOsNotifier, nodeNotifierBackend } from "../../../src/adapters/notifier/os-notifier.ts";
-import type { NodeNotifierLike, NotifyBackend, OsNotification } from "../../../src/adapters/notifier/os-notifier.ts";
+import {
+  callbackBackend,
+  createOsNotifier,
+  nodeNotifierBackend,
+  notifyBackendFor,
+  OSASCRIPT_NOTIFY_SCRIPT,
+  osascriptBackend,
+} from "../../../src/adapters/notifier/os-notifier.ts";
+import type {
+  ExecFileFn,
+  NodeNotifierLike,
+  NotifyBackend,
+  OsNotification,
+} from "../../../src/adapters/notifier/os-notifier.ts";
 
 const ALERT: AlertNotification = {
   alertId: alertIdSchema.parse("alert-1"),
@@ -86,5 +98,58 @@ describe("The callback style notifier backend", () => {
 
   it("is wired to the real node-notifier by default", () => {
     expect(nodeNotifierBackend).toBeTypeOf("function");
+  });
+});
+
+describe("The macOS notifier backend", () => {
+  const UNTRUSTED = [
+    "plain",
+    "say \"hi\"",
+    "back\\slash",
+    "\" & do shell script \"touch /tmp/pwned\" & \"",
+    "-e",
+    "--",
+  ];
+
+  const recordingExec = (error: Error | null) => {
+    const calls: { file: string; args: readonly string[] }[] = [];
+    const exec: ExecFileFn = (file, args, callback) => {
+      calls.push({ file, args });
+      callback(error);
+    };
+    return { calls, exec };
+  };
+
+  it.each(UNTRUSTED)("passes %j to osascript only as an argument, never inside the script", async (text) => {
+    const { calls, exec } = recordingExec(null);
+    await osascriptBackend(exec)({ title: text, message: `${text} body` });
+    expect(calls).toEqual([
+      { file: "osascript", args: ["-e", OSASCRIPT_NOTIFY_SCRIPT, "--", text, `${text} body`] },
+    ]);
+  });
+
+  it("uses a fixed script that reads the title and message from its arguments", () => {
+    expect(OSASCRIPT_NOTIFY_SCRIPT).toBe(
+      "on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run",
+    );
+  });
+
+  it("maps a failed osascript to notify failed", async () => {
+    const { exec } = recordingExec(new Error("osascript: execution error"));
+    const result = await createOsNotifier(osascriptBackend(exec)).notify(ALERT);
+    expect(result).toEqual({
+      ok: false,
+      error: { kind: PortErrorKind.NotifyFailed, detail: "Error: osascript: execution error" },
+    });
+  });
+});
+
+describe("Choosing the notifier backend for the platform", () => {
+  it("uses osascript on macOS, not node-notifier", () => {
+    expect(notifyBackendFor("darwin")).not.toBe(nodeNotifierBackend);
+  });
+
+  it.each(["linux", "win32"] as const)("uses node-notifier on %s", (platform) => {
+    expect(notifyBackendFor(platform)).toBe(nodeNotifierBackend);
   });
 });

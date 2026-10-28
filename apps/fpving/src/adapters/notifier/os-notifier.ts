@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { err, ok, PortErrorKind } from "@fpving/core";
 import type { AlertNotification, Notifier, NotifyFailed, Result } from "@fpving/core";
 import nodeNotifier from "node-notifier";
@@ -36,13 +37,48 @@ export const callbackBackend = (notifier: NodeNotifierLike): NotifyBackend => {
     });
 };
 
-/** Shows notifications through `node-notifier`: Notification Center, Windows toasts or notify-send. */
+/** Shows notifications through `node-notifier`: Windows toasts or notify-send. */
 export const nodeNotifierBackend: NotifyBackend = callbackBackend(nodeNotifier);
+
+/** The fixed AppleScript the macOS backend runs; the title and message arrive only as its arguments. */
+export const OSASCRIPT_NOTIFY_SCRIPT
+  = "on run argv\ndisplay notification (item 2 of argv) with title (item 1 of argv)\nend run";
+
+/** The part of `child_process.execFile` the macOS backend uses. */
+export type ExecFileFn = (file: string, args: readonly string[], callback: (error: Error | null) => void) => unknown;
+
+/**
+ * Shows notifications on macOS with the built-in `osascript`, which runs natively on Apple Silicon. The title and
+ * message are passed after `--` as script arguments, never written into the script, so they cannot inject AppleScript.
+ *
+ * @param exec - Runs the command, normally `execFile`.
+ * @returns A backend that rejects when `osascript` fails.
+ */
+export const osascriptBackend = (exec: ExecFileFn): NotifyBackend => async (notification) =>
+  new Promise((resolve, reject) => {
+    exec("osascript", ["-e", OSASCRIPT_NOTIFY_SCRIPT, "--", notification.title, notification.message], (error) => {
+      if (error === null) {
+        resolve();
+      } else {
+        reject(error);
+      }
+    });
+  });
+
+/**
+ * Picks the backend for a platform: {@link osascriptBackend} on macOS, where `node-notifier`'s bundled
+ * terminal-notifier is x86_64-only, and {@link nodeNotifierBackend} elsewhere.
+ *
+ * @param platform - Normally `process.platform`.
+ * @returns The backend.
+ */
+export const notifyBackendFor = (platform: NodeJS.Platform): NotifyBackend =>
+  platform === "darwin" ? osascriptBackend(execFile) : nodeNotifierBackend;
 
 /**
  * Creates the core {@link Notifier} on a backend. A failed backend is a `notify_failed` result, never a throw.
  *
- * @param backend - Shows the notification, normally {@link nodeNotifierBackend}.
+ * @param backend - Shows the notification, normally `notifyBackendFor(process.platform)`.
  * @returns The notifier.
  */
 export const createOsNotifier = (backend: NotifyBackend): Notifier => ({
