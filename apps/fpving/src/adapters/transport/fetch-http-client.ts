@@ -26,7 +26,7 @@ export interface FetchHttpClientOptions {
   readonly userAgent: string;
   /** The request deadline; defaults to {@link HTTP_TIMEOUT_MS}. */
   readonly timeoutMs?: number;
-  /** Lets loopback, private and link-local hosts through; false unless a test needs a local server. */
+  /** Lets private, loopback, link-local and other non-public hosts through; false unless a test needs a local host. */
   readonly allowPrivateHosts?: boolean;
 }
 

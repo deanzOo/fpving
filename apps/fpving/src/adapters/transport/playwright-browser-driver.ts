@@ -41,7 +41,7 @@ export interface BrowserDriverOptions {
   readonly limiter: DomainLimiter;
   /** Absolute directory for the browser profile: cookies and storage survive restarts. */
   readonly profileDir: string;
-  /** Lets loopback, private and link-local hosts through; false unless a test needs a local server. */
+  /** Lets private, loopback, link-local and other non-public hosts through; false unless a test needs a local host. */
   readonly allowPrivateHosts?: boolean;
 }
 

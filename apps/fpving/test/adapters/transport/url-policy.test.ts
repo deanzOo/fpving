@@ -70,11 +70,36 @@ describe("Which URLs a plugin may ask the host to load", () => {
     "http://[64:ff9b::169.254.169.254]/",
     "http://[fec0::1]/",
     "http://[feff::1]/",
+    "http://224.0.0.1/",
+    "http://239.255.255.255/",
+    "http://255.255.255.255/",
+    "http://198.18.0.1/",
+    "http://198.19.255.255/",
+    "http://192.0.0.1/",
+    "http://192.0.0.255/",
+    "http://[ff00::1]/",
+    "http://[ff02::1]/",
+    "http://[::ffff:224.0.0.1]/",
+    "http://[::ffff:255.255.255.255]/",
+    "http://[::ffff:192.0.0.8]/",
   ])("refuses the private host of %s", (url) => {
     expect(refused(url)).toContain("private");
   });
 
-  it.each(["http://[2606:4700::1]/", "http://[::ffff:8.8.8.8]/", "http://[fbff::1]/", "http://[ff00::1]/", "http://[2001:db8:1:2:3:4:5:6]/", "http://[::ffff:0:8.8.8.8]/", "http://[64:ff9b::8.8.8.8]/", "http://[::8.8.8.8]/"])(
+  it("names every kind of host it refuses", () => {
+    expect(refused("http://224.0.0.1/")).toBe(
+      "refused: private, loopback, link-local and other non-public hosts are not allowed",
+    );
+  });
+
+  it.each(["https://223.255.255.255/", "https://198.17.255.255/", "https://198.20.0.1/", "https://192.0.1.1/", "https://255.255.254.255/"])(
+    "allows the public ipv4 host next to a refused range, %s",
+    (url) => {
+      expect(refused(url)).toBeUndefined();
+    },
+  );
+
+  it.each(["http://[2606:4700::1]/", "http://[::ffff:8.8.8.8]/", "http://[fbff::1]/", "http://[2001:db8:1:2:3:4:5:6]/", "http://[::ffff:0:8.8.8.8]/", "http://[64:ff9b::8.8.8.8]/", "http://[::8.8.8.8]/"])(
     "allows the public ipv6 host of %s",
     (url) => {
       expect(refused(url)).toBeUndefined();

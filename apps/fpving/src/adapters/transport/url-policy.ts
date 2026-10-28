@@ -22,6 +22,8 @@ const UNIQUE_LOCAL_MASK = 0xfe00;
 const UNIQUE_LOCAL_PREFIX = 0xfc00;
 const LINK_LOCAL_MASK = 0xffc0;
 const LINK_LOCAL_PREFIX = 0xfe80;
+const MULTICAST_MASK = 0xff00;
+const MULTICAST_PREFIX = 0xff00;
 const OCTET_MASK = 0xff;
 const IPV4 = {
   Any: 0,
@@ -31,6 +33,10 @@ const IPV4 = {
   Private192: 192,
   LinkLocal: 169,
   Cgnat: 100,
+  MulticastMin: 224,
+  MulticastMax: 239,
+  Benchmark: 198,
+  Broadcast: 255,
 } as const;
 const IPV4_SECOND = {
   Private172Min: 16,
@@ -39,16 +45,23 @@ const IPV4_SECOND = {
   LinkLocal: 254,
   CgnatMin: 64,
   CgnatMax: 127,
+  BenchmarkMin: 18,
+  BenchmarkMax: 19,
+  ProtocolAssignments: 0,
 } as const;
 
-const isPrivateIpv4 = (first: number, second: number): boolean =>
+const isPrivateIpv4 = ([first = 0, second = 0, third = 0, fourth = 0]: readonly number[]): boolean =>
   first === IPV4.Any
   || first === IPV4.Loopback
   || first === IPV4.TenNet
   || (first === IPV4.Private172 && second >= IPV4_SECOND.Private172Min && second <= IPV4_SECOND.Private172Max)
   || (first === IPV4.Private192 && second === IPV4_SECOND.Private192)
   || (first === IPV4.LinkLocal && second === IPV4_SECOND.LinkLocal)
-  || (first === IPV4.Cgnat && second >= IPV4_SECOND.CgnatMin && second <= IPV4_SECOND.CgnatMax);
+  || (first === IPV4.Cgnat && second >= IPV4_SECOND.CgnatMin && second <= IPV4_SECOND.CgnatMax)
+  || (first >= IPV4.MulticastMin && first <= IPV4.MulticastMax)
+  || (first === IPV4.Benchmark && second >= IPV4_SECOND.BenchmarkMin && second <= IPV4_SECOND.BenchmarkMax)
+  || (first === IPV4.Private192 && second === IPV4_SECOND.ProtocolAssignments && third === 0)
+  || [first, second, third, fourth].every((octet) => octet === IPV4.Broadcast);
 
 const parseGroups = (part: string): number[] =>
   part === "" ? [] : part.split(":").map((group) => Number.parseInt(group, HEX_RADIX));
@@ -67,7 +80,7 @@ const allZero = (groups: readonly number[]): boolean => groups.every((group) => 
 
 const isPrivateIpv6 = (host: string): boolean => {
   const groups = expandIpv6(host);
-  const [first = 0, second = 0, , , group4 = 0, group5 = 0, embeddedHigh = 0] = groups;
+  const [first = 0, second = 0, , , group4 = 0, group5 = 0, embeddedHigh = 0, embeddedLow = 0] = groups;
   const head = groups.slice(0, EMBEDDED_IPV4_GROUP);
   const embedsIpv4
     = allZero(head)
@@ -75,12 +88,13 @@ const isPrivateIpv6 = (host: string): boolean => {
       || (allZero(head.slice(0, ZEROS_BEFORE_SIIT_MARKER)) && group4 === MAPPED_MARKER && group5 === 0)
       || (first === NAT64_FIRST && second === NAT64_SECOND && allZero(head.slice(NAT64_ZEROS_FROM)));
   if (embedsIpv4) {
-    return isPrivateIpv4(embeddedHigh >> OCTET_BITS, embeddedHigh & OCTET_MASK);
+    return isPrivateIpv4([embeddedHigh, embeddedLow].flatMap((group) => [group >> OCTET_BITS, group & OCTET_MASK]));
   }
   return (
     (first & UNIQUE_LOCAL_MASK) === UNIQUE_LOCAL_PREFIX
     || (first & LINK_LOCAL_MASK) === LINK_LOCAL_PREFIX
     || (first & LINK_LOCAL_MASK) === SITE_LOCAL_PREFIX
+    || (first & MULTICAST_MASK) === MULTICAST_PREFIX
   );
 };
 
@@ -90,8 +104,7 @@ const isPrivateHost = (hostname: string): boolean => {
     return isPrivateIpv6(host.slice(1, -1));
   }
   if (IPV4_PATTERN.test(host)) {
-    const [first = 0, second = 0] = host.split(".").map(Number);
-    return isPrivateIpv4(first, second);
+    return isPrivateIpv4(host.split(".").map(Number));
   }
   return host === LOCALHOST || host.endsWith(LOCALHOST_SUFFIX);
 };
@@ -99,10 +112,11 @@ const isPrivateHost = (hostname: string): boolean => {
 /**
  * Decides whether the host may load a URL a plugin asked for. Plugins are a trust boundary, so only absolute http and
  * https URLs are allowed, and by default not those whose literal host is loopback, private, link-local, carrier-grade
- * NAT or site-local, nor an IPv6 address embedding such an IPv4 address (IPv4-mapped, IPv4-compatible, SIIT, NAT64).
- * Those would reach files or services on the user's machine and network, including the host's own API.
+ * NAT, site-local, multicast, broadcast, benchmarking (198.18.0.0/15) or IETF protocol assignments (192.0.0.0/24),
+ * nor an IPv6 address embedding such an IPv4 address (IPv4-mapped, IPv4-compatible, SIIT, NAT64). Those would reach
+ * files or services on the user's machine and network, including the host's own API.
  *
- * Not covered: a redirect to a private host, and a public name that resolves to a private address (DNS rebinding).
+ * Not covered: a public name that resolves to a private address (DNS rebinding).
  *
  * @param url - The URL string from the plugin.
  * @param allowPrivateHosts - Lets private hosts through; for tests against a local server.
@@ -118,7 +132,7 @@ export const checkUrl = (url: string, allowPrivateHosts: boolean): Result<string
     return err(`refused: only http and https urls are allowed, got ${parsed.protocol}`);
   }
   if (!allowPrivateHosts && isPrivateHost(parsed.hostname)) {
-    return err("refused: private, loopback and link-local hosts are not allowed");
+    return err("refused: private, loopback, link-local and other non-public hosts are not allowed");
   }
   return ok(parsed.href);
 };
