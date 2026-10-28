@@ -29,6 +29,9 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.12.0(jiti@2.7.0))
+      '@fpving/core':
+        specifier: workspace:*
+        version: link:packages/core
       '@stylistic/eslint-plugin':
         specifier: 5.10.0
         version: 5.10.0(eslint@10.12.0(jiti@2.7.0))

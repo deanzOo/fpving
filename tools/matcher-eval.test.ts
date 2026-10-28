@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MatcherPair } from "../packages/core/eval/matcher-eval.ts";
-import { err, LlmErrorKind, LlmVerdict, ok } from "../packages/core/src/index.ts";
-import type { LlmJudge, Verdict } from "../packages/core/src/index.ts";
+import { err, LlmErrorKind, LlmVerdict, ok } from "@fpving/core";
+import type { LlmJudge, Verdict } from "@fpving/core";
 import { evaluateMatcher, MATCHER_EVAL_THRESHOLD, matcherEvalKey } from "./matcher-eval.ts";
 
 const PAIRS = 10;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LlmVerdict, verdictSchema } from "../src/index.ts";
+import { LlmVerdict, verdictSchema } from "@fpving/core";
 import { textSchema } from "../src/text.ts";
 
 /** The fewest labelled pairs the matcher eval runs on. */

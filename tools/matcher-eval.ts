@@ -1,7 +1,7 @@
 import { scoreMatcher } from "../packages/core/eval/matcher-eval.ts";
 import type { MatcherPair } from "../packages/core/eval/matcher-eval.ts";
-import { LlmVerdict } from "../packages/core/src/index.ts";
-import type { LlmJudge } from "../packages/core/src/index.ts";
+import { LlmVerdict } from "@fpving/core";
+import type { LlmJudge } from "@fpving/core";
 
 export const MATCHER_EVAL_THRESHOLD = 0.9;
 
