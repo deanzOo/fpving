@@ -30,7 +30,7 @@ const envSchema = z.object({
     .string()
     .min(1, "must not be empty")
     .pipe(z.string().refine(isAbsolute, "must be an absolute path")),
-  ANTHROPIC_API_KEY: z.string().min(1, "must not be empty when set").optional(),
+  ANTHROPIC_API_KEY: z.string().trim().min(1, "must not be empty when set").optional(),
   LOG_LEVEL: z.enum(LogLevel).default(LogLevel.Info),
 });
 

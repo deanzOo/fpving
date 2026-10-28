@@ -62,6 +62,19 @@ describe("Environment config", () => {
     }
   });
 
+  it("trims the Anthropic key, as the matcher eval does", () => {
+    const parsed = parseEnv({ ...valid, ANTHROPIC_API_KEY: `  ${FAKE_KEY}\n` });
+    expect(parsed).toMatchObject({ ok: true, value: { ANTHROPIC_API_KEY: FAKE_KEY } });
+  });
+
+  it("rejects an Anthropic key that is only whitespace", () => {
+    const parsed = parseEnv({ ...valid, ANTHROPIC_API_KEY: " \t " });
+    expect(parsed).toMatchObject({
+      ok: false,
+      error: { issues: [{ variable: "ANTHROPIC_API_KEY", message: "must not be empty when set" }] },
+    });
+  });
+
   it("treats an absent Anthropic key as not configured", () => {
     const parsed = parseEnv(valid);
     expect(parsed.ok && "ANTHROPIC_API_KEY" in parsed.value).toBe(false);
