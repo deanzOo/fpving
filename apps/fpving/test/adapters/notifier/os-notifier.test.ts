@@ -145,7 +145,17 @@ describe("The macOS notifier backend", () => {
 });
 
 describe("Choosing the notifier backend for the platform", () => {
-  it("uses osascript on macOS, not node-notifier", () => {
+  it("uses osascript on macOS, not node-notifier", async () => {
+    const files: string[] = [];
+    const exec: ExecFileFn = (file, _args, callback) => {
+      files.push(file);
+      callback(null);
+    };
+    await notifyBackendFor("darwin", exec)({ title: "t", message: "m" });
+    expect(files).toEqual(["osascript"]);
+  });
+
+  it("runs the real execFile on macOS by default", () => {
     expect(notifyBackendFor("darwin")).not.toBe(nodeNotifierBackend);
   });
 

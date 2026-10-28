@@ -70,10 +70,11 @@ export const osascriptBackend = (exec: ExecFileFn): NotifyBackend => async (noti
  * terminal-notifier is x86_64-only, and {@link nodeNotifierBackend} elsewhere.
  *
  * @param platform - Normally `process.platform`.
+ * @param exec - Runs `osascript` on macOS; `execFile` by default.
  * @returns The backend.
  */
-export const notifyBackendFor = (platform: NodeJS.Platform): NotifyBackend =>
-  platform === "darwin" ? osascriptBackend(execFile) : nodeNotifierBackend;
+export const notifyBackendFor = (platform: NodeJS.Platform, exec: ExecFileFn = execFile): NotifyBackend =>
+  platform === "darwin" ? osascriptBackend(exec) : nodeNotifierBackend;
 
 /**
  * Creates the core {@link Notifier} on a backend. A failed backend is a `notify_failed` result, never a throw.
