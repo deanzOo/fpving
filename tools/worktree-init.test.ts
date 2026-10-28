@@ -45,7 +45,7 @@ describe("Worktree port", () => {
 describe("Env rendering", () => {
   it("replaces the port and data dir and keeps every other line", () => {
     expect(renderEnv(TEMPLATE, { port: 4123, dataDir: "/w/adapters/.data/adapters" })).toBe(
-      "PORT=4123\nDATA_DIR=/w/adapters/.data/adapters\n# ANTHROPIC_API_KEY=\nLOG_LEVEL=info\n",
+      "PORT=4123\nDATA_DIR='/w/adapters/.data/adapters'\n# ANTHROPIC_API_KEY=\nLOG_LEVEL=info\n",
     );
   });
 });
@@ -53,11 +53,31 @@ describe("Env rendering", () => {
 describe("Env rendering safety", () => {
   it("writes replacement patterns in a directory name literally", () => {
     const dataDir = "/w/$&-$1/.data/x";
-    expect(renderEnv(TEMPLATE, { port: 4123, dataDir })).toContain(`DATA_DIR=${dataDir}\n`);
+    expect(renderEnv(TEMPLATE, { port: 4123, dataDir })).toContain(`DATA_DIR='${dataDir}'\n`);
   });
 
   it.each(["DATA_DIR=.data/main\n", "PORT=4000\n"])("fails when the template lacks a line (%j only)", (template) => {
     expect(() => renderEnv(template, { port: 4123, dataDir: "/w/.data/x" })).toThrow(/PORT=|DATA_DIR=/);
+  });
+});
+
+describe("Env rendering round trip", () => {
+  it.each([
+    "/work/fpv#123/.data/x",
+    "/work/my tree/.data/x",
+    "/work/ lead and trail /.data/x",
+    "/work/a=b;c/.data/x",
+    "/work/$HOME/`x`/\"q\"/.data/x",
+    "/work/back\\slash\\n/.data/x",
+    "/work/a  #b/.data/x",
+  ])("parses back to the same DATA_DIR for %j", (dataDir) => {
+    const parsed = parseDotenv(renderEnv(TEMPLATE, { port: 4123, dataDir }));
+    expect(parsed["DATA_DIR"]).toBe(dataDir);
+    expect(parsed["LOG_LEVEL"]).toBe("info");
+  });
+
+  it.each(["/work/it's/.data/x", "/work/a\rb/.data/x"])("refuses %j, which no quoting round-trips", (dataDir) => {
+    expect(() => renderEnv(TEMPLATE, { port: 4123, dataDir })).toThrow(/DATA_DIR/);
   });
 });
 
@@ -80,17 +100,17 @@ describe("Worktree init", () => {
     const dataDir = join(resolve(root), ".data", "my-tree");
     expect(result).toEqual({ status: "created", port: portFor(root), dataDir });
     expect(text).toContain(`PORT=${String(portFor(root))}\n`);
-    expect(text).toContain(`DATA_DIR=${dataDir}\n`);
-    const values = Object.fromEntries(
-      text
-        .split("\n")
-        .filter((line) => line.includes("=") && !line.startsWith("#"))
-        .map((line): [string, string] => {
-          const [name = "", value = ""] = line.split("=");
-          return [name, value];
-        }),
-    );
-    expect(parseEnv(values).ok).toBe(true);
+    expect(text).toContain(`DATA_DIR='${dataDir}'\n`);
+    expect(parseEnv(parseDotenv(text)).ok).toBe(true);
+  });
+
+  it("writes a .env that Node's parser reads back for a worktree path containing #", async () => {
+    const hashed = join(root, "..", "fpv#123");
+    await mkdir(hashed);
+    await writeFile(join(hashed, ".env.example"), TEMPLATE);
+    const result = await initWorktree(hashed);
+    const parsed = parseDotenv(await readFile(join(hashed, ".env"), "utf8"));
+    expect(result.status === "created" && parsed["DATA_DIR"] === result.dataDir).toBe(true);
   });
 
   it("never overwrites an existing .env", async () => {

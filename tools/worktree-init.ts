@@ -30,8 +30,17 @@ const replaceLine = (template: string, name: string, value: string): string => {
   return template.replace(line, () => `${name}=${value}`);
 };
 
+const UNQUOTABLE = /['\r]/;
+
+const quoteValue = (name: string, value: string): string => {
+  if (UNQUOTABLE.test(value)) {
+    throw new Error(`${name} cannot contain a single quote or carriage return: ${JSON.stringify(value)}`);
+  }
+  return `'${value}'`;
+};
+
 export const renderEnv = (template: string, values: EnvValues): string =>
-  replaceLine(replaceLine(template, "PORT", String(values.port)), "DATA_DIR", values.dataDir);
+  replaceLine(replaceLine(template, "PORT", String(values.port)), "DATA_DIR", quoteValue("DATA_DIR", values.dataDir));
 
 export type WorktreeInitResult
   = | { readonly status: "created"; readonly port: number; readonly dataDir: string }
