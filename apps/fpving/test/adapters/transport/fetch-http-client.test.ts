@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFetchHttpClient, HTTP_TIMEOUT_MS } from "../../../src/adapters/transport/fetch-http-client.ts";
+import {
+  createFetchHttpClient,
+  HTTP_TIMEOUT_MS,
+  MAX_REDIRECTS,
+} from "../../../src/adapters/transport/fetch-http-client.ts";
 import type { FetchFn } from "../../../src/adapters/transport/fetch-http-client.ts";
 import type { DomainLimiter } from "../../../src/adapters/transport/domain-limiter.ts";
 
@@ -7,6 +11,8 @@ const USER_AGENT = "fpving/9.9.9 (+https://example.test)";
 const NOT_FOUND = 404;
 const OK = 200;
 const CUSTOM_TIMEOUT_MS = 1234;
+const FOUND = 302;
+const NOT_MODIFIED = 304;
 
 const passThrough: DomainLimiter = { run: (_url, task) => task() };
 
@@ -18,6 +24,15 @@ const recording = (reply: () => Promise<Response>) => {
   };
   return { requests, client: createFetchHttpClient({ fetch: fetchFn, limiter: passThrough, userAgent: USER_AGENT }) };
 };
+
+const replying = (...replies: (() => Response)[]) =>
+  recording(() => {
+    const reply = replies.length > 1 ? replies.shift() : replies[0];
+    return Promise.resolve(reply ? reply() : new Response(""));
+  });
+
+const redirectTo = (location: string) => (): Response =>
+  new Response(null, { status: FOUND, headers: { location } });
 
 const headerOf = (init: RequestInit | undefined, name: string): string | null => new Headers(init?.headers).get(name);
 
@@ -181,5 +196,38 @@ describe("Plain HTTP access for plugins", () => {
     });
     await client.get("HTTPS://Shop.Example/a");
     expect(seen).toEqual(["https://shop.example/a"]);
+  });
+
+  it("follows redirects itself instead of letting fetch follow them unchecked", async () => {
+    const { client, requests } = replying(() => new Response(""));
+    await client.get("https://shop.example/a");
+    expect(requests[0]?.init.redirect).toBe("manual");
+  });
+
+  it("follows a relative redirect, resolved against the url that sent it", async () => {
+    const { client, requests } = replying(redirectTo("../b?x=1"), () => new Response("moved here"));
+    const result = await client.get("https://shop.example/a/c");
+    expect(requests.map((request) => request.url)).toEqual(["https://shop.example/a/c", "https://shop.example/b?x=1"]);
+    expect(result).toMatchObject({ ok: true, value: { status: OK, body: "moved here" } });
+  });
+
+  it("refuses a redirect to a private host without requesting it", async () => {
+    const { client, requests } = replying(redirectTo("http://127.0.0.1/admin"));
+    const result = await client.get("https://shop.example/a");
+    expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
+    expect(result.ok ? "" : result.error.detail).toMatch(/^refused: .*; redirect to http:\/\/127\.0\.0\.1\/admin$/);
+    expect(requests).toHaveLength(1);
+  });
+
+  it("gives up with a network error after too many redirects", async () => {
+    const { client, requests } = replying(redirectTo("/again"));
+    const result = await client.get("https://shop.example/a");
+    expect(result).toEqual({ ok: false, error: { kind: "network", detail: "too many redirects" } });
+    expect(requests).toHaveLength(MAX_REDIRECTS + 1);
+  });
+
+  it("returns a redirect status without a location as the response", async () => {
+    const { client } = replying(() => new Response(null, { status: NOT_MODIFIED }));
+    expect(await client.get("https://shop.example/a")).toMatchObject({ ok: true, value: { status: NOT_MODIFIED } });
   });
 });
