@@ -31,7 +31,7 @@ A typed `plugins.config.ts` lists plugin package names or local folder paths. Se
 
 ## Secrets
 
-The Anthropic API key used for matching is bring-your-own and optional. `pnpm eval:matcher` reads `ANTHROPIC_API_KEY` from the environment or from a `.env` in the working directory, and runs the matcher eval against the real model, which costs API credits; with the key unset or blank it skips. A variable already set in the shell takes precedence over `.env`, because Node's `--env-file` does not override it. `parseEnv` accepts the key and its error text never contains it, and the Anthropic adapter never logs it. The app does not load `.env` or wire the adapter in yet; both arrive with the app wiring.
+The Anthropic API key used for matching is bring-your-own and optional. `pnpm eval:matcher` reads `ANTHROPIC_API_KEY` from the environment or from a `.env` in the working directory, and runs the matcher eval against the real model, which costs API credits; with the key unset or blank it skips. A variable already set in the shell takes precedence over `.env`, because Node's `--env-file` does not override it. `parseEnv` trims the key, rejects one that is blank after trimming, and its error text never contains it. The Anthropic adapter never logs it and always sends it to `https://api.anthropic.com`, so an `ANTHROPIC_BASE_URL` set in the shell cannot redirect it. The app does not load `.env` or wire the adapter in yet; both arrive with the app wiring.
 
 ## Logging
 

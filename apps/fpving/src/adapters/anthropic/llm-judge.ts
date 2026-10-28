@@ -22,14 +22,18 @@ export type MessageReply = Pick<Message, "content" | "stop_reason" | "stop_detai
 /** Sends one non-streaming Messages API request. */
 export type CreateMessage = (params: MessageCreateParamsNonStreaming) => Promise<MessageReply>;
 
+/** Where the real client sends requests, fixed so a shell `ANTHROPIC_BASE_URL` cannot redirect the user's key. */
+export const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
 /**
- * The {@link CreateMessage} of a real client. The client's own retries cover 429 and 5xx replies.
+ * The {@link CreateMessage} of a real client, always on {@link ANTHROPIC_BASE_URL}. The client's own retries cover
+ * 429 and 5xx replies.
  *
  * @param options - The client options, at least the API key.
  * @returns The function that sends a request through the client.
  */
-export const anthropicMessages = (options: ClientOptions): CreateMessage => {
-  const client = new Anthropic(options);
+export const anthropicMessages = (options: Omit<ClientOptions, "baseURL">): CreateMessage => {
+  const client = new Anthropic({ ...options, baseURL: ANTHROPIC_BASE_URL });
   return async (params) => client.messages.create(params);
 };
 

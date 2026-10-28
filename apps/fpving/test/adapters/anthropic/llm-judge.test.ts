@@ -3,8 +3,9 @@ import type { MessageCreateParamsNonStreaming, StopReason } from "@anthropic-ai/
 import { LlmErrorKind, LlmVerdict, MATCHING_RULES } from "@fpving/core";
 import type { LlmError, Result } from "@fpving/core";
 import type { LogFields, Logger } from "@fpving/plugin-sdk";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  ANTHROPIC_BASE_URL,
   anthropicMessages,
   createAnthropicLlmJudge,
   MATCHER_MODEL,
@@ -19,6 +20,10 @@ const VERDICT = { verdict: LlmVerdict.Variant, reason: "Only the KV differs" };
 const IDENTITY = { brand: "T-Motor", model: "F60 Pro V", variantAttributes: ["2207", "1950KV"] };
 const CALLS = MAX_IN_FLIGHT * MAX_IN_FLIGHT;
 const Status = { BadRequest: 400, Unauthorized: 401, TooManyRequests: 429, ServerError: 500 } as const;
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const textReply = (text: string, stopReason: StopReason = "end_turn"): MessageReply => ({
   content: [{ type: "text", text, citations: null }],
@@ -150,6 +155,22 @@ describe("Anthropic LLM judge", () => {
     await Promise.all(Array.from({ length: CALLS }, async () => judge.compare(SOURCE, CANDIDATE)));
     expect(requests).toHaveLength(CALLS);
     expect(peak).toBe(MAX_IN_FLIGHT);
+  });
+
+  it("sends the key to the Anthropic API even when the shell sets ANTHROPIC_BASE_URL", async () => {
+    vi.stubEnv("ANTHROPIC_BASE_URL", "http://127.0.0.1:9");
+    const urls: string[] = [];
+    const createMessage = anthropicMessages({
+      apiKey: FAKE_KEY,
+      maxRetries: 0,
+      fetch: (url) => {
+        urls.push(new Request(url).url);
+        return Promise.resolve(new Response("{}", { status: Status.Unauthorized }));
+      },
+    });
+    await createAnthropicLlmJudge(createMessage, recordingLogger().logger).compare(SOURCE, CANDIDATE);
+    expect(urls).toEqual(["https://api.anthropic.com/v1/messages"]);
+    expect(ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
   });
 
   it("calls the real client without ever logging the api key", async () => {
