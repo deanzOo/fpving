@@ -54,11 +54,12 @@ describe("Which URLs a plugin may ask the host to load", () => {
     "http://[febf::1]/",
     "http://[::ffff:127.0.0.1]/",
     "http://[::ffff:10.0.0.1]/",
+    "http://[fc00:1:2:3:4:5:6:7]/",
   ])("refuses the private host of %s", (url) => {
     expect(refused(url)).toContain("private");
   });
 
-  it.each(["http://[2606:4700::1]/", "http://[::ffff:8.8.8.8]/", "http://[fec0::1]/", "http://[fbff::1]/"])(
+  it.each(["http://[2606:4700::1]/", "http://[::ffff:8.8.8.8]/", "http://[fec0::1]/", "http://[fbff::1]/", "http://[2001:db8:1:2:3:4:5:6]/"])(
     "allows the public ipv6 host of %s",
     (url) => {
       expect(refused(url)).toBeUndefined();

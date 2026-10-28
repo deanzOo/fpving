@@ -40,14 +40,12 @@ const allZero = (groups: readonly number[]): boolean => groups.every((group) => 
 
 const isPrivateIpv6 = (host: string): boolean => {
   const groups = expandIpv6(host);
-  const [first = 0] = groups;
-  const lastIndex = IPV6_GROUPS - 1;
-  if (allZero(groups.slice(0, MAPPED_PREFIX_GROUPS)) && groups[MAPPED_PREFIX_GROUPS] === MAPPED_MARKER) {
-    const high = groups[MAPPED_PREFIX_GROUPS + 1] ?? 0;
-    return isPrivateIpv4(high >> OCTET_BITS, high & OCTET_MASK);
+  const [first = 0, , , , , marker = 0, mappedHigh = 0, last = 0] = groups;
+  if (allZero(groups.slice(0, MAPPED_PREFIX_GROUPS)) && marker === MAPPED_MARKER) {
+    return isPrivateIpv4(mappedHigh >> OCTET_BITS, mappedHigh & OCTET_MASK);
   }
   return (
-    (allZero(groups.slice(0, lastIndex)) && (groups[lastIndex] ?? 0) <= 1)
+    (allZero(groups.slice(0, IPV6_GROUPS - 1)) && last <= 1)
     || (first & UNIQUE_LOCAL_MASK) === UNIQUE_LOCAL_PREFIX
     || (first & LINK_LOCAL_MASK) === LINK_LOCAL_PREFIX
   );
