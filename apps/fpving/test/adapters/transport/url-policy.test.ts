@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkUrl } from "../../../src/adapters/transport/url-policy.ts";
+import { checkUrl, checkWebSocketUrl } from "../../../src/adapters/transport/url-policy.ts";
 
 const refused = (url: string): string | undefined => {
   const checked = checkUrl(url, false);
@@ -120,5 +120,41 @@ describe("Which URLs a plugin may ask the host to load", () => {
       ok: true,
       value: "https://shop.example/a%20b?q=1#x",
     });
+  });
+});
+
+const refusedSocket = (url: string, allowPrivateHosts: boolean): string | undefined => {
+  const checked = checkWebSocketUrl(url, allowPrivateHosts);
+  return checked.ok ? undefined : checked.error;
+};
+
+describe("Which WebSocket URLs a page may open", () => {
+  it.each([["ws://shop.example/live", "ws://shop.example/live"], ["wss://shop.example:8443/live", "wss://shop.example:8443/live"]])(
+    "allows the public url %s",
+    (url, normalized) => {
+      expect(checkWebSocketUrl(url, false)).toEqual({ ok: true, value: normalized });
+    },
+  );
+
+  it.each(["ws://127.0.0.1:9/socket", "wss://localhost/socket", "ws://[::1]/", "ws://10.0.0.1/"])(
+    "refuses the private host of %s",
+    (url) => {
+      expect(refusedSocket(url, false)).toContain("private");
+    },
+  );
+
+  it("allows a private host only when private hosts are allowed", () => {
+    expect(checkWebSocketUrl("ws://127.0.0.1:9/socket", true)).toEqual({ ok: true, value: "ws://127.0.0.1:9/socket" });
+  });
+
+  it.each(["http://shop.example/", "https://shop.example/", "file:///etc/passwd"])(
+    "refuses the non-websocket scheme of %s",
+    (url) => {
+      expect(refusedSocket(url, true)).toContain("only ws and wss");
+    },
+  );
+
+  it("refuses a malformed url", () => {
+    expect(checkWebSocketUrl("not a url", true)).toEqual({ ok: false, error: "refused: not an absolute url" });
   });
 });

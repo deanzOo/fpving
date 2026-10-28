@@ -10,6 +10,7 @@ import type {
   BrowserPageHandle,
   LaunchContext,
   RouteHandle,
+  WebSocketRouteHandle,
 } from "../../../src/adapters/transport/playwright-browser-driver.ts";
 
 const PROFILE = "/data/browser-profile";
@@ -69,10 +70,16 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
     },
   };
   const routes: { pattern: string; handler: (route: RouteHandle) => Promise<void> }[] = [];
+  const socketRoutes: { pattern: RegExp; handler: (route: WebSocketRouteHandle) => Promise<void> }[] = [];
   const context: BrowserContextHandle = {
     route: (pattern, handler) => {
       routes.push({ pattern, handler });
       log.push("route");
+      return Promise.resolve();
+    },
+    routeWebSocket: (pattern, handler) => {
+      socketRoutes.push({ pattern, handler });
+      log.push("route websockets");
       return Promise.resolve();
     },
     newPage: () => Promise.resolve(page),
@@ -105,6 +112,7 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
     dirs,
     seen,
     routes,
+    socketRoutes,
     launches: () => launches,
     contextCloses: () => contextCloses,
   };
@@ -143,21 +151,21 @@ describe("Rendering pages in the host browser", () => {
   it("closes the page after a successful load", async () => {
     const { driver, log } = harness();
     await driver.fetchPage(URL_IN);
-    expect(log).toEqual(["route", "goto", "content", "page closed"]);
+    expect(log).toEqual(["route", "route websockets", "goto", "content", "page closed"]);
   });
 
   it("closes the page when navigation fails", async () => {
     const { driver, log } = harness({ gotoError: new Error("net::ERR_CONNECTION_REFUSED") });
     const result = await driver.fetchPage(URL_IN);
     expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
-    expect(log).toEqual(["route", "goto", "page closed"]);
+    expect(log).toEqual(["route", "route websockets", "goto", "page closed"]);
   });
 
   it("closes the page when reading the content fails", async () => {
     const { driver, log } = harness({ contentError: new Error("navigating") });
     const result = await driver.fetchPage(URL_IN);
     expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
-    expect(log).toEqual(["route", "goto", "content", "page closed"]);
+    expect(log).toEqual(["route", "route websockets", "goto", "content", "page closed"]);
   });
 
   it("maps a Playwright timeout to a timeout error", async () => {
@@ -323,6 +331,36 @@ describe("Rendering pages in the host browser", () => {
     const result = await strict.fetchPage(URL_IN);
     expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
     expect(result.ok ? "" : result.error.detail).toMatch(/^refused: .*; redirect to http:\/\/127\.0\.0\.1\/admin$/);
-    expect(log).toEqual(["route", "goto", "page closed"]);
+    expect(log).toEqual(["route", "route websockets", "goto", "page closed"]);
+  });
+
+  it("routes every WebSocket the page opens once the context is launched", async () => {
+    const { strict, socketRoutes, log } = harness();
+    await strict.fetchPage(URL_IN);
+    expect(socketRoutes.map((route) => route.pattern.test("wss://anything/at/all"))).toEqual([true]);
+    expect(log.indexOf("route websockets")).toBeLessThan(log.indexOf("goto"));
+  });
+
+  it.each([
+    ["ws://127.0.0.1:9/socket", false, "closed"],
+    ["wss://localhost/socket", false, "closed"],
+    ["wss://live.shop.example/prices", false, "connected"],
+    ["ws://127.0.0.1:9/socket", true, "connected"],
+  ])("lets a WebSocket to %s through when private hosts allowed is %s: %s", async (url, allow, outcome) => {
+    const { driver, strict, socketRoutes } = harness();
+    await (allow ? driver : strict).fetchPage(URL_IN);
+    const calls: string[] = [];
+    const socket: WebSocketRouteHandle = {
+      url: () => url,
+      connectToServer: () => {
+        calls.push("connected");
+      },
+      close: () => {
+        calls.push("closed");
+        return Promise.resolve();
+      },
+    };
+    await socketRoutes[0]?.handler(socket);
+    expect(calls).toEqual([outcome]);
   });
 });

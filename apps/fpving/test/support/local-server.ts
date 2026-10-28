@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import type { Duplex } from "node:stream";
 
 export const FIXTURE_HTML = [
   "<!doctype html><html><body><h1 id=\"title\">static</h1><script>",
@@ -24,6 +25,11 @@ const leakyPage = (target: string): string => [
   `<script>fetch("${target}/fetch").catch(() => undefined);</script></body></html>`,
 ].join("");
 
+const socketPage = (target: string, run: string): string => [
+  `<!doctype html><html><body><script>const socket = new WebSocket("${target.replace(/^http/, "ws")}/socket");`,
+  `socket.onclose = () => fetch("/socket-done?run=${run}").catch(() => undefined);</script></body></html>`,
+].join("");
+
 const respond = (request: IncomingMessage, response: ServerResponse): void => {
   const url = new URL(request.url ?? "/", "http://fixture");
   const target = url.searchParams.get("target") ?? "";
@@ -31,6 +37,10 @@ const respond = (request: IncomingMessage, response: ServerResponse): void => {
     case "/leaky":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
       response.end(leakyPage(target));
+      return;
+    case "/socket-page":
+      response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
+      response.end(socketPage(target, url.searchParams.get("run") ?? ""));
       return;
     case "/redirect-to":
       response.writeHead(FOUND, { location: target });
@@ -66,13 +76,18 @@ const listen = async (server: Server): Promise<string> =>
 
 /**
  * Serves the fixture page, a redirect to it, a user agent echo, a 404, a request that never answers, a page whose
- * subresources load from `?target=` and a redirect to `?target=`.
+ * subresources load from `?target=`, a page that opens a WebSocket to `?target=` and reports `/socket-done?run=` once
+ * it closes, and a redirect to `?target=`. WebSocket upgrades are logged as `upgrade <path>` and refused.
  */
 export const startLocalServer = async (): Promise<LocalServer> => {
   const requests: string[] = [];
   const server = createServer((request, response) => {
     requests.push(request.url ?? "");
     respond(request, response);
+  });
+  server.on("upgrade", (request: IncomingMessage, socket: Duplex) => {
+    requests.push(`upgrade ${request.url ?? ""}`);
+    socket.destroy();
   });
   const origin = await listen(server);
   return {

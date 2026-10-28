@@ -3,7 +3,7 @@ import { ok } from "@fpving/plugin-sdk";
 import type { BrowserDriver, BrowserPage, Result, TransportError } from "@fpving/plugin-sdk";
 import type { DomainLimiter } from "./domain-limiter.js";
 import { transportFailure } from "./transport-failure.js";
-import { checkUrl, guardUrl } from "./url-policy.js";
+import { checkUrl, checkWebSocketUrl, guardUrl } from "./url-policy.js";
 
 /** How long a navigation may take before it is a `timeout`: thirty seconds. */
 export const NAVIGATION_TIMEOUT_MS = 30_000;
@@ -23,9 +23,17 @@ export interface RouteHandle {
   continue(): Promise<void>;
 }
 
+/** The part of a Playwright `WebSocketRoute` the driver uses: one WebSocket the page opened. */
+export interface WebSocketRouteHandle {
+  url(): string;
+  connectToServer(): unknown;
+  close(): Promise<void>;
+}
+
 /** The part of a Playwright `BrowserContext` the driver uses. */
 export interface BrowserContextHandle {
   route(url: string, handler: (route: RouteHandle) => Promise<void>): Promise<unknown>;
+  routeWebSocket(url: RegExp, handler: (route: WebSocketRouteHandle) => Promise<void>): Promise<unknown>;
   newPage(): Promise<BrowserPageHandle>;
   close(): Promise<void>;
 }
@@ -88,12 +96,22 @@ const load = async (
 const refuseBlockedRequests = (allowPrivateHosts: boolean) => async (route: RouteHandle): Promise<void> =>
   checkUrl(route.request().url(), allowPrivateHosts).ok ? route.continue() : route.abort();
 
+const ANY_URL = /.*/;
+
+const refuseBlockedSockets = (allowPrivateHosts: boolean) => async (socket: WebSocketRouteHandle): Promise<void> => {
+  if (checkWebSocketUrl(socket.url(), allowPrivateHosts).ok) {
+    socket.connectToServer();
+    return;
+  }
+  await socket.close();
+};
+
 /**
  * Creates the SDK {@link BrowserDriver} on Playwright. One persistent context is launched on the first page and
- * reused; each page opens in a tab that is always closed again. Every request a page makes (subresources, XHR and
- * fetch) is routed through the URL policy and aborted when refused, and a navigation that was redirected to a refused
- * host is a `network` error. Playwright does not route redirect hops, so such a hop is still sent, but its response
- * never reaches the plugin.
+ * reused; each page opens in a tab that is always closed again. Every request a page starts (subresources, XHR and
+ * fetch) is routed through the URL policy and aborted when refused, every WebSocket it opens is checked the same way
+ * and closed when refused, and a navigation that was redirected to a refused host is a `network` error. Playwright
+ * does not route redirect hops, so such a hop is still sent, but its response never reaches the plugin.
  *
  * @param options - The launcher, limiter and profile directory.
  * @returns The driver, to be closed when the host shuts down.
@@ -109,6 +127,7 @@ export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): Cl
         .launch(options.profileDir)
         .then(async (launched) => {
           await launched.route("**/*", refuseBlockedRequests(allowPrivateHosts));
+          await launched.routeWebSocket(ANY_URL, refuseBlockedSockets(allowPrivateHosts));
           return launched;
         })
         .catch((error: unknown) => {

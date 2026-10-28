@@ -3,6 +3,7 @@ import type { Result, TransportError } from "@fpving/plugin-sdk";
 import { transportFailure } from "./transport-failure.js";
 
 const ALLOWED_PROTOCOLS: readonly string[] = ["http:", "https:"];
+const WEB_SOCKET_TO_HTTP: Readonly<Record<string, string>> = { "ws:": "http:", "wss:": "https:" };
 const LOCALHOST = "localhost";
 const LOCALHOST_SUFFIX = ".localhost";
 const IPV4_PATTERN = /^\d+\.\d+\.\d+\.\d+$/;
@@ -135,6 +136,29 @@ export const checkUrl = (url: string, allowPrivateHosts: boolean): Result<string
     return err("refused: private, loopback, link-local and other non-public hosts are not allowed");
   }
   return ok(parsed.href);
+};
+
+/**
+ * Decides whether a page may open a WebSocket. Only `ws:` and `wss:` URLs are allowed, and their host gets the same
+ * check as {@link checkUrl} gives the matching `http:` or `https:` URL.
+ *
+ * @param url - The WebSocket URL the page opened.
+ * @param allowPrivateHosts - Lets private hosts through; for tests against a local server.
+ * @returns The URL as the parser normalizes it, or the reason to log when it is refused.
+ */
+export const checkWebSocketUrl = (url: string, allowPrivateHosts: boolean): Result<string, string> => {
+  if (!URL.canParse(url)) {
+    return err("refused: not an absolute url");
+  }
+  const parsed = new URL(url);
+  const httpProtocol = WEB_SOCKET_TO_HTTP[parsed.protocol];
+  if (httpProtocol === undefined) {
+    return err(`refused: only ws and wss urls are allowed, got ${parsed.protocol}`);
+  }
+  const asHttp = new URL(parsed.href);
+  asHttp.protocol = httpProtocol;
+  const checked = checkUrl(asHttp.href, allowPrivateHosts);
+  return checked.ok ? ok(parsed.href) : checked;
 };
 
 /**

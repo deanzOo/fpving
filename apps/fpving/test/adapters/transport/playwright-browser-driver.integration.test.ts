@@ -132,6 +132,28 @@ describe.skipIf(!chromiumInstalled)(
       );
 
       it(
+        "closes a WebSocket the page opens to the private host before it connects",
+        async () => {
+          const result = await strict.fetchPage(publicUrl(`/socket-page?run=strict&target=${privateServer.origin}`));
+          expect(result).toMatchObject({ ok: true });
+          const served = () => server.requests;
+          await expect.poll(served, { timeout: BROWSER_TIMEOUT_MS }).toContain("/socket-done?run=strict");
+          expect(privateServer.requests).not.toContain("upgrade /socket");
+        },
+        BROWSER_TIMEOUT_MS,
+      );
+
+      it(
+        "lets the same WebSocket reach the private host when private hosts are allowed",
+        async () => {
+          await driver.fetchPage(`${server.origin}/socket-page?run=allowed&target=${privateServer.origin}`);
+          const upgrades = () => privateServer.requests;
+          await expect.poll(upgrades, { timeout: BROWSER_TIMEOUT_MS }).toContain("upgrade /socket");
+        },
+        BROWSER_TIMEOUT_MS,
+      );
+
+      it(
         "refuses a navigation redirected to the private host instead of returning its page",
         async () => {
           const result = await strict.fetchPage(publicUrl(`/redirect-to?target=${privateServer.origin}/page`));
