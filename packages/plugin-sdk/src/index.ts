@@ -36,3 +36,4 @@ export type { Amount, Money } from "./money.js";
 export type { SearchQuery, Store, StorePlugin } from "./plugin.js";
 export { err, ok } from "./result.js";
 export type { Result } from "./result.js";
+export { SDK_VERSION } from "./version.js";

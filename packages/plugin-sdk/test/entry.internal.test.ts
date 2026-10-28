@@ -11,6 +11,7 @@ describe("Plugin SDK entry points", () => {
       "CURRENCY_CODES",
       "CURRENCY_MINOR_UNITS",
       "PluginCapability",
+      "SDK_VERSION",
       "ShippingKind",
       "ShippingUnknown",
       "StoreErrorKind",
