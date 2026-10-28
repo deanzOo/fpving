@@ -18,7 +18,7 @@ Parallel branches live in separate git worktrees, and each can run the app. Two 
 
 ## Decision outcome
 
-`pnpm worktree:init` writes `.env` from `.env.example`. The port is `4000 + fnv1a(absolute worktree path) % 1000`, so it is stable per worktree and needs no state or crypto dependency. `DATA_DIR` is the absolute path `<worktree path>/.data/<worktree directory name>`, so it never depends on the directory the server starts from; `parseEnv` rejects a relative `DATA_DIR` with a readable error. An existing `.env` is never overwritten. The app reads `PORT`, `DATA_DIR`, `ANTHROPIC_API_KEY` (optional) and `LOG_LEVEL` through a Zod schema, which adds `zod` to `apps/fpving`; the project already uses it in core and the SDK. Error messages name the variable and the rule, never its value.
+`pnpm worktree:init` writes `.env` from `.env.example`. The port is `4000 + fnv1a(absolute worktree path) % 1000`, so it is stable per worktree and needs no state or crypto dependency. `DATA_DIR` is the absolute path `<worktree path>/.data/<worktree directory name>`, so it never depends on the directory the server starts from; `parseEnv` rejects a relative `DATA_DIR` with a readable error. An existing `.env` is never overwritten. `parseEnv` validates `PORT`, `DATA_DIR`, `ANTHROPIC_API_KEY` (optional) and `LOG_LEVEL` through a Zod schema, and the app will read them through it once its entry point is wired. The schema adds `zod` to `apps/fpving`; the project already uses it in core and the SDK. Error messages name the variable and the rule, never its value.
 
 ## Consequences
 
