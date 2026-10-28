@@ -34,10 +34,8 @@ const IPV4 = {
   Private192: 192,
   LinkLocal: 169,
   Cgnat: 100,
-  MulticastMin: 224,
-  MulticastMax: 239,
+  MulticastAndReservedMin: 224,
   Benchmark: 198,
-  Broadcast: 255,
 } as const;
 const IPV4_SECOND = {
   Private172Min: 16,
@@ -51,7 +49,7 @@ const IPV4_SECOND = {
   ProtocolAssignments: 0,
 } as const;
 
-const isPrivateIpv4 = ([first = 0, second = 0, third = 0, fourth = 0]: readonly number[]): boolean =>
+const isPrivateIpv4 = ([first = 0, second = 0, third = 0]: readonly number[]): boolean =>
   first === IPV4.Any
   || first === IPV4.Loopback
   || first === IPV4.TenNet
@@ -59,10 +57,9 @@ const isPrivateIpv4 = ([first = 0, second = 0, third = 0, fourth = 0]: readonly 
   || (first === IPV4.Private192 && second === IPV4_SECOND.Private192)
   || (first === IPV4.LinkLocal && second === IPV4_SECOND.LinkLocal)
   || (first === IPV4.Cgnat && second >= IPV4_SECOND.CgnatMin && second <= IPV4_SECOND.CgnatMax)
-  || (first >= IPV4.MulticastMin && first <= IPV4.MulticastMax)
+  || first >= IPV4.MulticastAndReservedMin
   || (first === IPV4.Benchmark && second >= IPV4_SECOND.BenchmarkMin && second <= IPV4_SECOND.BenchmarkMax)
-  || (first === IPV4.Private192 && second === IPV4_SECOND.ProtocolAssignments && third === 0)
-  || [first, second, third, fourth].every((octet) => octet === IPV4.Broadcast);
+  || (first === IPV4.Private192 && second === IPV4_SECOND.ProtocolAssignments && third === 0);
 
 const parseGroups = (part: string): number[] =>
   part === "" ? [] : part.split(":").map((group) => Number.parseInt(group, HEX_RADIX));
@@ -113,9 +110,10 @@ const isPrivateHost = (hostname: string): boolean => {
 /**
  * Decides whether the host may load a URL a plugin asked for. Plugins are a trust boundary, so only absolute http and
  * https URLs are allowed, and by default not those whose literal host is loopback, private, link-local, carrier-grade
- * NAT, site-local, multicast, broadcast, benchmarking (198.18.0.0/15) or IETF protocol assignments (192.0.0.0/24),
- * nor an IPv6 address embedding such an IPv4 address (IPv4-mapped, IPv4-compatible, SIIT, NAT64). Those would reach
- * files or services on the user's machine and network, including the host's own API.
+ * NAT, site-local, multicast, reserved (240.0.0.0/4, which includes broadcast), benchmarking (198.18.0.0/15) or IETF
+ * protocol assignments (192.0.0.0/24), nor an IPv6 address embedding such an IPv4 address (IPv4-mapped,
+ * IPv4-compatible, SIIT, NAT64). Those would reach files or services on the user's machine and network, including the
+ * host's own API.
  *
  * Not covered: a public name that resolves to a private address (DNS rebinding).
  *

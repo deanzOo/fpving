@@ -73,6 +73,9 @@ describe("Which URLs a plugin may ask the host to load", () => {
     "http://224.0.0.1/",
     "http://239.255.255.255/",
     "http://255.255.255.255/",
+    "http://240.0.0.1/",
+    "http://254.255.255.255/",
+    "http://255.255.254.255/",
     "http://198.18.0.1/",
     "http://198.19.255.255/",
     "http://192.0.0.1/",
@@ -92,7 +95,7 @@ describe("Which URLs a plugin may ask the host to load", () => {
     );
   });
 
-  it.each(["https://223.255.255.255/", "https://198.17.255.255/", "https://198.20.0.1/", "https://192.0.1.1/", "https://255.255.254.255/"])(
+  it.each(["https://223.255.255.255/", "https://198.17.255.255/", "https://198.20.0.1/", "https://192.0.1.1/"])(
     "allows the public ipv4 host next to a refused range, %s",
     (url) => {
       expect(refused(url)).toBeUndefined();
@@ -136,7 +139,7 @@ describe("Which WebSocket URLs a page may open", () => {
     },
   );
 
-  it.each(["ws://127.0.0.1:9/socket", "wss://localhost/socket", "ws://[::1]/", "ws://10.0.0.1/"])(
+  it.each(["ws://127.0.0.1:9/socket", "wss://localhost/socket", "ws://[::1]/", "ws://10.0.0.1/", "ws://240.0.0.1/"])(
     "refuses the private host of %s",
     (url) => {
       expect(refusedSocket(url, false)).toContain("private");
