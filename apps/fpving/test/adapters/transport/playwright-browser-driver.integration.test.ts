@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDomainLimiter } from "../../../src/adapters/transport/domain-limiter.ts";
 import { launchChromium } from "../../../src/adapters/transport/launch-chromium.ts";
@@ -14,6 +15,7 @@ import type { LocalServer } from "../../support/local-server.ts";
 const BROWSER_TIMEOUT_MS = 60_000;
 const OK = 200;
 const RENDERED_HTML_MARKER = "<h1 id=\"title\">rendered</h1>";
+const OPENER_AND_POPUP = 2;
 const PUBLIC_NAME = "shop.test";
 
 const launchResolvingPublicName = async (userDataDir: string) =>
@@ -88,6 +90,46 @@ describe.skipIf(!chromiumInstalled)(
       },
       BROWSER_TIMEOUT_MS,
     );
+
+    describe("with a page that opens a popup", () => {
+      let popupProfile: string;
+      let popupDriver: ClosableBrowserDriver;
+      let opened: BrowserContext | undefined;
+      const pagesSeen: Page[] = [];
+      let startingPages: Page[] = [];
+
+      beforeAll(async () => {
+        popupProfile = await mkdtemp(join(tmpdir(), "fpving-profile-"));
+        popupDriver = createPlaywrightBrowserDriver({
+          launch: async (userDataDir) => {
+            const launched = await chromium.launchPersistentContext(userDataDir, { headless: true });
+            launched.on("page", (page) => pagesSeen.push(page));
+            opened = launched;
+            startingPages = launched.pages();
+            return launched;
+          },
+          limiter: instantLimiter,
+          profileDir: popupProfile,
+          allowPrivateHosts: true,
+        });
+      }, BROWSER_TIMEOUT_MS);
+
+      afterAll(async () => {
+        await popupDriver.close();
+        await rm(popupProfile, { recursive: true, force: true });
+      }, BROWSER_TIMEOUT_MS);
+
+      it(
+        "leaves only the pages the context started with once the fetch returns",
+        async () => {
+          const result = await popupDriver.fetchPage(`${server.origin}/popup-opener`);
+          expect(result).toMatchObject({ ok: true, value: { status: OK } });
+          expect(pagesSeen).toHaveLength(OPENER_AND_POPUP);
+          expect(opened?.pages()).toEqual(startingPages);
+        },
+        BROWSER_TIMEOUT_MS,
+      );
+    });
 
     describe("with a page on a public name whose requests aim at a private host", () => {
       let privateServer: LocalServer;

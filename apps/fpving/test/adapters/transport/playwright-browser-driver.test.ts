@@ -16,6 +16,8 @@ import type {
 const PROFILE = "/data/browser-profile";
 const OK = 200;
 const RELAUNCHED = 2;
+const POPUPS_CLOSED = 3;
+const NESTED_POPUPS_CLOSED = 2;
 const URL_IN = "https://shop.example/start";
 const URL_OUT = "https://shop.example/final";
 
@@ -42,22 +44,57 @@ interface FakePageSpec {
   readonly contentError?: Error;
   readonly closeError?: Error;
   readonly finalUrl?: string;
+  readonly popups?: number;
 }
+
+const fakePopup = (log: string[], opensNested: boolean): BrowserPageHandle => {
+  const handlers: ((popup: BrowserPageHandle) => void)[] = [];
+  const popup: BrowserPageHandle = {
+    goto: () => Promise.resolve(null),
+    content: () => Promise.resolve(""),
+    url: () => "about:blank",
+    close: () => {
+      log.push("popup closed");
+      return Promise.resolve();
+    },
+    on: (_event, handler) => {
+      handlers.push(handler);
+    },
+  };
+  if (opensNested) {
+    queueMicrotask(() => {
+      for (const handler of handlers) {
+        handler(fakePopup(log, false));
+      }
+    });
+  }
+  return popup;
+};
 
 const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Promise<void>) => {
   const log: string[] = [];
   const gotos: { url: string; options: { timeout: number; waitUntil: string } }[] = [];
   let launches = 0;
   let contextCloses = 0;
+  const popupHandlers: ((popup: BrowserPageHandle) => void)[] = [];
   const page: BrowserPageHandle = {
-    goto: (url, options) => {
+    on: (_event, handler) => {
+      popupHandlers.push(handler);
+    },
+    goto: async (url, options) => {
       gotos.push({ url, options });
       log.push("goto");
+      for (let index = 0; index < (spec.popups ?? 0); index += 1) {
+        for (const handler of popupHandlers) {
+          handler(fakePopup(log, index === 0));
+        }
+      }
+      await Promise.resolve();
       if (spec.gotoError) {
-        return Promise.reject(spec.gotoError);
+        throw spec.gotoError;
       }
       const status = spec.status === undefined ? OK : spec.status;
-      return Promise.resolve(status === null ? null : { status: () => status });
+      return status === null ? null : { status: () => status };
     },
     content: () => {
       log.push("content");
@@ -152,6 +189,19 @@ describe("Rendering pages in the host browser", () => {
     const { driver, log } = harness();
     await driver.fetchPage(URL_IN);
     expect(log).toEqual(["route", "route websockets", "goto", "content", "page closed"]);
+  });
+
+  it("closes every popup the page opened, nested ones included, after a successful load", async () => {
+    const { driver, log } = harness({ popups: 2 });
+    await driver.fetchPage(URL_IN);
+    expect(log.filter((entry) => entry === "popup closed")).toHaveLength(POPUPS_CLOSED);
+    expect(log.at(-1)).toBe("page closed");
+  });
+
+  it("closes every popup the page opened when navigation fails", async () => {
+    const { driver, log } = harness({ popups: 1, gotoError: new Error("net::ERR_CONNECTION_REFUSED") });
+    await driver.fetchPage(URL_IN);
+    expect(log.filter((entry) => entry === "popup closed")).toHaveLength(NESTED_POPUPS_CLOSED);
   });
 
   it("closes the page when navigation fails", async () => {

@@ -14,6 +14,7 @@ export interface BrowserPageHandle {
   content(): Promise<string>;
   url(): string;
   close(): Promise<void>;
+  on(event: "popup", handler: (popup: BrowserPageHandle) => void): unknown;
 }
 
 /** The part of a Playwright `Route` the driver uses: one intercepted request the page made. */
@@ -76,19 +77,31 @@ const navigate = async (
   return ok({ status: response.status(), html: await page.content(), finalUrl });
 };
 
+const closeAll = async (pages: readonly BrowserPageHandle[]): Promise<void> => {
+  await Promise.allSettled(pages.map(async (page) => page.close()));
+};
+
 const load = async (
   context: BrowserContextHandle,
   url: string,
   allowPrivateHosts: boolean,
 ): Promise<Result<BrowserPage, TransportError>> => {
   const page = await context.newPage();
+  const popups: BrowserPageHandle[] = [];
+  const track = (popup: BrowserPageHandle): void => {
+    popups.push(popup);
+    popup.on("popup", track);
+  };
+  page.on("popup", track);
   let result: Result<BrowserPage, TransportError>;
   try {
     result = await navigate(page, url, allowPrivateHosts);
   } catch (error) {
+    await closeAll(popups);
     await page.close().catch(() => undefined);
     throw error;
   }
+  await closeAll(popups);
   await page.close();
   return result;
 };
@@ -108,9 +121,10 @@ const refuseBlockedSockets = (allowPrivateHosts: boolean) => async (socket: WebS
 
 /**
  * Creates the SDK {@link BrowserDriver} on Playwright. One persistent context is launched on the first page and
- * reused; each page opens in a tab that is always closed again. Every request a page starts (subresources, XHR and
- * fetch) is routed through the URL policy and aborted when refused, every WebSocket it opens is checked the same way
- * and closed when refused, and a navigation that was redirected to a refused host is a `network` error. Playwright
+ * reused; each page opens in a tab that is always closed again, together with every popup it opened. Every request
+ * a page starts (subresources, XHR and fetch) is routed through the URL policy and aborted when refused, every
+ * WebSocket it opens is checked the same way and closed when refused, and a navigation that was redirected to a
+ * refused host is a `network` error. Playwright
  * does not route redirect hops, so such a hop is still sent, but its response never reaches the plugin.
  *
  * @param options - The launcher, limiter and profile directory.

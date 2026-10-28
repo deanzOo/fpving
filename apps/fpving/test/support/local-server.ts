@@ -30,12 +30,23 @@ const socketPage = (target: string): string => [
   `socket.onclose = () => fetch("/socket-done").catch(() => undefined);</script></body></html>`,
 ].join("");
 
+const POPUP_OPENER_HTML = "<!doctype html><html><body><script>window.open(\"/popup-target\");</script></body></html>";
+const POPUP_TARGET_HTML = "<!doctype html><html><body>popup</body></html>";
+
 const respond = (request: IncomingMessage, response: ServerResponse, target: string): void => {
   const url = new URL(request.url ?? "/", "http://fixture");
   switch (url.pathname) {
     case "/leaky":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
       response.end(leakyPage(target));
+      return;
+    case "/popup-opener":
+      response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
+      response.end(POPUP_OPENER_HTML);
+      return;
+    case "/popup-target":
+      response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
+      response.end(POPUP_TARGET_HTML);
       return;
     case "/socket-page":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
@@ -79,8 +90,9 @@ export interface LocalServerOptions {
 }
 
 /**
- * Serves the fixture page, a redirect to it, a user agent echo, a 404, a request that never answers, a page whose
- * subresources load from `options.target`, a page that opens a WebSocket to `options.target` and reports `/socket-done`
+ * Serves the fixture page, a page that opens a popup with `window.open`, a redirect to it, a user agent echo, a 404,
+ * a request that never answers, a page whose subresources load from `options.target`, a page that opens a WebSocket
+ * to `options.target` and reports `/socket-done`
  * once it closes, and a redirect to `options.target`. WebSocket upgrades are logged as `upgrade <path>` and refused.
  */
 export const startLocalServer = async (options: LocalServerOptions = {}): Promise<LocalServer> => {
