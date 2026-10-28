@@ -4,7 +4,7 @@ description: Components, ports and adapters, the plugin system and the data flow
 ---
 
 :::note
-This is the target design. The workspace, the public plugin SDK contract (types, schemas, error taxonomy and contract test kit), core pricing, the core entities and ports, the alert evaluator, the add-product and add-listing use cases, assisted matching, the scan use case and the scan schedule policy exist; the SQLite, Anthropic, exchange rates, notifier, logger, HTTP client and browser adapters and the matcher eval runner exist; the host app, the timer adapter, the plugin host, the other adapters and the rest of the domain logic are still being built.
+This is the target design. The workspace, the public plugin SDK contract (types, schemas, error taxonomy and contract test kit), core pricing, the core entities and ports, the alert evaluator, the add-product and add-listing use cases, assisted matching, the scan use case and the scan schedule policy exist; the SQLite, Anthropic, exchange rates, notifier, logger, HTTP client and browser adapters, the matcher eval runner, and the plugin list, compatibility check and domain registry exist; the host app, the timer adapter, plugin loading and worker threads, the other adapters and the rest of the domain logic are still being built.
 :::
 
 ## Shape
@@ -69,7 +69,9 @@ Zod, React, Fastify and dev tooling are not wrapped: they are framework or type-
 
 ## Plugin system
 
-Plugins supply all store support and are designed to run in worker threads. The host will own the browser, HTTP client, rate limits and timeouts. Everything that crosses the host and plugin boundary is plain data that survives `structuredClone`, so URLs are absolute http(s) strings. See [Writing a plugin](../writing-a-plugin/) and ADRs [0003](../adr/0003-store-support-via-plugins-only/) and [0004](../adr/0004-worker-thread-plugin-isolation/).
+Plugins supply all store support and are designed to run in worker threads. The host will own the browser, HTTP client, rate limits and timeouts. Everything that crosses the host and plugin boundary is plain data that survives `structuredClone`, so URLs are absolute http(s) strings.
+
+The main-thread groundwork of the plugin host is in `apps/fpving/src/plugins`, all pure except the file reader. `config.ts` reads `DATA_DIR/plugins.json` through an injected reader and checks each entry on its own. `compatibility.ts` checks a manifest's `sdkVersion` against the SDK's `SDK_VERSION`. `registry.ts` maps declared hostnames to plugin ids with the `declaredDomains` and `pluginFor` semantics of `StoreGateway`: `pluginFor` takes a normalized URL and matches its hostname exactly, and `declaredDomains` lists only the hostnames that resolve to a plugin, so a hostname two plugins declare is in neither. `status.ts` is the status the Plugins screen will show: `loaded`, with any warnings, or `disabled` with a reason (`config_invalid`, `entry_invalid`, `duplicate_entry`, `manifest_invalid`, `sdk_incompatible`, `duplicate_id` or `domain_conflict`) and a detail. Loading plugins, the worker threads and the `StoreGateway` implementation are not built yet. See [Writing a plugin](../writing-a-plugin/) and ADRs [0003](../adr/0003-store-support-via-plugins-only/) and [0004](../adr/0004-worker-thread-plugin-isolation/).
 
 ## Data flow
 

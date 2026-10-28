@@ -1,10 +1,10 @@
 ---
 title: Configuration
-description: Planned settings and plugin configuration.
+description: Planned settings, and the plugin list.
 ---
 
 :::caution[Planned]
-No settings screen or config file exists yet. This page records the intended shape.
+No settings screen or settings file exists yet; this page records their intended shape. The plugin list format below is implemented.
 :::
 
 ## Settings
@@ -27,7 +27,22 @@ Changing `shipToCountry` invalidates shipping; the next scan refetches. Old snap
 
 ## Plugins
 
-A typed `plugins.config.ts` lists plugin package names or local folder paths. See [Writing a plugin](../writing-a-plugin/).
+The plugin list is `plugins.json` in `DATA_DIR`. It is a JSON array with one entry per plugin, either a local folder or an npm package:
+
+```json
+[
+  { "path": "/home/pilot/fpving-plugins/example-shop" },
+  { "package": "fpving-plugin-example" },
+  { "package": "@pilot/fpving-shop" }
+]
+```
+
+- No file means no plugins. That is not an error.
+- A file that cannot be read, is not valid JSON or is not an array disables every plugin with a `config_invalid` reason. The app still runs, with no plugins.
+- Each entry is checked on its own, and a bad one disables only itself with an `entry_invalid` reason. An entry has exactly one key. `path` must be absolute; relative paths are rejected, because they would depend on the directory the app starts from. `package` must be a valid npm package name, scoped or not, at most 214 characters.
+- Folder paths are normalized, so `/a/b/` and `/a/x/../b` are the same folder. A later entry naming the same folder or package as an earlier one is rejected as `duplicate_entry`, and the first one stays.
+
+Only reading and checking the list exists so far (`apps/fpving/src/plugins/config.ts`); loading the listed plugins is not built yet. See [Writing a plugin](../writing-a-plugin/) and [ADR 0020](../adr/0020-plugin-list-in-data-dir-plugins-json/).
 
 ## Secrets
 
