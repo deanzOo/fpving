@@ -15,6 +15,7 @@ export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
 export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
 export { MatchErrorKind } from "./matching/errors.js";
 export { findMatches, rejudgeUnjudged } from "./matching/find.js";
+export { MATCHING_RULES } from "./matching/rules.js";
 export type {
   AlreadySuggested,
   FailedSearch,
@@ -44,9 +45,9 @@ export { normalizeListingUrl } from "./products/normalize-url.js";
 export type { InvalidUrl } from "./products/normalize-url.js";
 export { COUNTRY_PRESETS, presetFor } from "./pricing/country-presets.js";
 export type { CountryPreset, PresetSource } from "./pricing/country-presets.js";
-export { convert } from "./pricing/fx.js";
+export { convert, fxTableSchema } from "./pricing/fx.js";
 export type { FxTable, MissingRate, PricingError } from "./pricing/fx.js";
-export { importTax, ThresholdBasis } from "./pricing/import-tax.js";
+export { importTax, importTaxRuleSchema, ThresholdBasis } from "./pricing/import-tax.js";
 export type { ImportTaxRule } from "./pricing/import-tax.js";
 export { landedCost } from "./pricing/landed-cost.js";
 export type { PricingSettings, ShippingUnknownError } from "./pricing/landed-cost.js";

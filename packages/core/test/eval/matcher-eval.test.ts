@@ -14,24 +14,21 @@ const pair = (label: MatcherPair["label"]): MatcherPair => ({
 });
 
 describe("Matcher eval", () => {
-  it("ships labelling rules and at least 40 labelled pairs covering same, variant and different", () => {
-    const { rules, pairs } = matcherEvalFileSchema.parse(JSON.parse(readFileSync(PAIRS_FILE, "utf8")));
-    expect(rules.length).toBeGreaterThan(0);
+  it("ships at least 40 labelled pairs covering same, variant and different", () => {
+    const { pairs } = matcherEvalFileSchema.parse(JSON.parse(readFileSync(PAIRS_FILE, "utf8")));
     expect(pairs.length).toBeGreaterThanOrEqual(MIN_MATCHER_PAIRS);
     expect(new Set(pairs.map((row) => row.label))).toEqual(
       new Set([LlmVerdict.Same, LlmVerdict.Variant, LlmVerdict.Different]),
     );
   });
 
-  it("refuses a pairs file without rules, with too few pairs or with a label that is not a verdict", () => {
-    const rules = ["same: the same item."];
+  it("refuses a pairs file with too few pairs or with a label that is not a verdict", () => {
     const valid = (file: unknown): boolean => matcherEvalFileSchema.safeParse(file).success;
     const few = Array.from({ length: MIN_MATCHER_PAIRS - 1 }, () => pair(LlmVerdict.Same));
     const many = Array.from({ length: MIN_MATCHER_PAIRS }, () => pair(LlmVerdict.Same));
-    expect(valid({ rules, pairs: many })).toBe(true);
-    expect(valid({ rules: [], pairs: many })).toBe(false);
-    expect(valid({ rules, pairs: few })).toBe(false);
-    expect(valid({ rules, pairs: [...many, { ...pair(LlmVerdict.Same), label: LlmVerdict.Unjudged }] })).toBe(false);
+    expect(valid({ pairs: many })).toBe(true);
+    expect(valid({ pairs: few })).toBe(false);
+    expect(valid({ pairs: [...many, { ...pair(LlmVerdict.Same), label: LlmVerdict.Unjudged }] })).toBe(false);
   });
 
   it("scores accuracy per label and overall, counting an unjudged verdict as wrong", () => {

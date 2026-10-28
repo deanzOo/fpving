@@ -23,9 +23,9 @@ export const nextScanDue = (lastScanAt: Date | null, intervalHours: number, now:
 
 /**
  * What {@link refreshRatesIfStale} did. `fresh`: the stored rates are recent enough, so nothing was fetched.
- * `unchanged`: the stored rates were stale but the fetch returned the date already stored, so nothing was saved.
- * `refreshed`: new rates were fetched and saved. `failed`: the fetch failed and the last stored rates, if any, stay
- * in use.
+ * `unchanged`: the stored rates were stale but the fetch returned the date already stored or an older one, so
+ * nothing was saved. `refreshed`: new rates were fetched and saved. `failed`: the fetch failed and the last stored
+ * rates, if any, stay in use.
  */
 export const RatesRefresh = {
   Fresh: "fresh",
@@ -52,8 +52,9 @@ export interface RefreshRatesDeps {
 /**
  * Fetches and saves exchange rates unless the stored ones are fresh. Rates are stale when none are stored, when
  * their `fetchedOn` date cannot be read, or when more than a day has passed since the start (UTC) of that date.
- * A fetch that returns the date already stored is not saved again. A failed fetch is logged, not thrown, so the
- * scan still runs on the last rates.
+ * A fetch that returns the date already stored, or an older one, is not saved, so a source that regresses
+ * cannot overwrite newer rates. A failed fetch is logged, not thrown, so the scan still runs on the last
+ * rates.
  *
  * @param deps - The ports to use.
  * @returns What happened.
@@ -69,7 +70,7 @@ export const refreshRatesIfStale = async (deps: RefreshRatesDeps): Promise<Rates
     logger.warn("exchange rates could not be refreshed, using the last ones", { detail: fetched.error.detail });
     return RatesRefresh.Failed;
   }
-  if (stored?.fetchedOn === fetched.value.fetchedOn) {
+  if (stored !== null && Date.parse(fetched.value.fetchedOn) <= Date.parse(stored.fetchedOn)) {
     return RatesRefresh.Unchanged;
   }
   await repository.fxRates.save(fetched.value);
