@@ -115,9 +115,9 @@ export const createFetchHttpClient = (options: FetchHttpClientOptions): HttpClie
   get: async (url, requestOptions) =>
     guardUrl(url, options.allowPrivateHosts, async (target) =>
       options.limiter.run(target, async (): Promise<Result<HttpResponse, TransportError>> => {
-        const headers = new Headers(requestOptions?.headers);
-        headers.set("user-agent", options.userAgent);
         try {
+          const headers = new Headers(requestOptions?.headers);
+          headers.set("user-agent", options.userAgent);
           const followed = await fetchFollowing(options, target, {
             headers,
             redirect: "manual",

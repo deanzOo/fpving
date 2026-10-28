@@ -94,6 +94,16 @@ describe("Plain HTTP access for plugins", () => {
     expect(requests[0]?.url).toBe("https://shop.example/a");
   });
 
+  it.each([
+    ["a header name with a space", { "Bad Header": "x" }],
+    ["a header value with a newline", { "X-Shop": "a\nb" }],
+  ])("returns a network error for %s without fetching", async (_label, headers) => {
+    const { client, requests } = recording(() => Promise.resolve(new Response("")));
+    const result = await client.get("https://shop.example/a", { headers });
+    expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
+    expect(requests).toEqual([]);
+  });
+
   it("puts the default deadline on every request", async () => {
     const timeout = vi.spyOn(AbortSignal, "timeout");
     const { client, requests } = recording(() => Promise.resolve(new Response("")));
