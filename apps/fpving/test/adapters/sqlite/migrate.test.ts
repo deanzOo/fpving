@@ -117,6 +117,46 @@ describe("SQLite migrations", () => {
     expect(tables(path)).not.toContain("half");
   });
 
+  it("rebuilds a table other tables reference while they hold rows pointing at it", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    migrate(path);
+    const client = new Database(path);
+    client.prepare("insert into products (id, name, created_at) values ('p1', 'Goggles', 1)").run();
+    client
+      .prepare(
+        "insert into listings (id, product_id, plugin_id, url, title, status, origin, added_at, failure_streak, "
+        + "not_found_streak) values ('l1', 'p1', 'shop', 'https://shop.example/1', 'Goggles', 'active', 'manual', 1, 0, 0)",
+      )
+      .run();
+    client.close();
+    const rebuild = [
+      "CREATE TABLE `__new_products` (`id` text PRIMARY KEY NOT NULL, `name` text NOT NULL, "
+      + "`created_at` integer NOT NULL, `archived_at` integer, `cheapest_listing_id` text, "
+      + "FOREIGN KEY (`cheapest_listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE restrict);",
+      "INSERT INTO `__new_products` SELECT * FROM `products`;",
+      "DROP TABLE `products`;",
+      "ALTER TABLE `__new_products` RENAME TO `products`;",
+    ].join("\n--> statement-breakpoint\n");
+    expect(migrate(path, migrationsWith(rebuild)).backupPath).not.toBeNull();
+    expect(contents(path)["listings"]).toHaveLength(1);
+    expect(contents(path)["products"]).toEqual([expect.objectContaining({ id: "p1" })]);
+  });
+
+  it("refuses a migration that leaves a dangling foreign key, naming the backup it kept", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const dangling
+      = "INSERT INTO `listings` (`id`, `product_id`, `plugin_id`, `url`, `title`, `status`, `origin`, `added_at`, "
+        + "`failure_streak`, `not_found_streak`) VALUES ('l1', 'missing', 'shop', 'https://shop.example/1', 'Goggles', "
+        + "'active', 'manual', 1, 0, 0);";
+    expect(() => migrate(path, migrationsWith(dangling))).toThrow(
+      /^Migrating .* left 1 dangling foreign key\(s\) \(listings\); backup: .*\.bak$/,
+    );
+    expect(backups(dir)).toHaveLength(1);
+  });
+
   it("reports that no backup exists when migrating a new database file fails", () => {
     const path = join(tempDir(), "fpving.db");
     expect(() => migrate(path, migrationsWith("NOT SQL;"))).toThrow(/backup: none$/);

@@ -15,6 +15,12 @@ const lastAppliedMillis = (client: Database.Database): number | null => {
   return tracked === undefined ? null : z.number().nullable().parse(lastMillis());
 };
 
+const danglingKeys = (client: Database.Database): string | null => {
+  const rows = z.array(z.object({ table: z.string() })).parse(client.pragma("foreign_key_check"));
+  const tables = [...new Set(rows.map((row) => row.table))].join(", ");
+  return rows.length === 0 ? null : `${String(rows.length)} dangling foreign key(s) (${tables})`;
+};
+
 const backUp = (client: Database.Database, path: string): string => {
   const backupPath = `${path}.${new Date().toISOString().replaceAll(/[:.]/g, "-")}.bak`;
   client.prepare("VACUUM INTO ?").run(backupPath);
@@ -25,7 +31,9 @@ const backUp = (client: Database.Database, path: string): string => {
  * Applies the pending migrations in `migrationsFolder` to the SQLite file at `path`, creating it when missing. An
  * existing file with pending migrations is first copied with `VACUUM INTO` to a timestamped `.bak` file beside it,
  * which is consistent in any journal mode. All pending migrations run in one transaction, so a failure leaves the
- * database as it was and throws, naming the backup. Run it before opening any repository connection to the file.
+ * database as it was and throws, naming the backup. Foreign keys are off while migrating, so a migration may rebuild a
+ * referenced table; afterwards `foreign_key_check` must come back empty, or it throws, naming the backup, since those
+ * migrations are already committed. Run it before opening any repository connection to the file.
  *
  * @param path - The database file.
  * @param migrationsFolder - The drizzle-kit migrations; the app's own by default.
@@ -38,10 +46,16 @@ export const migrate = (path: string, migrationsFolder = MIGRATIONS_FOLDER): { b
     const last = lastAppliedMillis(client);
     const pending = readMigrationFiles({ migrationsFolder }).some((row) => last === null || row.folderMillis > last);
     const backupPath = existed && pending ? backUp(client, path) : null;
+    const backupNote = `backup: ${backupPath ?? "none"}`;
+    client.pragma("foreign_keys = OFF");
     try {
       applyMigrations(drizzle({ client }), { migrationsFolder });
     } catch (cause) {
-      throw new Error(`Migrating ${path} failed and was rolled back; backup: ${backupPath ?? "none"}`, { cause });
+      throw new Error(`Migrating ${path} failed and was rolled back; ${backupNote}`, { cause });
+    }
+    const dangling = danglingKeys(client);
+    if (dangling !== null) {
+      throw new Error(`Migrating ${path} left ${dangling}; ${backupNote}`);
     }
     return { backupPath };
   } finally {
