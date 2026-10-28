@@ -1,6 +1,7 @@
 /**
  * The store plugin contract: plugin types, the schemas the host validates plugin output with, the store error
- * taxonomy, ISO currency and country codes, and `Result`.
+ * taxonomy, ISO currency and country codes, `Result`, and the SDK version with the semver check the host applies to
+ * a manifest's `sdkVersion`.
  *
  * @module plugin-sdk
  */
