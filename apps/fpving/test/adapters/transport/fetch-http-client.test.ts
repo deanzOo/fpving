@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createFetchHttpClient,
   HTTP_TIMEOUT_MS,
+  MAX_BODY_BYTES,
   MAX_REDIRECTS,
 } from "../../../src/adapters/transport/fetch-http-client.ts";
 import type { FetchFn } from "../../../src/adapters/transport/fetch-http-client.ts";
@@ -13,6 +14,9 @@ const OK = 200;
 const CUSTOM_TIMEOUT_MS = 1234;
 const FOUND = 302;
 const NOT_MODIFIED = 304;
+const NO_CONTENT = 204;
+const HALF = 2;
+const PULLS_TO_EXCEED_CAP = 2;
 
 const passThrough: DomainLimiter = { run: (_url, task) => task() };
 
@@ -229,5 +233,59 @@ describe("Plain HTTP access for plugins", () => {
   it("returns a redirect status without a location as the response", async () => {
     const { client } = replying(() => new Response(null, { status: NOT_MODIFIED }));
     expect(await client.get("https://shop.example/a")).toMatchObject({ ok: true, value: { status: NOT_MODIFIED } });
+  });
+
+  it("reads a body of exactly the size cap", async () => {
+    const { client } = replying(() => new Response("a".repeat(MAX_BODY_BYTES)));
+    const result = await client.get("https://shop.example/a");
+    expect(result.ok ? result.value.body.length : 0).toBe(MAX_BODY_BYTES);
+  });
+
+  it("stops reading a body over the size cap and reports it as a network error", async () => {
+    let cancelled = false;
+    let pulls = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull: (controller) => {
+        pulls += 1;
+        controller.enqueue(new Uint8Array(MAX_BODY_BYTES / HALF + 1));
+      },
+      cancel: () => {
+        cancelled = true;
+      },
+    });
+    const { client } = replying(() => new Response(endless));
+    const result = await client.get("https://shop.example/a");
+    expect(result).toEqual({ ok: false, error: { kind: "network", detail: "response too large" } });
+    expect(cancelled).toBe(true);
+    expect(pulls).toBeLessThanOrEqual(PULLS_TO_EXCEED_CAP + 1);
+  });
+
+  it("decodes a utf-8 character split across two chunks", async () => {
+    const euro = new TextEncoder().encode("€");
+    const split = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        controller.enqueue(euro.slice(0, 1));
+        controller.enqueue(euro.slice(1));
+        controller.close();
+      },
+    });
+    const { client } = replying(() => new Response(split));
+    expect(await client.get("https://shop.example/a")).toMatchObject({ ok: true, value: { body: "€" } });
+  });
+
+  it("reads a response without a body as an empty body", async () => {
+    const { client } = replying(() => new Response(null, { status: NO_CONTENT }));
+    expect(await client.get("https://shop.example/a")).toMatchObject({ ok: true, value: { body: "" } });
+  });
+
+  it("reports a body stream that yields something other than bytes as a network error", async () => {
+    const strings = new ReadableStream<string>({
+      start: (controller) => {
+        controller.enqueue("not bytes");
+      },
+    });
+    const { client } = replying(() => new Response(strings));
+    const result = await client.get("https://shop.example/a");
+    expect(result).toEqual({ ok: false, error: { kind: "network", detail: "response body is not bytes" } });
   });
 });

@@ -7,6 +7,9 @@ import { checkUrl, guardUrl } from "./url-policy.js";
 /** How long a request may take before it is a `timeout`: fifteen seconds. */
 export const HTTP_TIMEOUT_MS = 15_000;
 
+/** The largest body the client reads, five megabytes; a larger one is a `network` error. */
+export const MAX_BODY_BYTES = 5_242_880;
+
 /** How many redirects one request follows before it is a `network` error. */
 export const MAX_REDIRECTS = 10;
 
@@ -59,6 +62,30 @@ const fetchFollowing = async (
   return networkError("too many redirects");
 };
 
+const readCapped = async (response: Response): Promise<Result<string, TransportError>> => {
+  if (response.body === null) {
+    return ok("");
+  }
+  const decoder = new TextDecoder();
+  const reader = response.body.getReader();
+  let text = "";
+  let size = 0;
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+    const bytes: unknown = chunk.value;
+    if (!(bytes instanceof Uint8Array)) {
+      await reader.cancel();
+      return networkError("response body is not bytes");
+    }
+    size += bytes.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return networkError("response too large");
+    }
+    text += decoder.decode(bytes, { stream: true });
+  }
+  return ok(text + decoder.decode());
+};
+
 const isTimeout = (error: unknown): boolean => error instanceof DOMException && error.name === "TimeoutError";
 
 /**
@@ -85,8 +112,12 @@ export const createFetchHttpClient = (options: FetchHttpClientOptions): HttpClie
             return followed;
           }
           const response = followed.value;
-          const body = await response.text();
-          return ok({ status: response.status, body, headers: Object.fromEntries(response.headers.entries()) });
+          const body = await readCapped(response);
+          if (!body.ok) {
+            return body;
+          }
+          const responseHeaders = Object.fromEntries(response.headers.entries());
+          return ok({ status: response.status, body: body.value, headers: responseHeaders });
         } catch (error) {
           return transportFailure(isTimeout(error), error);
         }
