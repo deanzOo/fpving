@@ -1,4 +1,4 @@
-import { parse, Range, validRange } from "semver";
+import { parse, Range, satisfies, validRange } from "semver";
 import type { Comparator } from "semver";
 
 /** True when `value` is a canonical semver version such as `1.2.3` or `1.2.3+build.1`, without a `v` or `=` prefix. */
@@ -18,3 +18,12 @@ const hasUpperBound = (comparators: readonly Comparator[]): boolean =>
  */
 export const isSemverRange = (value: string): boolean =>
   validRange(value) !== null && new Range(value).set.every(hasUpperBound);
+
+/**
+ * True when the semver `version` lies in `range`, as npm decides it. A prerelease version satisfies only a range that
+ * names a prerelease of the same version, and an invalid version or range is never satisfied.
+ *
+ * @param version - A semver version, such as `SDK_VERSION`.
+ * @param range - A semver range, such as a manifest's `sdkVersion`.
+ */
+export const satisfiesSemverRange = (version: string, range: string): boolean => satisfies(version, range);

@@ -24,6 +24,7 @@ describe("Plugin SDK entry points", () => {
       "manifestSchema",
       "moneySchema",
       "ok",
+      "satisfiesSemverRange",
       "searchCandidateSchema",
       "shippingSchema",
       "storeErrorSchema",
