@@ -24,7 +24,7 @@ const copy = structuredClone;
 
 const bug = async (message: string): Promise<never> => Promise.reject(new Error(message));
 
-const byCodePoint = (a: string, b: string): number => Number(a > b) - Number(a < b);
+const byCodePoint = (a: string, b: string): number => Buffer.compare(Buffer.from(a, "utf8"), Buffer.from(b, "utf8"));
 
 const newestFirst = <T extends { readonly id: string }>(rows: Iterable<T>, at: (row: T) => Date): T[] =>
   [...rows].toSorted((a, b) => at(b).getTime() - at(a).getTime() || byCodePoint(b.id, a.id));

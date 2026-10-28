@@ -36,6 +36,8 @@ import type {
 
 const PRICE = 1999;
 const SHIPPING = 500;
+const ASTRAL_ID_LOW = "id\uFFFF";
+const ASTRAL_ID_HIGH = "id\u{10000}";
 const HIGH_SIMILARITY = 0.9;
 const LOW_SIMILARITY = 0.4;
 const FAILURES = 3;
@@ -308,6 +310,13 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot("s5", l1.id, JAN_2)]);
       });
 
+      it("picks the snapshot id outside the basic plane over one inside it on an observed instant tie", async () => {
+        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
+          await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
+        }
+        expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot(ASTRAL_ID_HIGH, l1.id, JAN_2)]);
+      });
+
       it("refuses a snapshot for a listing that does not exist", async () => {
         expect(await repo.snapshots.append(snapshot("s3", missingListing, JAN_1))).toEqual(notFound);
       });
@@ -330,6 +339,13 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
 
     describe("Match candidates", () => {
       beforeEach(seed);
+
+      it("lists candidate ids outside the basic plane after those inside it when similarity ties", async () => {
+        const inside = candidate(ASTRAL_ID_LOW, p1.id, url("inside"), HIGH_SIMILARITY);
+        const outside = candidate(ASTRAL_ID_HIGH, p1.id, url("outside"), HIGH_SIMILARITY);
+        expect(await repo.matchCandidates.save([outside, inside])).toEqual(ok);
+        expect(await repo.matchCandidates.listPending()).toEqual([inside, outside]);
+      });
 
       it("lists pending candidates highest similarity first and leaves out decided ones", async () => {
         const low = candidate("c1", p1.id, url("c1"), LOW_SIMILARITY);
@@ -555,6 +571,13 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
           await repo.scanRuns.record(run);
         }
         expect(await repo.scanRuns.latest(PLUGIN)).toEqual(scanRun("r3", PLUGIN, JAN_1));
+      });
+
+      it("picks the run id outside the basic plane over one inside it on a start instant tie", async () => {
+        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
+          await repo.scanRuns.record(scanRun(id, PLUGIN, JAN_1));
+        }
+        expect(await repo.scanRuns.latest(PLUGIN)).toEqual(scanRun(ASTRAL_ID_HIGH, PLUGIN, JAN_1));
       });
 
       it("rejects a scan run id that is already stored as a bug", async () => {
