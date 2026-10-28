@@ -288,4 +288,27 @@ describe("Plain HTTP access for plugins", () => {
     const result = await client.get("https://shop.example/a");
     expect(result).toEqual({ ok: false, error: { kind: "network", detail: "response body is not bytes" } });
   });
+
+  const CREDENTIALS = { "Authorization": "Bearer t", "Proxy-Authorization": "Basic p", "Cookie": "session=1" };
+  const credentialsSent = (init: RequestInit | undefined): (string | null)[] =>
+    ["authorization", "proxy-authorization", "cookie"].map((name) => headerOf(init, name));
+
+  it("keeps the plugin's credentials on a redirect to the same origin", async () => {
+    const { client, requests } = replying(redirectTo("/b"), () => new Response(""));
+    await client.get("https://shop.example/a", { headers: CREDENTIALS });
+    expect(credentialsSent(requests[1]?.init)).toEqual(["Bearer t", "Basic p", "session=1"]);
+  });
+
+  it.each(["https://other.example/b", "http://shop.example/b", "https://shop.example:8443/b"])(
+    "drops the plugin's credentials on a redirect to the other origin %s, and keeps the rest",
+    async (location) => {
+      const { client, requests } = replying(redirectTo(location), redirectTo("/c"), () => new Response(""));
+      await client.get("https://shop.example/a", { headers: { ...CREDENTIALS, Accept: "text/html" } });
+      expect(credentialsSent(requests[0]?.init)).toEqual(["Bearer t", "Basic p", "session=1"]);
+      expect(credentialsSent(requests[1]?.init)).toEqual([null, null, null]);
+      expect(credentialsSent(requests.at(-1)?.init)).toEqual([null, null, null]);
+      expect(headerOf(requests[1]?.init, "accept")).toBe("text/html");
+      expect(headerOf(requests[1]?.init, "user-agent")).toBe(USER_AGENT);
+    },
+  );
 });

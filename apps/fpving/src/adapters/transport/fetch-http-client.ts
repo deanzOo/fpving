@@ -33,6 +33,16 @@ export interface FetchHttpClientOptions {
   readonly allowPrivateHosts?: boolean;
 }
 
+const CROSS_ORIGIN_DROPPED_HEADERS = ["authorization", "proxy-authorization", "cookie"] as const;
+
+const withoutCredentials = (headers: RequestInit["headers"]): Headers => {
+  const kept = new Headers(headers);
+  for (const name of CROSS_ORIGIN_DROPPED_HEADERS) {
+    kept.delete(name);
+  }
+  return kept;
+};
+
 const networkError = (detail: string): Result<never, TransportError> => err({ kind: StoreErrorKind.Network, detail });
 
 const redirectTarget = (response: Response, from: string): string | null => {
@@ -46,8 +56,9 @@ const fetchFollowing = async (
   init: RequestInit,
 ): Promise<Result<Response, TransportError>> => {
   let current = url;
+  let hopInit = init;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    const response = await options.fetch(current, init);
+    const response = await options.fetch(current, hopInit);
     const next = redirectTarget(response, current);
     if (next === null) {
       return ok(response);
@@ -56,6 +67,9 @@ const fetchFollowing = async (
     const checked = checkUrl(next, options.allowPrivateHosts ?? false);
     if (!checked.ok) {
       return networkError(`${checked.error}; redirect to ${next}`);
+    }
+    if (new URL(checked.value).origin !== new URL(current).origin) {
+      hopInit = { ...hopInit, headers: withoutCredentials(hopInit.headers) };
     }
     current = checked.value;
   }
@@ -92,6 +106,7 @@ const isTimeout = (error: unknown): boolean => error instanceof DOMException && 
  * Creates the SDK {@link HttpClient} on `fetch`. Any status is a completed response, including 404 and 403, because
  * plugins decide what those mean; only a deadline or a transport failure is an error. Redirects are followed here, up
  * to {@link MAX_REDIRECTS}, and each `Location` is resolved against the URL that sent it and checked like the first.
+ * Once a redirect leaves the origin, `authorization`, `proxy-authorization` and `cookie` are no longer sent.
  *
  * @param options - The injected `fetch`, limiter and user agent.
  * @returns The client.
