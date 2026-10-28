@@ -284,7 +284,7 @@ describe("Plain HTTP access for plugins", () => {
         controller.enqueue("not bytes");
       },
     });
-    const { client } = replying(() => new Response(strings));
+    const { client } = replying(() => Object.defineProperty(new Response(""), "body", { value: strings }));
     const result = await client.get("https://shop.example/a");
     expect(result).toEqual({ ok: false, error: { kind: "network", detail: "response body is not bytes" } });
   });
