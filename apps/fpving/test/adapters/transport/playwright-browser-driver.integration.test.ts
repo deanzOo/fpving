@@ -91,12 +91,14 @@ describe.skipIf(!chromiumInstalled)(
 
     describe("with a page on a public name whose requests aim at a private host", () => {
       let privateServer: LocalServer;
+      let pageServer: LocalServer;
       let strict: ClosableBrowserDriver;
       let strictProfile: string;
-      const publicUrl = (path: string): string => `${server.origin.replace("127.0.0.1", PUBLIC_NAME)}${path}`;
+      const publicUrl = (path: string): string => `${pageServer.origin.replace("127.0.0.1", PUBLIC_NAME)}${path}`;
 
       beforeAll(async () => {
         privateServer = await startLocalServer();
+        pageServer = await startLocalServer({ target: privateServer.origin });
         strictProfile = await mkdtemp(join(tmpdir(), "fpving-profile-"));
         strict = createPlaywrightBrowserDriver({
           launch: launchResolvingPublicName,
@@ -107,6 +109,7 @@ describe.skipIf(!chromiumInstalled)(
 
       afterAll(async () => {
         await strict.close();
+        await pageServer.close();
         await privateServer.close();
         await rm(strictProfile, { recursive: true, force: true });
       }, BROWSER_TIMEOUT_MS);
@@ -114,7 +117,7 @@ describe.skipIf(!chromiumInstalled)(
       it(
         "loads the page but blocks its image, script and fetch requests to the private host",
         async () => {
-          const result = await strict.fetchPage(publicUrl(`/leaky?target=${privateServer.origin}`));
+          const result = await strict.fetchPage(publicUrl("/leaky"));
           expect(result).toMatchObject({ ok: true, value: { status: OK } });
           expect(privateServer.requests).toEqual([]);
         },
@@ -124,7 +127,7 @@ describe.skipIf(!chromiumInstalled)(
       it(
         "lets the same requests through when private hosts are allowed, so the block above is real",
         async () => {
-          const result = await driver.fetchPage(`${server.origin}/leaky?target=${privateServer.origin}`);
+          const result = await driver.fetchPage(`${pageServer.origin}/leaky`);
           expect(result).toMatchObject({ ok: true });
           expect(privateServer.requests).toEqual(expect.arrayContaining(["/pixel", "/script.js"]));
         },
@@ -134,10 +137,10 @@ describe.skipIf(!chromiumInstalled)(
       it(
         "closes a WebSocket the page opens to the private host before it connects",
         async () => {
-          const result = await strict.fetchPage(publicUrl(`/socket-page?run=strict&target=${privateServer.origin}`));
+          const result = await strict.fetchPage(publicUrl("/socket-page"));
           expect(result).toMatchObject({ ok: true });
-          const served = () => server.requests;
-          await expect.poll(served, { timeout: BROWSER_TIMEOUT_MS }).toContain("/socket-done?run=strict");
+          const served = () => pageServer.requests;
+          await expect.poll(served, { timeout: BROWSER_TIMEOUT_MS }).toContain("/socket-done");
           expect(privateServer.requests).not.toContain("upgrade /socket");
         },
         BROWSER_TIMEOUT_MS,
@@ -146,7 +149,7 @@ describe.skipIf(!chromiumInstalled)(
       it(
         "lets the same WebSocket reach the private host when private hosts are allowed",
         async () => {
-          await driver.fetchPage(`${server.origin}/socket-page?run=allowed&target=${privateServer.origin}`);
+          await driver.fetchPage(`${pageServer.origin}/socket-page`);
           const upgrades = () => privateServer.requests;
           await expect.poll(upgrades, { timeout: BROWSER_TIMEOUT_MS }).toContain("upgrade /socket");
         },
@@ -156,7 +159,7 @@ describe.skipIf(!chromiumInstalled)(
       it(
         "refuses a navigation redirected to the private host instead of returning its page",
         async () => {
-          const result = await strict.fetchPage(publicUrl(`/redirect-to?target=${privateServer.origin}/page`));
+          const result = await strict.fetchPage(publicUrl("/redirect-to"));
           expect(result).toMatchObject({ ok: false, error: { kind: "network" } });
         },
         BROWSER_TIMEOUT_MS,

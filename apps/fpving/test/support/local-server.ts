@@ -25,14 +25,13 @@ const leakyPage = (target: string): string => [
   `<script>fetch("${target}/fetch").catch(() => undefined);</script></body></html>`,
 ].join("");
 
-const socketPage = (target: string, run: string): string => [
+const socketPage = (target: string): string => [
   `<!doctype html><html><body><script>const socket = new WebSocket("${target.replace(/^http/, "ws")}/socket");`,
-  `socket.onclose = () => fetch("/socket-done?run=${run}").catch(() => undefined);</script></body></html>`,
+  `socket.onclose = () => fetch("/socket-done").catch(() => undefined);</script></body></html>`,
 ].join("");
 
-const respond = (request: IncomingMessage, response: ServerResponse): void => {
+const respond = (request: IncomingMessage, response: ServerResponse, target: string): void => {
   const url = new URL(request.url ?? "/", "http://fixture");
-  const target = url.searchParams.get("target") ?? "";
   switch (url.pathname) {
     case "/leaky":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
@@ -40,10 +39,10 @@ const respond = (request: IncomingMessage, response: ServerResponse): void => {
       return;
     case "/socket-page":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
-      response.end(socketPage(target, url.searchParams.get("run") ?? ""));
+      response.end(socketPage(target));
       return;
     case "/redirect-to":
-      response.writeHead(FOUND, { location: target });
+      response.writeHead(FOUND, { location: `${target}/page` });
       response.end();
       return;
     case "/page":
@@ -74,16 +73,21 @@ const listen = async (server: Server): Promise<string> =>
     });
   });
 
+export interface LocalServerOptions {
+  /** The origin that `/leaky`, `/socket-page` and `/redirect-to` point at. */
+  readonly target?: string;
+}
+
 /**
  * Serves the fixture page, a redirect to it, a user agent echo, a 404, a request that never answers, a page whose
- * subresources load from `?target=`, a page that opens a WebSocket to `?target=` and reports `/socket-done?run=` once
- * it closes, and a redirect to `?target=`. WebSocket upgrades are logged as `upgrade <path>` and refused.
+ * subresources load from `options.target`, a page that opens a WebSocket to `options.target` and reports `/socket-done`
+ * once it closes, and a redirect to `options.target`. WebSocket upgrades are logged as `upgrade <path>` and refused.
  */
-export const startLocalServer = async (): Promise<LocalServer> => {
+export const startLocalServer = async (options: LocalServerOptions = {}): Promise<LocalServer> => {
   const requests: string[] = [];
   const server = createServer((request, response) => {
     requests.push(request.url ?? "");
-    respond(request, response);
+    respond(request, response, options.target ?? "");
   });
   server.on("upgrade", (request: IncomingMessage, socket: Duplex) => {
     requests.push(`upgrade ${request.url ?? ""}`);
