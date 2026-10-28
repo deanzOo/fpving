@@ -27,7 +27,13 @@ export interface LlmError {
   readonly detail: string;
 }
 
-/** Judges listing titles with an LLM. Methods resolve to a `Result` and never reject. */
+/**
+ * Judges listing titles with an LLM. Methods resolve to a `Result` and never reject.
+ *
+ * @remarks
+ * The adapter limits concurrency and request rate itself, since core calls it for many candidates at once.
+ * The adapter logs every failure with its `detail`; core only falls back to `unjudged` or the raw title.
+ */
 export interface LlmJudge {
   /** Extracts brand, model and variant attributes from a listing title. */
   extractIdentity(title: string): Promise<Result<ProductIdentity, LlmError>>;

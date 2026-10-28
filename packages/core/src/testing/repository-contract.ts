@@ -36,6 +36,8 @@ import type {
 
 const PRICE = 1999;
 const SHIPPING = 500;
+const ASTRAL_ID_LOW = "id\uFFFF";
+const ASTRAL_ID_HIGH = "id\u{10000}";
 const HIGH_SIMILARITY = 0.9;
 const LOW_SIMILARITY = 0.4;
 const FAILURES = 3;
@@ -60,6 +62,7 @@ const product = (id: string): Product => ({
   name: `Product ${id}`,
   createdAt: JAN_1,
   archivedAt: null,
+  cheapestListingId: null,
 });
 
 const listing = (id: string, productId: ProductId, url: string): Listing => ({
@@ -162,7 +165,8 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       it("refuses a product whose first listing url is already tracked and stores none of the three", async () => {
         await repo.products.add(p1, l1, s1);
         expect(await repo.products.add(p2, { ...l2, url: l1.url }, s2)).toEqual(duplicateUrl);
-        expect(await repo.listings.add(listing("l3", p2.id, url("three")))).toEqual(notFound);
+        const l3 = listing("l3", p2.id, url("three"));
+        expect(await repo.listings.addWithSnapshot(l3, snapshot("s3", l3.id, JAN_2))).toEqual(notFound);
         expect(await repo.snapshots.append(snapshot("s3", l2.id, JAN_2))).toEqual(notFound);
         expect(await repo.snapshots.append(s2)).toEqual(notFound);
       });
@@ -170,6 +174,37 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       it("rejects a first listing of another product or a first snapshot of another listing as a bug", async () => {
         await expect(repo.products.add(p1, { ...l1, productId: p2.id }, s1)).rejects.toThrow();
         await expect(repo.products.add(p1, l1, { ...s1, listingId: l2.id })).rejects.toThrow();
+      });
+
+      it("rejects a new product that already names a cheapest listing as a bug and stores nothing", async () => {
+        await expect(repo.products.add({ ...p1, cheapestListingId: l1.id }, l1, s1)).rejects.toThrow();
+        expect(await repo.products.get(p1.id)).toBeNull();
+        expect(await repo.listings.findByUrl(l1.url)).toBeNull();
+      });
+
+      it("reads a stored product, and none for an id that is not stored", async () => {
+        await repo.products.add(p1, l1, s1);
+        expect(await repo.products.get(p1.id)).toEqual(p1);
+        expect(await repo.products.get(missingProduct)).toBeNull();
+      });
+
+      it("sets and clears a product's cheapest listing", async () => {
+        await repo.products.add(p1, l1, s1);
+        expect(await repo.products.setCheapest(p1.id, l1.id)).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual({ ...p1, cheapestListingId: l1.id });
+        expect(await repo.products.setCheapest(p1.id, null)).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual(p1);
+      });
+
+      it("rejects a cheapest listing that is missing or another product's as a bug, changing nothing", async () => {
+        await seed();
+        await expect(repo.products.setCheapest(p1.id, missingListing)).rejects.toThrow();
+        await expect(repo.products.setCheapest(p1.id, l2.id)).rejects.toThrow();
+        expect(await repo.products.get(p1.id)).toEqual(p1);
+      });
+
+      it("reports not_found when setting the cheapest listing of a product that does not exist", async () => {
+        expect(await repo.products.setCheapest(missingProduct, null)).toEqual(notFound);
       });
 
       it("rejects a product id that is already stored as a bug", async () => {
@@ -186,22 +221,39 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.listings.findByUrl(url("unknown"))).toBeNull();
       });
 
-      it("adds a listing to an existing product and lists a product's listings oldest first", async () => {
+      it("lists a product's listings oldest first", async () => {
         const later = { ...listing("l3", p1.id, url("three")), origin: ListingOrigin.Matched, addedAt: JAN_2 };
-        expect(await repo.listings.add(later)).toEqual(ok);
+        expect(await repo.listings.addWithSnapshot(later, snapshot("s3", later.id, JAN_2))).toEqual(ok);
         expect(await repo.listings.listByProduct(p1.id)).toEqual([l1, later]);
       });
 
-      it("refuses a listing for a product that does not exist", async () => {
-        expect(await repo.listings.add(listing("l3", missingProduct, url("three")))).toEqual(notFound);
+      it("adds a listing with its first snapshot in one step", async () => {
+        const l3 = listing("l3", p1.id, url("three"));
+        const s3 = snapshot("s3", l3.id, JAN_2);
+        expect(await repo.listings.addWithSnapshot(l3, s3)).toEqual(ok);
+        expect(await repo.listings.findByUrl(l3.url)).toEqual(l3);
+        expect(await repo.snapshots.listSince(l3.id, JAN_1)).toEqual([s3]);
       });
 
-      it("refuses a listing whose url is already tracked", async () => {
-        expect(await repo.listings.add(listing("l3", p1.id, l2.url))).toEqual(duplicateUrl);
+      it("refuses a listing with a snapshot for a missing product or a tracked url and stores neither", async () => {
+        const orphan = listing("l3", missingProduct, url("three"));
+        expect(await repo.listings.addWithSnapshot(orphan, snapshot("s3", orphan.id, JAN_2))).toEqual(notFound);
+        const tracked = listing("l4", p1.id, l2.url);
+        expect(await repo.listings.addWithSnapshot(tracked, snapshot("s4", tracked.id, JAN_2))).toEqual(duplicateUrl);
+        expect(await repo.snapshots.append(snapshot("s5", orphan.id, JAN_2))).toEqual(notFound);
+        expect(await repo.snapshots.listSince(orphan.id, JAN_1)).toEqual([]);
+        expect(await repo.snapshots.listSince(tracked.id, JAN_1)).toEqual([]);
+        expect(await repo.snapshots.append(snapshot("s6", tracked.id, JAN_2))).toEqual(notFound);
+        expect(await repo.listings.listByProduct(p1.id)).toEqual([l1]);
       });
 
-      it("rejects a listing id that is already stored as a bug", async () => {
-        await expect(repo.listings.add(listing("l1", p1.id, url("three")))).rejects.toThrow();
+      it("rejects a snapshot of another listing, or a listing or snapshot id already stored, as a bug", async () => {
+        const l3 = listing("l3", p1.id, url("three"));
+        await expect(repo.listings.addWithSnapshot(l3, snapshot("s3", l1.id, JAN_2))).rejects.toThrow();
+        const reused = listing("l1", p1.id, url("three"));
+        await expect(repo.listings.addWithSnapshot(reused, snapshot("s3", reused.id, JAN_2))).rejects.toThrow();
+        await expect(repo.listings.addWithSnapshot(l3, snapshot("s1", l3.id, JAN_2))).rejects.toThrow();
+        expect(await repo.listings.findByUrl(l3.url)).toBeNull();
       });
 
       it("updates a listing's status and failure streaks", async () => {
@@ -213,6 +265,19 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       it("reports not_found when updating a listing that does not exist", async () => {
         const update = { status: ListingStatus.Gone, failureStreak: 0, notFoundStreak: 0 };
         expect(await repo.listings.updateStatus(missingListing, update)).toEqual(notFound);
+      });
+
+      it("lists active and stale listings of live products to scan, by plugin, then product, then age", async () => {
+        const otherPlugin = { ...listing("l3", p1.id, url("three")), pluginId: OTHER_PLUGIN };
+        const stale = { ...listing("l4", p1.id, url("four")), addedAt: JAN_2, status: ListingStatus.Stale };
+        const gone = { ...listing("l5", p2.id, url("five")), status: ListingStatus.Gone };
+        const archived = { ...product("p3"), archivedAt: JAN_2 };
+        const ofArchived = listing("l6", archived.id, url("six"));
+        for (const row of [otherPlugin, stale, gone]) {
+          await repo.listings.addWithSnapshot(row, snapshot(`s-${row.id}`, row.id, JAN_2));
+        }
+        await repo.products.add(archived, ofArchived, snapshot("s6", ofArchived.id, JAN_2));
+        expect(await repo.listings.listToScan()).toEqual([l1, stale, l2, otherPlugin]);
       });
 
       it("returns copies, so changing a returned row does not change the stored one", async () => {
@@ -238,6 +303,20 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.snapshots.listSince(l1.id, JAN_2)).toEqual([atJan2, unknownShipping]);
       });
 
+      it("picks the snapshot with the greater id by code point when two share an observed instant", async () => {
+        for (const id of ["s4", "s5", "s3"]) {
+          await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
+        }
+        expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot("s5", l1.id, JAN_2)]);
+      });
+
+      it("picks the snapshot id outside the basic plane over one inside it on an observed instant tie", async () => {
+        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
+          await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
+        }
+        expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot(ASTRAL_ID_HIGH, l1.id, JAN_2)]);
+      });
+
       it("refuses a snapshot for a listing that does not exist", async () => {
         expect(await repo.snapshots.append(snapshot("s3", missingListing, JAN_1))).toEqual(notFound);
       });
@@ -246,12 +325,11 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await expect(repo.snapshots.append(snapshot("s1", l1.id, JAN_2))).rejects.toThrow();
       });
 
-      it("returns the latest snapshot of each of a product's listings that has one", async () => {
+      it("returns the latest snapshot of each of a product's listings", async () => {
         const l3 = listing("l3", p1.id, url("three"));
-        await repo.listings.add(l3);
-        await repo.listings.add(listing("l4", p1.id, url("four")));
         const latest = [snapshot("s3", l1.id, JAN_2), snapshot("s4", l3.id, JAN_1)];
-        for (const row of [...latest, snapshot("s5", l2.id, JAN_3)]) {
+        await repo.listings.addWithSnapshot(l3, snapshot("s4", l3.id, JAN_1));
+        for (const row of [snapshot("s3", l1.id, JAN_2), snapshot("s5", l2.id, JAN_3)]) {
           await repo.snapshots.append(row);
         }
         const found = await repo.snapshots.latestPerListing(p1.id);
@@ -262,6 +340,13 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
     describe("Match candidates", () => {
       beforeEach(seed);
 
+      it("lists candidate ids outside the basic plane after those inside it when similarity ties", async () => {
+        const inside = candidate(ASTRAL_ID_LOW, p1.id, url("inside"), HIGH_SIMILARITY);
+        const outside = candidate(ASTRAL_ID_HIGH, p1.id, url("outside"), HIGH_SIMILARITY);
+        expect(await repo.matchCandidates.save([outside, inside])).toEqual(ok);
+        expect(await repo.matchCandidates.listPending()).toEqual([inside, outside]);
+      });
+
       it("lists pending candidates highest similarity first and leaves out decided ones", async () => {
         const low = candidate("c1", p1.id, url("c1"), LOW_SIMILARITY);
         const high = candidate("c2", p2.id, url("c2"), HIGH_SIMILARITY);
@@ -269,35 +354,112 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         const accepted = candidate("c4", p1.id, url("c4"), HIGH_SIMILARITY);
         expect(await repo.matchCandidates.save([low, high, rejected, accepted])).toEqual(ok);
         expect(await repo.matchCandidates.reject(rejected.id)).toEqual(ok);
-        expect(await repo.matchCandidates.accept(accepted.id, listing("l3", p1.id, accepted.url))).toEqual(ok);
+        const l3 = listing("l3", p1.id, accepted.url);
+        expect(await repo.matchCandidates.accept(accepted.id, l3, snapshot("s3", l3.id, JAN_2))).toEqual(ok);
         expect(await repo.matchCandidates.listPending()).toEqual([high, low]);
       });
 
-      it("accepts a candidate by storing its listing in the same step", async () => {
-        const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
-        const matched = { ...listing("l3", p1.id, found.url), origin: ListingOrigin.Matched };
-        await repo.matchCandidates.save([found]);
-        expect(await repo.matchCandidates.accept(found.id, matched)).toEqual(ok);
-        expect(await repo.listings.findByUrl(found.url)).toEqual(matched);
+      it("breaks similarity ties by candidate id, comparing ids by code point", async () => {
+        const first = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const second = candidate("c2", p1.id, url("c2"), HIGH_SIMILARITY);
+        const third = candidate("c3", p1.id, url("c3"), HIGH_SIMILARITY);
+        expect(await repo.matchCandidates.save([third, first, second])).toEqual(ok);
+        expect(await repo.matchCandidates.listPending()).toEqual([first, second, third]);
       });
 
-      it("refuses to accept a candidate whose listing url is already tracked and leaves it pending", async () => {
+      it("accepts a candidate by storing its listing and first snapshot in the same step", async () => {
         const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const matched = { ...listing("l3", p1.id, found.url), origin: ListingOrigin.Matched };
+        const first = snapshot("s3", matched.id, JAN_2);
         await repo.matchCandidates.save([found]);
-        expect(await repo.matchCandidates.accept(found.id, listing("l3", p1.id, l2.url))).toEqual(duplicateUrl);
+        expect(await repo.matchCandidates.accept(found.id, matched, first)).toEqual(ok);
+        expect(await repo.listings.findByUrl(found.url)).toEqual(matched);
+        expect(await repo.snapshots.listSince(matched.id, JAN_1)).toEqual([first]);
+      });
+
+      it("refuses accepting a tracked url, storing nothing and leaving the candidate pending", async () => {
+        const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const tracked = listing("l3", p1.id, l2.url);
+        await repo.matchCandidates.save([found]);
+        expect(await repo.matchCandidates.accept(found.id, tracked, snapshot("s3", tracked.id, JAN_2))).toEqual(
+          duplicateUrl,
+        );
+        expect(await repo.snapshots.listSince(tracked.id, JAN_1)).toEqual([]);
         expect(await repo.matchCandidates.listPending()).toEqual([found]);
       });
 
       it("reports not_found when accepting or rejecting a candidate that does not exist", async () => {
         const missing = matchCandidateIdSchema.parse("missing");
-        expect(await repo.matchCandidates.accept(missing, listing("l3", p1.id, url("three")))).toEqual(notFound);
+        const l3 = listing("l3", p1.id, url("three"));
+        expect(await repo.matchCandidates.accept(missing, l3, snapshot("s3", l3.id, JAN_2))).toEqual(notFound);
         expect(await repo.matchCandidates.reject(missing)).toEqual(notFound);
+        expect(await repo.listings.findByUrl(l3.url)).toBeNull();
       });
 
-      it("rejects accepting a candidate with a listing of another product as a bug", async () => {
+      it("rejects accepting with a listing of another product or a snapshot of another listing as a bug", async () => {
         const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const foreign = listing("l3", p2.id, found.url);
+        const own = listing("l3", p1.id, found.url);
         await repo.matchCandidates.save([found]);
-        await expect(repo.matchCandidates.accept(found.id, listing("l3", p2.id, found.url))).rejects.toThrow();
+        const foreignFirst = snapshot("s3", foreign.id, JAN_2);
+        await expect(repo.matchCandidates.accept(found.id, foreign, foreignFirst)).rejects.toThrow();
+        await expect(repo.matchCandidates.accept(found.id, own, snapshot("s3", l1.id, JAN_2))).rejects.toThrow();
+        expect(await repo.listings.findByUrl(found.url)).toBeNull();
+      });
+
+      it("rejects accepting with a listing or snapshot id already stored as a bug", async () => {
+        const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const reused = listing("l1", p1.id, found.url);
+        const fresh = listing("l3", p1.id, found.url);
+        await repo.matchCandidates.save([found]);
+        const reusedFirst = snapshot("s3", reused.id, JAN_2);
+        await expect(repo.matchCandidates.accept(found.id, reused, reusedFirst)).rejects.toThrow();
+        await expect(repo.matchCandidates.accept(found.id, fresh, snapshot("s1", fresh.id, JAN_2))).rejects.toThrow();
+        expect(await repo.matchCandidates.listPending()).toEqual([found]);
+      });
+
+      it("records a verdict on a candidate, replacing its earlier one", async () => {
+        const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const judged = { verdict: LlmVerdict.Variant, reason: "Different battery size." };
+        await repo.matchCandidates.save([found]);
+        expect(await repo.matchCandidates.recordVerdict(found.id, judged)).toEqual(ok);
+        expect(await repo.matchCandidates.listPending()).toEqual([
+          { ...found, llmVerdict: judged.verdict, llmReason: judged.reason },
+        ]);
+      });
+
+      it("reports not_found when recording a verdict on a candidate that does not exist", async () => {
+        const judged = { verdict: LlmVerdict.Same, reason: "Same model." };
+        expect(await repo.matchCandidates.recordVerdict(matchCandidateIdSchema.parse("missing"), judged)).toEqual(
+          notFound,
+        );
+      });
+
+      it("refuses with not_found to accept or reject a candidate already decided, storing nothing", async () => {
+        const accepted = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const rejected = candidate("c2", p1.id, url("c2"), HIGH_SIMILARITY);
+        const l3 = listing("l3", p1.id, accepted.url);
+        await repo.matchCandidates.save([accepted, rejected]);
+        await repo.matchCandidates.accept(accepted.id, l3, snapshot("s3", l3.id, JAN_2));
+        await repo.matchCandidates.reject(rejected.id);
+        const again = listing("l4", p1.id, url("again"));
+        const againFirst = snapshot("s4", again.id, JAN_2);
+        expect(await repo.matchCandidates.accept(accepted.id, again, againFirst)).toEqual(notFound);
+        const late = listing("l5", p1.id, rejected.url);
+        expect(await repo.matchCandidates.accept(rejected.id, late, snapshot("s5", late.id, JAN_2))).toEqual(notFound);
+        expect(await repo.matchCandidates.reject(accepted.id)).toEqual(notFound);
+        expect(await repo.listings.listByProduct(p1.id)).toEqual([l1, l3]);
+        expect(await repo.snapshots.listSince(late.id, JAN_1)).toEqual([]);
+        expect(await repo.matchCandidates.isKnownUrl(p1.id, rejected.url)).toBe(true);
+        expect(await repo.matchCandidates.listPending()).toEqual([]);
+      });
+
+      it("refuses with not_found to record a verdict on a candidate already decided", async () => {
+        const rejected = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        await repo.matchCandidates.save([rejected]);
+        await repo.matchCandidates.reject(rejected.id);
+        const judged = { verdict: LlmVerdict.Same, reason: "Same model." };
+        expect(await repo.matchCandidates.recordVerdict(rejected.id, judged)).toEqual(notFound);
       });
 
       it("refuses a batch repeating a url already suggested for the same product and saves none of it", async () => {
@@ -404,6 +566,20 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.scanRuns.latest(PLUGIN)).toEqual(scanRun("r2", PLUGIN, JAN_2));
       });
 
+      it("picks the run with the greater id by code point when two started at the same instant", async () => {
+        for (const run of [scanRun("r2", PLUGIN, JAN_1), scanRun("r3", PLUGIN, JAN_1), scanRun("r1", PLUGIN, JAN_1)]) {
+          await repo.scanRuns.record(run);
+        }
+        expect(await repo.scanRuns.latest(PLUGIN)).toEqual(scanRun("r3", PLUGIN, JAN_1));
+      });
+
+      it("picks the run id outside the basic plane over one inside it on a start instant tie", async () => {
+        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
+          await repo.scanRuns.record(scanRun(id, PLUGIN, JAN_1));
+        }
+        expect(await repo.scanRuns.latest(PLUGIN)).toEqual(scanRun(ASTRAL_ID_HIGH, PLUGIN, JAN_1));
+      });
+
       it("rejects a scan run id that is already stored as a bug", async () => {
         await repo.scanRuns.record(scanRun("r1", PLUGIN, JAN_1));
         await expect(repo.scanRuns.record(scanRun("r1", OTHER_PLUGIN, JAN_2))).rejects.toThrow();
@@ -421,6 +597,12 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await repo.fxRates.save(table("2026-01-01"));
         await repo.fxRates.save(table("2026-01-02"));
         expect(await repo.fxRates.latest()).toEqual(table("2026-01-02"));
+      });
+
+      it("returns the last saved table even when its date is older than an earlier one's", async () => {
+        await repo.fxRates.save(table("2026-01-02"));
+        await repo.fxRates.save(table("2026-01-01"));
+        expect(await repo.fxRates.latest()).toEqual(table("2026-01-01"));
       });
     });
 

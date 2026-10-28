@@ -9,3 +9,6 @@ graphify-out
 apps/docs/src/content/docs/reference/behaviour-spec.md
 apps/docs/src/content/docs/api
 .astro
+*.db
+*.db-journal
+*.bak

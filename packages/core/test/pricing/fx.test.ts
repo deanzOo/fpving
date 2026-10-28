@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { err, ok } from "../../src/index.ts";
-import { convert } from "../../src/pricing/fx.ts";
+import { convert, fxTableSchema } from "../../src/pricing/fx.ts";
 import type { FxTable } from "../../src/pricing/fx.ts";
 
 const ILS_PER_USD = 3.6;
@@ -104,5 +104,23 @@ describe("Currency conversion", () => {
     expect(convert({ amountMinor: LARGEST_AMOUNT, currency: "USD" }, "JPY", rates)).toEqual(
       err({ kind: "amount_out_of_range" }),
     );
+  });
+});
+
+describe("Exchange rate table", () => {
+  it("accepts a table of positive finite rates published on an ISO date", () => {
+    expect(fxTableSchema.parse(rates)).toEqual(rates);
+  });
+
+  it.each(BAD_RATES)("rejects the rate %s", (rate) => {
+    expect(fxTableSchema.safeParse({ ...rates, ratesPerBase: { ILS: rate } }).success).toBe(false);
+  });
+
+  it.each(["2026-13-01", "27/10/2026", "2026-10-27T00:00:00Z", ""])("rejects the publication date %j", (fetchedOn) => {
+    expect(fxTableSchema.safeParse({ ...rates, fetchedOn }).success).toBe(false);
+  });
+
+  it("rejects a rate keyed by something that is not a currency code", () => {
+    expect(fxTableSchema.safeParse({ ...rates, ratesPerBase: { usd: 1 } }).success).toBe(false);
   });
 });

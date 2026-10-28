@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { PortErrorKind, PricingErrorKind } from "../src/index.ts";
+import { AddErrorKind, MatchErrorKind, PortErrorKind, PricingErrorKind, SchedulerErrorKind } from "../src/index.ts";
 import type { ShippingUnknownError } from "../src/index.ts";
 
 describe("Error kinds", () => {
@@ -21,5 +21,27 @@ describe("Error kinds", () => {
       NotifyFailed: "notify_failed",
       DebugWriteFailed: "debug_write_failed",
     });
+  });
+
+  it("names every reason adding a product or listing failed by its snake_case kind", () => {
+    expect(AddErrorKind).toEqual({
+      InvalidUrl: "invalid_url",
+      NoPluginForDomain: "no_plugin_for_domain",
+      AlreadyTracked: "already_tracked",
+      FetchFailed: "fetch_failed",
+      ProductNotFound: "product_not_found",
+    });
+  });
+
+  it("names every reason assisted matching did nothing by its snake_case kind", () => {
+    expect(MatchErrorKind).toEqual({
+      NoSourceListing: "no_source_listing",
+      NotPending: "not_pending",
+      AlreadySuggested: "already_suggested",
+    });
+  });
+
+  it("names the reason a scan on demand did nothing by its snake_case kind", () => {
+    expect(SchedulerErrorKind).toEqual({ Stopped: "stopped" });
   });
 });

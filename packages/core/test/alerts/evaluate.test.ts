@@ -373,6 +373,11 @@ describe("New cheapest alert", () => {
     expect(run([unrated], listingA).cheapestListingId).toBe(listingA);
   });
 
+  it("compares nothing and keeps the previous cheapest when no exchange rates were ever fetched", () => {
+    const input = { ...dropInput(arriving("in", HUNDRED), []), previousCheapestListingId: listingB, rates: null };
+    expect(evaluate(input)).toEqual({ alerts: [], cheapestListingId: listingB });
+  });
+
   it("excludes stale and gone listings", () => {
     const result = run([entry("b", 1, {}, ListingStatus.Stale), entry("c", 1, {}, ListingStatus.Gone)], listingA);
     expect(result.cheapestListingId).toBe(listingA);
@@ -388,6 +393,18 @@ describe("New cheapest alert", () => {
     const incoming = arriving("in", HIGHER, { inStock: false });
     const result = run([entry("b", HUNDRED, {}, ListingStatus.Stale)], listingB, incoming);
     expect(result).toEqual({ alerts: [], cheapestListingId: listingB });
+  });
+
+  it("clears a previous cheapest that is gone when no listing qualifies, raising nothing", () => {
+    const incoming = arriving("in", HIGHER, { inStock: false });
+    const result = run([entry("b", HUNDRED, {}, ListingStatus.Gone)], listingB, incoming);
+    expect(result).toEqual({ alerts: [], cheapestListingId: null });
+  });
+
+  it("clears a previous cheapest that is gone even without exchange rates", () => {
+    const productListings = [entry("b", HUNDRED, {}, ListingStatus.Gone)];
+    const input = { ...dropInput(arriving("in", HUNDRED), []), productListings, previousCheapestListingId: listingB };
+    expect(evaluate({ ...input, rates: null })).toEqual({ alerts: [], cheapestListingId: null });
   });
 
   it("reports no cheapest only when none was ever computed", () => {

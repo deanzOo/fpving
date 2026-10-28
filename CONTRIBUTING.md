@@ -22,7 +22,15 @@ Work on a branch in its own git worktree, never directly on `main`:
 git worktree add .worktrees/my-change -b feat/my-change main
 ```
 
-Planned, not built yet: tooling that gives each worktree its own port, SQLite file and Playwright profile so parallel branches cannot collide. Until it exists there is no per-worktree isolation, so do not run two worktrees' servers or databases against the same port or file.
+Then give the worktree its own settings:
+
+```sh
+pnpm worktree:init
+```
+
+This writes `.env` from `.env.example` with `PORT` set to `4000 + fnv1a(absolute worktree path) % 1000` (stable for a given path) and `DATA_DIR` set to the absolute path `<worktree path>/.data/<worktree directory name>`. It is absolute so it never depends on the directory the server starts from, and the app rejects a relative `DATA_DIR`. If `.env` already exists it is left untouched and the command exits 0. `.env` and `.data/` are gitignored; `.env.example` is committed and holds placeholders only; its `DATA_DIR` is empty, so a hand-copied `.env` fails validation until it is filled in. Two worktrees can hash to the same port, one chance in a thousand; edit `PORT` in `.env` if so. `ANTHROPIC_API_KEY` is optional, is never written for you, and must not be left empty when uncommented.
+
+Planned, not built yet: a per-worktree Playwright profile and log directory. They arrive with the E2E suite, so until then only the port and the data directory are isolated.
 
 ## Tests first
 
