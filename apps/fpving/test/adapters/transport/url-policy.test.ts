@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { urlRefusal } from "../../../src/adapters/transport/url-policy.ts";
+import { checkUrl } from "../../../src/adapters/transport/url-policy.ts";
 
-const refused = (url: string): string | undefined => urlRefusal(url, false);
+const refused = (url: string): string | undefined => {
+  const checked = checkUrl(url, false);
+  return checked.ok ? undefined : checked.error;
+};
 
 describe("Which URLs a plugin may ask the host to load", () => {
-  it.each(["http://shop.example/a", "https://shop.example:8443/a?b=c", "https://8.8.8.8/", "https://172.32.0.1/"])(
+  it.each(["http://shop.example/a", "https://shop.example:8443/a?b=c", "https://8.8.8.8/", "https://172.32.0.1/", "https://100.63.255.255/", "https://100.128.0.1/"])(
     "allows the public url %s",
     (url) => {
       expect(refused(url)).toBeUndefined();
@@ -55,11 +58,23 @@ describe("Which URLs a plugin may ask the host to load", () => {
     "http://[::ffff:127.0.0.1]/",
     "http://[::ffff:10.0.0.1]/",
     "http://[fc00:1:2:3:4:5:6:7]/",
+    "http://localhost../",
+    "http://api.localhost.../",
+    "http://100.64.0.1/",
+    "http://100.127.255.255/",
+    "http://[::127.0.0.1]/",
+    "http://[::10.0.0.1]/",
+    "http://[::ffff:0:127.0.0.1]/",
+    "http://[::ffff:0:192.168.1.1]/",
+    "http://[64:ff9b::127.0.0.1]/",
+    "http://[64:ff9b::169.254.169.254]/",
+    "http://[fec0::1]/",
+    "http://[feff::1]/",
   ])("refuses the private host of %s", (url) => {
     expect(refused(url)).toContain("private");
   });
 
-  it.each(["http://[2606:4700::1]/", "http://[::ffff:8.8.8.8]/", "http://[fec0::1]/", "http://[fbff::1]/", "http://[2001:db8:1:2:3:4:5:6]/"])(
+  it.each(["http://[2606:4700::1]/", "http://[::ffff:8.8.8.8]/", "http://[fbff::1]/", "http://[ff00::1]/", "http://[2001:db8:1:2:3:4:5:6]/", "http://[::ffff:0:8.8.8.8]/", "http://[64:ff9b::8.8.8.8]/", "http://[::8.8.8.8]/"])(
     "allows the public ipv6 host of %s",
     (url) => {
       expect(refused(url)).toBeUndefined();
@@ -67,11 +82,18 @@ describe("Which URLs a plugin may ask the host to load", () => {
   );
 
   it("allows private hosts only when asked to", () => {
-    expect(urlRefusal("http://127.0.0.1:8080/", true)).toBeUndefined();
-    expect(urlRefusal("http://localhost/", true)).toBeUndefined();
+    expect(checkUrl("http://127.0.0.1:8080/", true)).toEqual({ ok: true, value: "http://127.0.0.1:8080/" });
+    expect(checkUrl("http://localhost/", true).ok).toBe(true);
   });
 
   it("refuses other schemes even when private hosts are allowed", () => {
-    expect(urlRefusal("file:///etc/passwd", true)).toContain("only http and https");
+    expect(checkUrl("file:///etc/passwd", true).ok).toBe(false);
+  });
+
+  it("returns the url as the parser normalizes it", () => {
+    expect(checkUrl("HTTPS://Shop.Example:443/a b?q=1#x", false)).toEqual({
+      ok: true,
+      value: "https://shop.example/a%20b?q=1#x",
+    });
   });
 });

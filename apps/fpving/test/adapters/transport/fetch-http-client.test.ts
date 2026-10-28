@@ -116,6 +116,12 @@ describe("Plain HTTP access for plugins", () => {
     expect(fetched).toBe(false);
   });
 
+  it("fetches the normalized url, not the plugin's raw string", async () => {
+    const { client, requests } = recording(() => Promise.resolve(new Response("")));
+    await client.get("HTTPS://Shop.Example:443/a b");
+    expect(requests[0]?.url).toBe("https://shop.example/a%20b");
+  });
+
   it("explains why a url was refused", async () => {
     const { client } = recording(() => Promise.resolve(new Response("")));
     const result = await client.get("file:///etc/passwd");
@@ -173,7 +179,7 @@ describe("Plain HTTP access for plugins", () => {
       limiter,
       userAgent: USER_AGENT,
     });
-    await client.get("https://shop.example/a");
+    await client.get("HTTPS://Shop.Example/a");
     expect(seen).toEqual(["https://shop.example/a"]);
   });
 });

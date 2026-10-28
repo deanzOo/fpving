@@ -266,6 +266,13 @@ describe("Rendering pages in the host browser", () => {
     expect(launches()).toBe(0);
   });
 
+  it("loads the normalized url and limits on it, not the plugin's raw string", async () => {
+    const { driver, gotos, seen } = harness();
+    await driver.fetchPage("HTTPS://Shop.Example:443/a b");
+    expect(gotos[0]?.url).toBe("https://shop.example/a%20b");
+    expect(seen).toEqual(["https://shop.example/a%20b"]);
+  });
+
   it("loads a private host only when private hosts are allowed", async () => {
     const { driver } = harness();
     expect(await driver.fetchPage("http://127.0.0.1:8080/")).toMatchObject({ ok: true });
