@@ -1,6 +1,8 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { parseEnv as parseDotenv } from "node:util";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseEnv } from "../apps/fpving/src/config/env.ts";
 import { fnv1a, initWorktree, portFor, renderEnv } from "./worktree-init.ts";
@@ -101,5 +103,24 @@ describe("Worktree init", () => {
   it("reports a missing .env.example instead of writing anything", async () => {
     await rm(join(root, ".env.example"));
     await expect(initWorktree(root)).rejects.toThrow(/\.env\.example/);
+  });
+});
+
+describe("The committed .env.example", () => {
+  const example = async (): Promise<string> =>
+    readFile(fileURLToPath(new URL("../.env.example", import.meta.url)), "utf8");
+
+  it("fails validation when copied by hand, because DATA_DIR is left empty", async () => {
+    const parsed = parseEnv(parseDotenv(await example()));
+    expect(parsed).toMatchObject({
+      ok: false,
+      error: { issues: [{ variable: "DATA_DIR", message: "must not be empty" }] },
+    });
+  });
+
+  it("passes validation once worktree:init has filled it in", async () => {
+    const dataDir = "/w/adapters/.data/adapters";
+    const rendered = renderEnv(await example(), { port: 4123, dataDir });
+    expect(parseEnv(parseDotenv(rendered))).toMatchObject({ ok: true, value: { DATA_DIR: dataDir } });
   });
 });
