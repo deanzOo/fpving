@@ -10,6 +10,7 @@ import { createDomainLimiter } from "../../src/adapters/transport/domain-limiter
 import { createFetchHttpClient } from "../../src/adapters/transport/fetch-http-client.ts";
 import { createUserAgent, readAppVersion } from "../../src/adapters/transport/user-agent.ts";
 import { PLUGINS_FILE, readPluginsConfig, readTextFile } from "../../src/plugins/config.ts";
+import type { PluginEntry } from "../../src/plugins/config.ts";
 import { startPluginHost } from "../../src/plugins/runtime/host.ts";
 import type { PluginHost } from "../../src/plugins/runtime/host.ts";
 import { createPluginStoreGateway } from "../../src/plugins/store-gateway.ts";
@@ -42,13 +43,14 @@ export interface FixtureGateway {
 }
 
 /**
- * Writes a `plugins.json` listing the fixture plugin and the `capabilities` fixture into a temp `DATA_DIR`, starts
- * the host on it with the real HTTP client against a fresh local server, and builds the gateway with a file debug sink.
+ * Writes a `plugins.json` listing the fixture plugin, the `capabilities` fixture and `extra` into a temp `DATA_DIR`,
+ * starts the host on it with the real HTTP client against a fresh local server, and builds the gateway with a file
+ * debug sink.
  */
-export const startFixtureGateway = async (): Promise<FixtureGateway> => {
+export const startFixtureGateway = async (extra: readonly PluginEntry[] = []): Promise<FixtureGateway> => {
   const server = await startLocalServer();
   const dataDir = await mkdtemp(join(tmpdir(), "fpving-gateway-"));
-  const entries = [{ path: FIXTURE_PLUGIN_DIR }, fixturePlugin("capabilities")];
+  const entries = [{ path: FIXTURE_PLUGIN_DIR }, fixturePlugin("capabilities"), ...extra];
   await writeFile(join(dataDir, PLUGINS_FILE), JSON.stringify(entries));
   const config = await readPluginsConfig(dataDir, readTextFile);
   if (!config.ok) {

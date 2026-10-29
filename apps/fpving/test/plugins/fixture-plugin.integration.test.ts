@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pluginIdSchema } from "@fpving/core";
 import { describeStoreGatewayContract } from "@fpving/core/testing";
 import { err, ok, StoreErrorKind } from "@fpving/plugin-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -7,14 +8,34 @@ import { PluginStatusKind } from "../../src/plugins/status.ts";
 import { CAPABLE_SHOP, FIXTURE_SHOP, startFixtureGateway } from "../support/fixture-gateway.ts";
 import type { FixtureGateway } from "../support/fixture-gateway.ts";
 import { FIXTURE_BROKEN_HTML, FixturePath } from "../support/local-server.ts";
+import { fixturePlugin } from "../support/plugin-workers.ts";
+
+const CRASHING_SHOP = pluginIdSchema.parse("crashing-shop");
+const CRASHING_URL = "https://crashing.example/p/1";
+
+const crashTwice = async (fixture: FixtureGateway): Promise<void> => {
+  const disabled = new Promise<void>((resolve) => {
+    fixture.host.subscribe((plugins) => {
+      if (plugins.some(({ manifest, status }) =>
+        manifest?.id === CRASHING_SHOP && status.kind === PluginStatusKind.Disabled)) {
+        resolve();
+      }
+    });
+  });
+  await fixture.gateway.fetchListing(CRASHING_SHOP, CRASHING_URL);
+  await fixture.gateway.fetchListing(CRASHING_SHOP, CRASHING_URL);
+  await disabled;
+};
 
 describeStoreGatewayContract(async () => {
-  const started = await startFixtureGateway();
+  const started = await startFixtureGateway([fixturePlugin("crashes")]);
+  await crashTwice(started);
   return {
     gateway: started.gateway,
     listingUrl: `${started.server.origin}${FixturePath.Product}`,
     searchablePlugin: FIXTURE_SHOP,
     fetchOnlyPlugin: CAPABLE_SHOP,
+    disabledPlugin: CRASHING_SHOP,
     close: async () => started.close(),
   };
 });

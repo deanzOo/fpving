@@ -9,12 +9,14 @@ interface FakePlugin {
   listing: StoreResult<FetchedListing>;
   byUrl?: Record<string, StoreResult<FetchedListing>>;
   search?: StoreResult<SearchCandidate[]>;
+  disabled?: true;
 }
 
 /**
  * A {@link StoreGateway} over scripted plugins that records every fetched url and every search. A fetch answers the
  * plugin's `byUrl` entry for the url, else its `listing`; both are read at call time, so tests can change them. An
- * unknown plugin, or a search through one without `search`, answers a `network` error.
+ * unknown or `disabled` plugin, or a search through one without `search`, answers a `network` error. A disabled plugin
+ * keeps its domains, as a crashed one does in the real gateway.
  */
 export const fakeStoreGateway = (
   plugins: FakePlugin[],
@@ -23,7 +25,8 @@ export const fakeStoreGateway = (
   const fetched: string[] = [];
   const searched: { pluginId: PluginId; query: SearchQuery }[] = [];
   const missing = (id: PluginId) => err({ kind: StoreErrorKind.Network, detail: `plugin ${id} cannot answer that` });
-  const plugin = (id: PluginId): FakePlugin | undefined => plugins.find((row) => row.id === id);
+  const plugin = (id: PluginId): FakePlugin | undefined =>
+    plugins.find((row) => row.id === id && row.disabled === undefined);
   return {
     fetched,
     searched,
@@ -39,6 +42,7 @@ export const fakeStoreGateway = (
       searched.push({ pluginId: id, query });
       return Promise.resolve(plugin(id)?.search ?? missing(id));
     },
-    searchablePlugins: () => plugins.filter((row) => row.search !== undefined).map((row) => row.id),
+    searchablePlugins: () =>
+      plugins.filter((row) => row.search !== undefined && row.disabled === undefined).map((row) => row.id),
   };
 };

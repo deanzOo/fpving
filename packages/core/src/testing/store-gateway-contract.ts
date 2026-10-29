@@ -8,6 +8,7 @@ import type { PluginId, StoreGateway } from "../index.js";
 const UNKNOWN_PLUGIN = pluginIdSchema.parse("contract-no-such-plugin");
 const QUERY: SearchQuery = { text: "contract" };
 const UNDECLARED_URL = "https://contract-undeclared.invalid/p";
+const NAMED_HOST = /[a-z]$/u;
 
 /** The gateway a contract run checks, and the plugins it was built with. */
 export interface StoreGatewayContractSubject {
@@ -19,6 +20,8 @@ export interface StoreGatewayContractSubject {
   readonly searchablePlugin: PluginId;
   /** A loaded plugin that does not declare `search`. */
   readonly fetchOnlyPlugin: PluginId;
+  /** A plugin that declares `search` but is disabled, for example after it crashed. */
+  readonly disabledPlugin: PluginId;
   /** Releases whatever the subject holds, such as plugin workers or a server. */
   close(): Promise<void>;
 }
@@ -69,7 +72,9 @@ export const describeStoreGatewayContract = (makeSubject: () => Promise<StoreGat
     it("resolves a hostname no plugin declares, such as a subdomain of a declared one, to null", () => {
       const { gateway } = subject;
       const declared = gateway.declaredDomains();
-      const subdomains = declared.map((domain) => `contract-sub.${domain}`).filter((host) => !declared.includes(host));
+      const subdomains = declared.filter((domain) => NAMED_HOST.test(domain)).map((domain) => `contract-sub.${domain}`)
+        .filter((host) => !declared.includes(host));
+      expect(subdomains.length).toBeGreaterThan(0);
       expect(subdomains.map((host) => gateway.pluginFor(`https://${host}/p`))).toEqual(subdomains.map(() => null));
       expect(gateway.pluginFor(UNDECLARED_URL)).toBeNull();
     });
@@ -86,6 +91,7 @@ export const describeStoreGatewayContract = (makeSubject: () => Promise<StoreGat
       expect(new Set(searchable).size).toBe(searchable.length);
       expect(searchable).toContain(subject.searchablePlugin);
       expect(searchable).not.toContain(subject.fetchOnlyPlugin);
+      expect(searchable).not.toContain(subject.disabledPlugin);
       expect(searchable).not.toContain(UNKNOWN_PLUGIN);
       expect(owners()).toEqual(expect.arrayContaining([...searchable]));
     });
@@ -99,6 +105,12 @@ export const describeStoreGatewayContract = (makeSubject: () => Promise<StoreGat
       const { gateway, listingUrl } = subject;
       expect(failed.safeParse(await gateway.fetchListing(UNKNOWN_PLUGIN, listingUrl)).success).toBe(true);
       expect(failed.safeParse(await gateway.search(UNKNOWN_PLUGIN, QUERY)).success).toBe(true);
+    });
+
+    it("answers a fetch or search through a disabled plugin with a typed error, not a rejection", async () => {
+      const { gateway, listingUrl, disabledPlugin } = subject;
+      expect(failed.safeParse(await gateway.fetchListing(disabledPlugin, listingUrl)).success).toBe(true);
+      expect(failed.safeParse(await gateway.search(disabledPlugin, QUERY)).success).toBe(true);
     });
 
     it("answers a search through a plugin that cannot search with a typed error, not a rejection", async () => {
