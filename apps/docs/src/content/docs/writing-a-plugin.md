@@ -57,7 +57,7 @@ Store methods never throw for expected failures. They resolve to `err({ kind, de
 
 `ctx` is a `PluginContext`:
 
-- `http.get(url, options?)` takes an absolute http(s) URL string and resolves to `{ status, body, headers }` or a `TransportError`.
+- `http.get(url, options?)` takes an absolute http(s) URL string and resolves to `{ status, body, headers }` or a `TransportError`. Redirects are always followed. `authorization`, `proxy-authorization` and `cookie` are dropped once a redirect leaves the origin, but any other header you set, such as `x-api-key`, goes to the redirect target too, and you cannot prevent that, so never put a secret in a custom header.
 - `browser.fetchPage(url)` renders a page and resolves to `{ status, html, finalUrl }`, where `finalUrl` is the URL string after redirects, or a `TransportError`.
 - `logger` has `debug`, `info`, `warn` and `error(message, fields?)`. Never log secrets, cookies or page bodies.
 - `clock.now()` is the current time.
