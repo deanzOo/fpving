@@ -9,6 +9,36 @@ export const FIXTURE_HTML = [
   "</script></body></html>",
 ].join("");
 
+/** A product page the fixture plugin reads: title, price in minor units and stock. */
+export const FIXTURE_PRODUCT_HTML = [
+  "<!doctype html><html><body><h1 class=\"title\">Fixture Frame</h1>",
+  "<p class=\"price\" data-amount-minor=\"1999\" data-currency=\"USD\">$19.99</p><p>In stock</p></body></html>",
+].join("");
+
+/** A product page without a price, which the fixture plugin cannot parse. */
+export const FIXTURE_BROKEN_HTML = [
+  "<!doctype html><html><body>",
+  "<h1 class=\"title\">Fixture Frame</h1></body></html>",
+].join("");
+
+const FIXTURE_SEARCH_HTML = [
+  "<!doctype html><html><body><a class=\"result\" href=\"/fixture/product\">Fixture Frame</a>",
+  "<a class=\"result\" href=\"/fixture/broken\">Fixture Frame v2</a></body></html>",
+].join("");
+
+/** The static pages the fixture plugin reads, by path. They never echo anything from the request. */
+export const FixturePath = {
+  Product: "/fixture/product",
+  Broken: "/fixture/broken",
+  Search: "/fixture/search",
+} as const;
+
+const FIXTURE_PAGES: Readonly<Record<string, string>> = {
+  [FixturePath.Product]: FIXTURE_PRODUCT_HTML,
+  [FixturePath.Broken]: FIXTURE_BROKEN_HTML,
+  [FixturePath.Search]: FIXTURE_SEARCH_HTML,
+};
+
 export const NOT_FOUND = 404;
 export const FOUND = 302;
 const OK = 200;
@@ -35,6 +65,12 @@ const POPUP_TARGET_HTML = "<!doctype html><html><body>popup</body></html>";
 
 const respond = (request: IncomingMessage, response: ServerResponse, target: string): void => {
   const url = new URL(request.url ?? "/", "http://fixture");
+  const fixturePage = FIXTURE_PAGES[url.pathname];
+  if (fixturePage !== undefined) {
+    response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
+    response.end(fixturePage);
+    return;
+  }
   switch (url.pathname) {
     case "/leaky":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
@@ -90,10 +126,11 @@ export interface LocalServerOptions {
 }
 
 /**
- * Serves the fixture page, a page that opens a popup with `window.open`, a redirect to it, a user agent echo, a 404,
- * a request that never answers, a page whose subresources load from `options.target`, a page that opens a WebSocket
- * to `options.target` and reports `/socket-done`
- * once it closes, and a redirect to `options.target`. WebSocket upgrades are logged as `upgrade <path>` and refused.
+ * Serves the fixture page, the fixture plugin's product, unparseable product and search pages, a page that opens a
+ * popup with `window.open`, a redirect to it, a user agent echo, a 404, a request that never answers, a page whose
+ * subresources load from `options.target`, a page that opens a WebSocket to `options.target` and reports
+ * `/socket-done` once it closes, and a redirect to `options.target`. WebSocket upgrades are logged as
+ * `upgrade <path>` and refused.
  */
 export const startLocalServer = async (options: LocalServerOptions = {}): Promise<LocalServer> => {
   const requests: string[] = [];

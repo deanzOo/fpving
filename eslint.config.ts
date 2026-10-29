@@ -19,6 +19,7 @@ export default defineConfig(
       "apps/docs/src/content.config.ts",
       "tests/tooling/fixtures/**",
       "apps/fpving/test/fixtures/plugins/**",
+      "apps/fpving/test/fixture-plugin/**",
     ],
   },
   js.configs.recommended,
