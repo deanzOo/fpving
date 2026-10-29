@@ -3,7 +3,7 @@ import { err, ok, StoreErrorKind } from "@fpving/plugin-sdk";
 import type { PluginManifest } from "@fpving/plugin-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startPluginHost } from "../../../src/plugins/runtime/host.ts";
-import type { PluginHostOptions, PluginState } from "../../../src/plugins/runtime/host.ts";
+import type { PluginHost, PluginHostOptions, PluginState } from "../../../src/plugins/runtime/host.ts";
 import { MessageType } from "../../../src/plugins/runtime/protocol.ts";
 import type { WorkerData } from "../../../src/plugins/runtime/protocol.ts";
 import { PluginIssueKind, PluginStatusKind } from "../../../src/plugins/status.ts";
@@ -75,6 +75,13 @@ const both = {
 const lastCallId = (worker: FakeWorker | undefined): number => {
   const message = worker?.received.findLast(({ type }) => type === MessageType.Call);
   return message?.type === MessageType.Call ? message.id : -1;
+};
+
+const expectCallRefusedAfterRestart = async (host: PluginHost, first: FakeWorker | undefined): Promise<void> => {
+  first?.emit("exit", 1);
+  const waiting = host.fetchListing(SHOP, URL_1);
+  await flush();
+  expect(await waiting).toEqual(err({ kind: StoreErrorKind.Network, detail: "the plugin example-shop is not loaded" }));
 };
 
 const statusesOf = (plugins: readonly PluginState[]) => plugins.map(({ manifest, status }) => ({
@@ -307,12 +314,7 @@ describe("Plugin host restarts", () => {
         });
       }],
     });
-    workerFor(SHOP_ENTRY.path)?.emit("exit", 1);
-    const waiting = host.fetchListing(SHOP, URL_1);
-    await flush();
-    expect(await waiting).toEqual(
-      err({ kind: StoreErrorKind.Network, detail: "the plugin example-shop is not loaded" }),
-    );
+    await expectCallRefusedAfterRestart(host, workerFor(SHOP_ENTRY.path));
     expect(host.plugins()[0]?.status).toEqual({
       kind: PluginStatusKind.Disabled,
       reason: {
@@ -327,12 +329,7 @@ describe("Plugin host restarts with a changed plugin", () => {
   it("disables a plugin whose restarted worker reports a different manifest instead of routing to it", async () => {
     const changed = { ...MANIFEST, version: "2.0.0" };
     const { host, workerFor } = await start({ ...both, [SHOP_ENTRY.path]: [readyWith(MANIFEST), readyWith(changed)] });
-    workerFor(SHOP_ENTRY.path)?.emit("exit", 1);
-    const waiting = host.fetchListing(SHOP, URL_1);
-    await flush();
-    expect(await waiting).toEqual(
-      err({ kind: StoreErrorKind.Network, detail: "the plugin example-shop is not loaded" }),
-    );
+    await expectCallRefusedAfterRestart(host, workerFor(SHOP_ENTRY.path));
     expect(workerFor(SHOP_ENTRY.path, 1)?.received).toEqual([]);
     expect(workerFor(SHOP_ENTRY.path, 1)?.terminations()).toBe(1);
     expect(host.plugins()[0]?.status).toEqual({
