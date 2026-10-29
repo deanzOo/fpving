@@ -3,10 +3,12 @@ export const PluginIssueKind = {
   ConfigInvalid: "config_invalid",
   EntryInvalid: "entry_invalid",
   DuplicateEntry: "duplicate_entry",
+  LoadFailed: "load_failed",
   ManifestInvalid: "manifest_invalid",
   SdkIncompatible: "sdk_incompatible",
   DuplicateId: "duplicate_id",
   DomainConflict: "domain_conflict",
+  Crashed: "crashed",
 } as const;
 
 export type PluginIssueKind = (typeof PluginIssueKind)[keyof typeof PluginIssueKind];
