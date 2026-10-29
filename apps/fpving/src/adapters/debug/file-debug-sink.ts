@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { err, ok, PortErrorKind, pluginIdSchema } from "@fpving/core";
 import type { Clock, DebugSink, DebugWriteFailed } from "@fpving/core";
 import type { Result } from "@fpving/plugin-sdk";
+import { MAX_BODY_BYTES } from "../transport/fetch-http-client.js";
 
-/** The largest page the sink saves, five megabytes of UTF-8; a larger one is refused, not truncated. */
-export const MAX_DEBUG_PAGE_BYTES = 5_242_880;
+/** The largest page the sink saves, the HTTP client's body cap, in UTF-8 bytes; a larger one is refused. */
+export const MAX_DEBUG_PAGE_BYTES = MAX_BODY_BYTES;
 
 /** Why the sink refused a page before touching the file system. */
 export const DebugSinkRefusal = {
