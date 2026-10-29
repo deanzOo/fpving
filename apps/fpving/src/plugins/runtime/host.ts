@@ -4,6 +4,7 @@ import type { PluginId } from "@fpving/core";
 import {
   err,
   fetchedListingSchema,
+  PluginCapability,
   SDK_VERSION,
   searchCandidateSchema,
   StoreErrorKind,
@@ -37,6 +38,8 @@ const LOAD_TIMEOUT_MS = 30_000;
 
 const MAX_WORKER_FAILURES = 2;
 const SHUT_DOWN = "the plugin host is shut down";
+const STARTUP_FAILURE = "the plugin worker failed while the plugins were starting: ";
+const CHANGED_MANIFEST = "the restarted plugin reported a different manifest than it loaded with";
 const INVALID_OUTPUT = "invalid plugin output";
 
 /** The built worker entry, next to this module in `dist`. */
@@ -89,7 +92,14 @@ interface Slot {
   connection: Connection;
   current: Promise<Connection | null>;
   failures: number;
+  startupFailure: string | null;
 }
+
+type RoutedSlot = Slot & {
+  readonly id: PluginId;
+  readonly domains: PluginManifest["domains"];
+  readonly searchable: boolean;
+};
 
 const network = (detail: string): StoreResult<never> => err({ kind: StoreErrorKind.Network, detail });
 
@@ -113,6 +123,7 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
   const spawn = options.spawn ?? spawnWorker(WORKER_ENTRY);
   const listeners = new Set<(plugins: readonly PluginState[]) => void>();
   let closed = false;
+  let started = false;
   const isClosed = (): boolean => closed;
 
   const plugins = (): readonly PluginState[] =>
@@ -121,14 +132,14 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
   const disable = (slot: Slot, reason: PluginIssue): void => {
     slot.status = { kind: PluginStatusKind.Disabled, reason };
     void slot.connection.stop();
-  };
-
-  const crash = (slot: Slot, detail: string): void => {
-    disable(slot, { kind: PluginIssueKind.Crashed, detail: `the plugin worker failed twice this session: ${detail}` });
     const snapshot = plugins();
     listeners.forEach((listener) => {
       listener(snapshot);
     });
+  };
+
+  const crash = (slot: Slot, detail: string): void => {
+    disable(slot, { kind: PluginIssueKind.Crashed, detail: `the plugin worker failed twice this session: ${detail}` });
   };
 
   const open = (entry: PluginEntry, onFailure: (detail: string, pluginId: string) => void): Connection => connect({
@@ -141,6 +152,10 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
   });
 
   const restart = (slot: Slot, detail: string, pluginId: string): void => {
+    if (!started) {
+      slot.startupFailure = detail;
+      return;
+    }
     slot.failures += 1;
     if (slot.failures >= MAX_WORKER_FAILURES) {
       crash(slot, detail);
@@ -152,10 +167,12 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
     });
     slot.connection = next;
     slot.current = next.loaded.then((outcome) => {
-      if (outcome.ok) {
+      if (outcome.ok && JSON.stringify(outcome.value) === JSON.stringify(slot.manifest)) {
         return next;
       }
-      if (!closed) {
+      if (outcome.ok) {
+        disable(slot, { kind: PluginIssueKind.ManifestInvalid, detail: CHANGED_MANIFEST });
+      } else if (!closed) {
         crash(slot, outcome.error.detail);
       }
       return null;
@@ -172,12 +189,13 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
       }),
       current: Promise.resolve(null),
       failures: 0,
+      startupFailure: null,
     };
     slot.current = Promise.resolve(slot.connection);
     return slot;
   });
 
-  const compatible: (Slot & { readonly id: PluginId; readonly domains: PluginManifest["domains"] })[] = [];
+  const candidates: RoutedSlot[] = [];
   for (const slot of slots) {
     const loaded = await slot.connection.loaded;
     if (!loaded.ok) {
@@ -190,11 +208,18 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
       disable(slot, compatibility.error);
       continue;
     }
-    const { id, domains } = loaded.value;
-    compatible.push(Object.assign(slot, { id: pluginIdSchema.parse(id), domains }));
+    const { id, domains, capabilities } = loaded.value;
+    const searchable = capabilities.includes(PluginCapability.Search);
+    candidates.push(Object.assign(slot, { id: pluginIdSchema.parse(id), domains, searchable }));
   }
+  const compatible = candidates.filter((slot) => {
+    if (slot.startupFailure !== null) {
+      disable(slot, { kind: PluginIssueKind.Crashed, detail: `${STARTUP_FAILURE}${slot.startupFailure}` });
+    }
+    return slot.startupFailure === null;
+  });
   const { registry, statuses } = buildDomainRegistry(compatible);
-  const routes = new Map<PluginId, Slot>();
+  const routes = new Map<PluginId, RoutedSlot>();
   for (const { plugin, status } of statuses) {
     plugin.status = status;
     if (status.kind === PluginStatusKind.Disabled) {
@@ -203,6 +228,7 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
       routes.set(plugin.id, plugin);
     }
   }
+  started = true;
 
   const call = async (pluginId: PluginId, request: CallRequest): Promise<StoreResult<unknown>> => {
     const slot = routes.get(pluginId);
@@ -227,8 +253,9 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
     },
     fetchListing: async (pluginId, url) =>
       parseOutput(fetchedListingSchema, await call(pluginId, { method: CallMethod.FetchListing, url })),
-    search: async (pluginId, query) =>
-      parseOutput(searchCandidateSchema.array(), await call(pluginId, { method: CallMethod.Search, query })),
+    search: async (pluginId, query) => routes.get(pluginId)?.searchable === false
+      ? network(`the plugin ${pluginId} does not declare search`)
+      : parseOutput(searchCandidateSchema.array(), await call(pluginId, { method: CallMethod.Search, query })),
     shutdown: async () => {
       closed = true;
       await Promise.all(slots.map(({ connection }) => connection.stop()));

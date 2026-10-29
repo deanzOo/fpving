@@ -36,11 +36,11 @@ const readyWith = (manifest: PluginManifest): Script => (worker) => {
 
 const entryKey = (data: WorkerData): string => ("path" in data.entry ? data.entry.path : data.entry.package);
 
-const start = async (scripts: Readonly<Record<string, Script[]>>, overrides: Partial<PluginHostOptions> = {}) => {
+const begin = (scripts: Readonly<Record<string, Script[]>>, overrides: Partial<PluginHostOptions> = {}) => {
   const workers: FakeWorker[] = [];
   const spawned = new Map<string, number>();
   const { services, mocks } = fakeServices();
-  const host = await startPluginHost({
+  const starting = startPluginHost({
     entries: [SHOP_ENTRY, OTHER_ENTRY],
     services,
     shipTo: "IL",
@@ -59,7 +59,12 @@ const start = async (scripts: Readonly<Record<string, Script[]>>, overrides: Par
   });
   const workerFor = (key: string, generation = 0): FakeWorker | undefined =>
     workers.filter((worker) => entryKey(worker.data) === key)[generation];
-  return { host, workers, workerFor, mocks };
+  return { starting, workers, workerFor, mocks };
+};
+
+const start = async (scripts: Readonly<Record<string, Script[]>>, overrides: Partial<PluginHostOptions> = {}) => {
+  const { starting, ...rest } = begin(scripts, overrides);
+  return { host: await starting, ...rest };
 };
 
 const both = {
@@ -142,6 +147,47 @@ describe("Plugin host loading", () => {
   });
 });
 
+describe("Plugin host startup failures", () => {
+  it("reports a plugin whose worker fails before all plugins reported as crashed, and never routes it", async () => {
+    const { starting, workerFor } = begin({
+      [OTHER_ENTRY.package]: [readyWith(OTHER_MANIFEST), readyWith(OTHER_MANIFEST)],
+    });
+    await flush();
+    workerFor(OTHER_ENTRY.package)?.emit("exit", 1);
+    await flush();
+    workerFor(OTHER_ENTRY.package, 1)?.emit("exit", 1);
+    workerFor(SHOP_ENTRY.path)?.ready();
+    const host = await starting;
+    expect(host.plugins()[1]?.status).toEqual({
+      kind: PluginStatusKind.Disabled,
+      reason: {
+        kind: PluginIssueKind.Crashed,
+        detail: "the plugin worker failed while the plugins were starting: the plugin worker exited with code 1",
+      },
+    });
+    expect(workerFor(OTHER_ENTRY.package, 1)).toBeUndefined();
+    expect(host.registry.declaredDomains()).toEqual(["shop.example.com"]);
+    expect(await host.search(OTHER, { text: "x" })).toEqual(
+      err({ kind: StoreErrorKind.Network, detail: "the plugin other-shop is not loaded" }),
+    );
+  });
+
+  it("keeps an sdk_incompatible reason when that plugin's worker also fails during startup", async () => {
+    const future = { ...OTHER_MANIFEST, sdkVersion: ">=9.0.0 <10.0.0" };
+    const { starting, workerFor } = begin({ [OTHER_ENTRY.package]: [readyWith(future)] });
+    await flush();
+    workerFor(OTHER_ENTRY.package)?.emit("exit", 1);
+    await flush();
+    workerFor(SHOP_ENTRY.path)?.ready();
+    const host = await starting;
+    await flush();
+    expect(host.plugins()[1]?.status).toMatchObject({
+      kind: PluginStatusKind.Disabled,
+      reason: { kind: PluginIssueKind.SdkIncompatible },
+    });
+  });
+});
+
 describe("Plugin host calls", () => {
   it("returns a listing the plugin produced once it passes the SDK schema", async () => {
     const { host, workerFor } = await start(both);
@@ -186,6 +232,15 @@ describe("Plugin host calls", () => {
     await flush();
     workerFor(SHOP_ENTRY.path)?.answer(0, output);
     expect(await result).toEqual(err({ kind: StoreErrorKind.ParseFailed, detail: "invalid plugin output" }));
+  });
+
+  it("refuses search, without asking the worker, for a plugin whose manifest does not declare it", async () => {
+    const fetchOnly = { ...MANIFEST, capabilities: ["fetchListing"] } satisfies PluginManifest;
+    const { host, workerFor } = await start({ ...both, [SHOP_ENTRY.path]: [readyWith(fetchOnly)] });
+    expect(await host.search(SHOP, { text: "x" })).toEqual(
+      err({ kind: StoreErrorKind.Network, detail: "the plugin example-shop does not declare search" }),
+    );
+    expect(workerFor(SHOP_ENTRY.path)?.received).toEqual([]);
   });
 
   it("refuses a call to a plugin it never loaded", async () => {
@@ -263,6 +318,28 @@ describe("Plugin host restarts", () => {
       reason: {
         kind: PluginIssueKind.Crashed,
         detail: "the plugin worker failed twice this session: the plugin worker exited with code 1",
+      },
+    });
+  });
+});
+
+describe("Plugin host restarts with a changed plugin", () => {
+  it("disables a plugin whose restarted worker reports a different manifest instead of routing to it", async () => {
+    const changed = { ...MANIFEST, version: "2.0.0" };
+    const { host, workerFor } = await start({ ...both, [SHOP_ENTRY.path]: [readyWith(MANIFEST), readyWith(changed)] });
+    workerFor(SHOP_ENTRY.path)?.emit("exit", 1);
+    const waiting = host.fetchListing(SHOP, URL_1);
+    await flush();
+    expect(await waiting).toEqual(
+      err({ kind: StoreErrorKind.Network, detail: "the plugin example-shop is not loaded" }),
+    );
+    expect(workerFor(SHOP_ENTRY.path, 1)?.received).toEqual([]);
+    expect(workerFor(SHOP_ENTRY.path, 1)?.terminations()).toBe(1);
+    expect(host.plugins()[0]?.status).toEqual({
+      kind: PluginStatusKind.Disabled,
+      reason: {
+        kind: PluginIssueKind.ManifestInvalid,
+        detail: "the restarted plugin reported a different manifest than it loaded with",
       },
     });
   });
