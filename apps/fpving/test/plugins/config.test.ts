@@ -58,7 +58,7 @@ describe("Plugin list config", () => {
     [{ package: OVERLONG_NPM_NAME }, /^package: must be an npm package name$/u],
     [{ path: PLUGIN_DIR, package: "fpving-plugin-example" }, /package/u],
     [{ name: "example" }, /^package: .*name/u],
-    ["fpving-plugin-example", /./u],
+    ["fpving-plugin-example", /object/u],
   ])("disables only the invalid entry %j, with the reason", (bad, detail) => {
     const parsed = parse([{ path: PLUGIN_DIR }, bad]);
     expect(parsed.ok && parsed.value.entries).toEqual([{ path: PLUGIN_DIR }]);
