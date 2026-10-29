@@ -46,12 +46,12 @@ Store methods never throw for expected failures. They resolve to `err({ kind, de
 | --------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `not_found`           | The product page is gone, for example HTTP 404.                                                                     |
 | `blocked`             | A captcha or bot wall.                                                                                              |
-| `parse_failed`        | The page loaded but could not be read. Attach the page as `rawPage`; the host will save it as a ready-made fixture. |
+| `parse_failed`        | The page loaded but could not be read. Attach the page as `rawPage`; the host saves it as a ready-made fixture.     |
 | `timeout`             | The host HTTP client or browser timed out.                                                                          |
 | `network`             | Any other transport failure.                                                                                        |
 | `unsupported_ship_to` | The store does not ship to `ctx.shipTo`.                                                                            |
 
-`rawPage` exists only on `parse_failed`.
+`rawPage` exists only on `parse_failed`. The host saves it to `DATA_DIR/debug/<plugin id>/<time>-<hash>.html`, where the hash is a SHA-256 prefix of the URL; a page over five megabytes is not saved. The result your store returned still reaches core unchanged.
 
 ## Host-provided context
 
@@ -127,7 +127,8 @@ At run time:
 
 - `http.get` and `browser.fetchPage` are served by the host, so its rate limits, timeouts and URL policy apply. `logger` calls are written to the host log with your `pluginId` added. `clock.now()` is the worker's own clock.
 - A store method that throws or rejects, or resolves to something that cannot be structured-cloned, gives `parse_failed`.
-- A call has two minutes. When it runs out the call resolves to `timeout` and the worker is terminated, and so is a worker that throws an uncaught error or exits; other open calls on it get `network`. The worker is restarted once; a second failure disables the plugin as `crashed` until the app restarts. A failure before every plugin has loaded disables it straight away. If the restarted worker reports a different manifest, because the plugin changed on disk, the plugin is disabled as `manifest_invalid` until the app restarts. The host never calls `search` on a plugin whose manifest does not declare it. A busy loop is stopped the same way.
+- A call has two minutes. When it runs out the call resolves to `timeout` and the worker is terminated, and so is a worker that throws an uncaught error or exits; other open calls on it get `network`. The worker is restarted once; a second failure disables the plugin as `crashed` until the app restarts. A failure before every plugin has loaded disables it straight away. If the restarted worker reports a different manifest, because the plugin changed on disk, the plugin is disabled as `manifest_invalid` until the app restarts. The host never calls `search` on a plugin whose manifest does not declare it, and lists only loaded plugins that declare it as searchable. A busy loop is stopped the same way.
+- A disabled plugin keeps its domains for the session, so a link to its store still names it, but every call to it resolves to `network` with the detail `the plugin is not loaded` without reaching a worker.
 
 ## Contract test kit
 
