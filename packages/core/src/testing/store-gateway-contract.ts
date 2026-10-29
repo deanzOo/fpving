@@ -10,7 +10,10 @@ const QUERY: SearchQuery = { text: "contract" };
 const UNDECLARED_URL = "https://contract-undeclared.invalid/p";
 const NAMED_HOST = /[a-z]$/u;
 
-/** The gateway a contract run checks, and the plugins it was built with. */
+/**
+ * The gateway a contract run checks, and the plugins it was built with. At least one declared domain must be a
+ * hostname rather than an IP literal, because the subdomain check needs one.
+ */
 export interface StoreGatewayContractSubject {
   /** The gateway under test. */
   readonly gateway: StoreGateway;
