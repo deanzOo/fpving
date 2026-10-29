@@ -2,10 +2,12 @@ import { z } from "zod";
 import { isSemverRange, isSemverVersion } from "./semver.js";
 
 /**
- * What a store plugin can do. The host only calls a capability the manifest declares.
+ * What a store plugin can do. The host calls `search` only on a plugin whose manifest declares it, and lists only those
+ * plugins as searchable.
  *
  * @remarks
- * - `fetchListing`: fetch one product page and return its price, shipping and stock. Every store implements it.
+ * - `fetchListing`: fetch one product page and return its price, shipping and stock. Every store implements it, and
+ *   the host calls it on every loaded plugin, so declare it.
  * - `search`: search the store for candidate listings; the store must then implement {@link Store.search}.
  * - `shippingToCountry`: prices include shipping to the context's `shipTo` country.
  */
