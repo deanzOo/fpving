@@ -46,3 +46,4 @@ Chromium is installed in the Linux job of the `check` workflow only, and the bro
 - Bad: the browser integration test does not run on macOS or Windows CI, so it covers Chromium on Linux only.
 - Bad: one cookie and storage profile is shared by all stores and plugins, so a site can correlate visits and one plugin's cookies reach another's pages. The profile directory holds session cookies, so treat `DATA_DIR` as sensitive.
 - Bad: the limiter is per process; two fpving processes sharing a profile would not coordinate.
+- Bad: only `authorization`, `proxy-authorization` and `cookie` are dropped on a cross-origin redirect. Any other header a plugin sets, such as `x-api-key`, is still sent to the other origin, as native `fetch` does, so a plugin that puts a secret in a custom header must not follow redirects off its store. The three dropped headers stay dropped for the rest of the chain, even when a later redirect returns to the first origin.
