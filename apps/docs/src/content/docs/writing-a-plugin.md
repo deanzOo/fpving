@@ -4,10 +4,10 @@ description: The plugin contract, the context the host provides, and the contrac
 ---
 
 :::caution[Pre-release]
-The SDK contract below exists in `@fpving/plugin-sdk` and is covered by tests, but nothing is released yet and it may still change. The host that loads plugins, isolates them in worker threads and schedules them is planned, not built.
+The SDK contract below exists in `@fpving/plugin-sdk` and is covered by tests, but nothing is released yet and it may still change. The host loads plugins and isolates them in worker threads; wiring them into scans and the app is planned, not built.
 :::
 
-Plugins are for personal use. Respect each site's terms of service. Plugins are designed to run in worker threads (not built yet) for crash containment, not as a security sandbox: install only plugins you trust.
+Plugins are for personal use. Respect each site's terms of service. Each plugin runs in its own worker thread for crash containment, not as a security sandbox: install only plugins you trust.
 
 ## Contract
 
@@ -34,9 +34,9 @@ A `FetchedListing` is `{ title, itemPrice, shipping, inStock, images }`:
 
 A `SearchCandidate` is `{ url, title, itemPrice? }`, where `url` is an absolute URL string.
 
-The host will parse everything a plugin returns with these schemas (`fetchedListingSchema`, `searchCandidateSchema`, `storeErrorSchema`) before it reaches core.
+The host parses everything a plugin returns with these schemas (`fetchedListingSchema`, `searchCandidateSchema`, `storeErrorSchema`) before it reaches core. Output that fails them becomes `parse_failed` with detail `invalid plugin output`.
 
-Plugins are designed to run in worker threads, so every value crossing the host and plugin boundary is plain data that survives `structuredClone`. URLs are absolute http(s) strings everywhere, never `URL` objects.
+Plugins run in worker threads, so every value crossing the host and plugin boundary is plain data that survives `structuredClone`. URLs are absolute http(s) strings everywhere, never `URL` objects.
 
 ## Errors
 
@@ -116,7 +116,18 @@ Users list plugins in `plugins.json` in the data directory, by absolute folder p
 
 The host then maps each declared domain to its plugin and matches a URL's hostname exactly. A domain that two or more plugins declare goes to none of them, and each of them gets a `domain_conflict` warning naming the others, so the outcome never depends on load order. A plugin left with no domain is disabled. Plugins that share a manifest `id` are all disabled as `duplicate_id` and claim none of their domains; a domain one of them declares still goes to another plugin when that plugin is its only other declarer.
 
-The config, compatibility and domain checks exist. Importing a plugin, validating its manifest at load time and running it in a worker thread are planned; an invalid plugin will be disabled with a reason while the app keeps running.
+Each entry gets its own worker thread, which imports the plugin:
+
+- A folder entry is loaded the way `require(folder)` finds it: the `main` of the folder's `package.json`, else `index.js`. Folder resolution does not read `exports`, so set `main` to your built ESM entry.
+- A package entry is imported by name from the app's own directory, with Node's ESM resolution, so `exports` and its `import` condition apply. See [Configuration](../configuration/#plugins).
+- The plugin is the module's default export when that is an object, as in the example above, else the module itself, so named `manifest` and `createStore` exports work too. Anything else, or a manifest that fails `manifestSchema`, disables the plugin as `manifest_invalid`; a module that cannot be imported, or a `createStore` that throws, as `load_failed`. A plugin has thirty seconds to load.
+- `createStore` is called once per worker. The store must have `fetchListing`, and `search` when the manifest declares it, or the plugin is `manifest_invalid`.
+
+At run time:
+
+- `http.get` and `browser.fetchPage` are served by the host, so its rate limits, timeouts and URL policy apply. `logger` calls are written to the host log with your `pluginId` added. `clock.now()` is the worker's own clock.
+- A store method that throws or rejects, or resolves to something that cannot be structured-cloned, gives `parse_failed`.
+- A call has two minutes. When it runs out the call resolves to `timeout` and the worker is terminated, and so is a worker that throws an uncaught error or exits; other open calls on it get `network`. The worker is restarted once; a second failure disables the plugin as `crashed` until the app restarts. A busy loop is stopped the same way.
 
 ## Contract test kit
 

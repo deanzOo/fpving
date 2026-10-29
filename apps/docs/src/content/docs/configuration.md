@@ -41,8 +41,11 @@ The plugin list is `plugins.json` in `DATA_DIR`. It is a JSON array with one ent
 - A file that cannot be read, is not valid JSON or is not an array disables every plugin with a `config_invalid` reason. The app still runs, with no plugins.
 - Each entry is checked on its own, and a bad one disables only itself with an `entry_invalid` reason. An entry has exactly one key. `path` must be absolute; relative paths are rejected, because they would depend on the directory the app starts from. `package` must be a valid npm package name, scoped or not, at most 214 characters.
 - Folder paths are normalized, so `/a/b/` and `/a/x/../b` are the same folder. A later entry naming the same folder or package as an earlier one is rejected as `duplicate_entry`, and the first one stays.
+- `plugins.json` must be a regular file. A folder or a named pipe in its place is refused as `config_invalid`, so a pipe can never block start-up.
 
-Only reading and checking the list exists so far (`apps/fpving/src/plugins/config.ts`); loading the listed plugins is not built yet. See [Writing a plugin](../writing-a-plugin/) and [ADR 0020](../adr/0020-plugin-list-in-data-dir-plugins-json/).
+A `path` entry loads the folder's `package.json` `main` (or `index.js`). A `package` entry is imported by name from the app's directory (`apps/fpving` in a checkout), with Node's ESM resolution walking up through its `node_modules`, so the package must be installed where the app can resolve it, for example with `pnpm --filter @fpving/app add <package>`. This root is the app's own, not `DATA_DIR/node_modules`, because Node can run its ESM resolution, which honours `exports` and the `import` condition, only from a module's own location. To use a plugin that is installed elsewhere, list its folder with `path`.
+
+The host loads each entry in its own worker thread (`apps/fpving/src/plugins/runtime`); wiring it into the app is not built yet. See [Writing a plugin](../writing-a-plugin/) and [ADR 0020](../adr/0020-plugin-list-in-data-dir-plugins-json/).
 
 ## Secrets
 
