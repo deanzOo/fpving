@@ -26,7 +26,7 @@ const packageEntrySchema = z.strictObject({
   package: z.string().max(MAX_NPM_NAME_LENGTH, NPM_NAME_RULE).regex(NPM_NAME, NPM_NAME_RULE),
 });
 
-type PluginEntry = z.infer<typeof pathEntrySchema> | z.infer<typeof packageEntrySchema>;
+export type PluginEntry = z.infer<typeof pathEntrySchema> | z.infer<typeof packageEntrySchema>;
 
 interface RejectedEntry {
   readonly index: number;
