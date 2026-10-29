@@ -69,7 +69,7 @@ Zod, React, Fastify and dev tooling are not wrapped: they are framework or type-
 
 ## Plugin system
 
-Plugins supply all store support and are designed to run in worker threads. The host will own the browser, HTTP client, rate limits and timeouts. Everything that crosses the host and plugin boundary is plain data that survives `structuredClone`, so URLs are absolute http(s) strings.
+Plugins supply all store support and run in worker threads. The host owns the browser, HTTP client, rate limits and timeouts. Everything that crosses the host and plugin boundary is plain data that survives `structuredClone`, so URLs are absolute http(s) strings.
 
 The main-thread groundwork of the plugin host is in `apps/fpving/src/plugins`, all pure except the file reader. `config.ts` reads `DATA_DIR/plugins.json` through an injected reader and checks each entry on its own. `compatibility.ts` checks a manifest's `sdkVersion` against the SDK's `SDK_VERSION`. `registry.ts` maps declared hostnames to plugin ids with the `declaredDomains` and `pluginFor` semantics of `StoreGateway`: `pluginFor` takes a normalized URL and matches its hostname exactly, and `declaredDomains` lists only the hostnames that resolve to a plugin, so a hostname two plugins declare is in neither. `status.ts` is the status the Plugins screen will show: `loaded`, with any warnings, or `disabled` with a reason (`config_invalid`, `entry_invalid`, `duplicate_entry`, `load_failed`, `manifest_invalid`, `sdk_incompatible`, `duplicate_id`, `domain_conflict` or `crashed`) and a detail.
 

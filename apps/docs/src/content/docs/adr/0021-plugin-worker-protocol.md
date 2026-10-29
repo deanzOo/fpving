@@ -13,7 +13,7 @@ description: How the host and a plugin's worker thread talk, how plugins are imp
 ## Considered options
 
 - Hand the worker its own `HttpClient` and `BrowserDriver`. Rejected: per-host rate limits, the URL policy and the one browser profile must stay in one place.
-- An RPC library over `MessagePort`. Rejected: a new dependency for six message types.
+- An RPC library over `MessagePort`. Rejected: a new dependency for seven message types.
 - Zod-validated messages with request ids, and capability calls forwarded to the host. Chosen.
 
 ## Decision outcome

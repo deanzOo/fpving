@@ -63,7 +63,7 @@ Store methods never throw for expected failures. They resolve to `err({ kind, de
 - `clock.now()` is the current time.
 - `shipTo` is an ISO 3166-1 alpha-2 country code and `currencyPreference` an ISO 4217 code. Report prices in the store's own currency.
 
-A `TransportError` has kind `timeout` or `network`, so a store can return it unchanged. Plugins do not bring their own Playwright or HTTP client. The host will own per-domain rate limits, jitter, timeouts, the browser profile and the user-agent.
+A `TransportError` has kind `timeout` or `network`, so a store can return it unchanged. Plugins do not bring their own Playwright or HTTP client. The host owns per-domain rate limits, jitter, timeouts, the browser profile and the user-agent.
 
 ```ts
 import {
@@ -128,7 +128,7 @@ At run time:
 - `http.get` and `browser.fetchPage` are served by the host, so its rate limits, timeouts and URL policy apply. `logger` calls are written to the host log with your `pluginId` added. `clock.now()` is the worker's own clock.
 - A store method that throws or rejects, or resolves to something that cannot be structured-cloned, gives `parse_failed`.
 - A call has two minutes. When it runs out the call resolves to `timeout` and the worker is terminated, and so is a worker that throws an uncaught error or exits; other open calls on it get `network`. The worker is restarted once; a second failure disables the plugin as `crashed` until the app restarts. A failure before every plugin has loaded disables it straight away. If the restarted worker reports a different manifest, because the plugin changed on disk, the plugin is disabled as `manifest_invalid` until the app restarts. The host never calls `search` on a plugin whose manifest does not declare it, and lists only loaded plugins that declare it as searchable. A busy loop is stopped the same way.
-- A disabled plugin keeps its domains for the session, so a link to its store still names it, but every call to it resolves to `network` with the detail `the plugin is not loaded` without reaching a worker.
+- A plugin disabled after it loaded, for example as `crashed`, keeps its domains for the session, so a link to its store still names it, but every call to it resolves to `network` with the detail `the plugin is not loaded` without reaching a worker. A plugin disabled at startup never enters the domain registry, so its domains resolve to no plugin.
 
 ## Contract test kit
 
