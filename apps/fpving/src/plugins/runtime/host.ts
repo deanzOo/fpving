@@ -131,7 +131,7 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
     });
   };
 
-  const open = (entry: PluginEntry, onFailure: (detail: string) => void): Connection => connect({
+  const open = (entry: PluginEntry, onFailure: (detail: string, pluginId: string) => void): Connection => connect({
     spawn,
     data: { entry, shipTo: options.shipTo, currencyPreference: options.currencyPreference },
     services: options.services,
@@ -140,15 +140,15 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
     onFailure,
   });
 
-  const restart = (slot: Slot, detail: string): void => {
+  const restart = (slot: Slot, detail: string, pluginId: string): void => {
     slot.failures += 1;
     if (slot.failures >= MAX_WORKER_FAILURES) {
       crash(slot, detail);
       return;
     }
-    options.services.logger.warn("restarting a plugin worker", { pluginId: slot.manifest?.id ?? null, detail });
+    options.services.logger.warn("restarting a plugin worker", { pluginId, detail });
     const next = open(slot.entry, (later) => {
-      restart(slot, later);
+      restart(slot, later, pluginId);
     });
     slot.connection = next;
     slot.current = next.loaded.then((outcome) => {
@@ -167,8 +167,8 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
       entry,
       manifest: null,
       status: { kind: PluginStatusKind.Loaded, warnings: [] },
-      connection: open(entry, (detail) => {
-        restart(slot, detail);
+      connection: open(entry, (detail, pluginId) => {
+        restart(slot, detail, pluginId);
       }),
       current: Promise.resolve(null),
       failures: 0,
@@ -180,16 +180,18 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
   const compatible: (Slot & { readonly id: PluginId; readonly domains: PluginManifest["domains"] })[] = [];
   for (const slot of slots) {
     const loaded = await slot.connection.loaded;
-    const compatibility = loaded.ok ? checkSdkCompatibility(loaded.value, SDK_VERSION) : loaded;
-    if (loaded.ok) {
-      slot.manifest = loaded.value;
+    if (!loaded.ok) {
+      disable(slot, loaded.error);
+      continue;
     }
+    slot.manifest = loaded.value;
+    const compatibility = checkSdkCompatibility(loaded.value, SDK_VERSION);
     if (!compatibility.ok) {
       disable(slot, compatibility.error);
-    } else if (loaded.ok) {
-      const { id, domains } = loaded.value;
-      compatible.push(Object.assign(slot, { id: pluginIdSchema.parse(id), domains }));
+      continue;
     }
+    const { id, domains } = loaded.value;
+    compatible.push(Object.assign(slot, { id: pluginIdSchema.parse(id), domains }));
   }
   const { registry, statuses } = buildDomainRegistry(compatible);
   const routes = new Map<PluginId, Slot>();

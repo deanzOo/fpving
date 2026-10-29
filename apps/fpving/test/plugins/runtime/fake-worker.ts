@@ -20,7 +20,19 @@ export const DATA: WorkerData = { entry: { path: "/plugins/example-shop" }, ship
 type WorkerEvent = "message" | "error" | "exit";
 
 /** A scripted stand-in for a `node:worker_threads` Worker. */
-export const fakeWorker = (data: WorkerData = DATA) => {
+export interface FakeWorker {
+  readonly data: WorkerData;
+  readonly handle: ReturnType<SpawnWorker>;
+  readonly received: HostMessage[];
+  terminations(): number;
+  emit(event: WorkerEvent, value: unknown): void;
+  send(message: unknown): void;
+  ready(manifest?: PluginManifest): void;
+  answer(id: number, result: unknown): void;
+}
+
+/** Creates a {@link FakeWorker}. */
+export const fakeWorker = (data: WorkerData = DATA): FakeWorker => {
   const listeners = new Map<WorkerEvent, ((value: unknown) => void)[]>();
   const received: HostMessage[] = [];
   let terminated = 0;
@@ -58,8 +70,6 @@ export const fakeWorker = (data: WorkerData = DATA) => {
     },
   };
 };
-
-export type FakeWorker = ReturnType<typeof fakeWorker>;
 
 interface ServiceMocks {
   readonly debug: Mock<Logger["debug"]>;

@@ -35,7 +35,7 @@ interface ConnectionOptions {
   readonly services: HostServices;
   readonly callTimeoutMs: number;
   readonly loadTimeoutMs: number;
-  readonly onFailure: (detail: string) => void;
+  readonly onFailure: (detail: string, pluginId: string) => void;
 }
 
 /** One running plugin worker, seen from the host. */
@@ -98,7 +98,7 @@ export const connect = (options: ConnectionOptions): Connection => {
     if (halt(detail)) {
       void worker.terminate();
       if (wasLoaded) {
-        options.onFailure(detail);
+        options.onFailure(detail, pluginId);
       }
     }
   };
