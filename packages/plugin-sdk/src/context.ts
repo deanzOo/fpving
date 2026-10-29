@@ -78,7 +78,7 @@ export interface Clock {
  *
  * @remarks
  * Every value crossing the host and plugin boundary is plain data that survives `structuredClone`, because plugins
- * are designed to run in worker threads. URLs are therefore absolute http(s) URL strings, never `URL` objects. Host
+ * run in worker threads. URLs are therefore absolute http(s) URL strings, never `URL` objects. Host
  * methods resolve to a `Result` and never reject.
  */
 export interface PluginContext {
