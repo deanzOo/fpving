@@ -123,7 +123,14 @@ export const connect = (options: ConnectionOptions): Connection => {
         calls.settle(message.id, ok(message.result));
         return;
       case MessageType.CapabilityCall:
-        void serve(services, message.call).then((result) => {
+        if (stopReason !== null) {
+          return;
+        }
+        void serve(services, message.call).then((result) => result, (error: unknown): CapabilityResult => {
+          const detail = `the host could not serve ${message.call.capability}: ${String(error)}`;
+          services.logger.warn("a plugin capability call failed", { pluginId, detail });
+          return { capability: message.call.capability, value: err({ kind: StoreErrorKind.Network, detail }) };
+        }).then((result) => {
           if (stopReason === null) {
             worker.postMessage({ type: MessageType.CapabilityResult, id: message.id, result });
           }

@@ -203,6 +203,32 @@ describe("Plugin worker connection capabilities", () => {
     ]);
   });
 
+  it("answers a capability call whose port rejects with a network failure and logs it", async () => {
+    const { worker, mocks } = await loadedSetup();
+    mocks.get.mockRejectedValueOnce(new Error("adapter broke"));
+    worker.send({ type: MessageType.CapabilityCall, id: 0, call: { capability: Capability.HttpGet, url: URL_1 } });
+    await flush();
+    const detail = "the host could not serve http.get: Error: adapter broke";
+    expect(worker.received).toEqual([{
+      type: MessageType.CapabilityResult,
+      id: 0,
+      result: { capability: Capability.HttpGet, value: err({ kind: StoreErrorKind.Network, detail }) },
+    }]);
+    expect(mocks.warn).toHaveBeenCalledWith("a plugin capability call failed", { pluginId: MANIFEST.id, detail });
+  });
+
+  it("does not serve capability calls a stopped worker sent", async () => {
+    const { worker, connection, mocks } = await loadedSetup();
+    await connection.stop();
+    worker.send({ type: MessageType.CapabilityCall, id: 0, call: { capability: Capability.HttpGet, url: URL_1 } });
+    const page = { capability: Capability.BrowserFetchPage, url: URL_1 };
+    worker.send({ type: MessageType.CapabilityCall, id: 1, call: page });
+    await flush();
+    expect(mocks.get).not.toHaveBeenCalled();
+    expect(mocks.fetchPage).not.toHaveBeenCalled();
+    expect(worker.received).toEqual([]);
+  });
+
   it("drops a capability result when the worker stopped in the meantime", async () => {
     const { worker, connection } = await loadedSetup();
     worker.send({ type: MessageType.CapabilityCall, id: 0, call: { capability: Capability.HttpGet, url: URL_1 } });
