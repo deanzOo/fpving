@@ -127,7 +127,7 @@ At run time:
 
 - `http.get` and `browser.fetchPage` are served by the host, so its rate limits, timeouts and URL policy apply. `logger` calls are written to the host log with your `pluginId` added. `clock.now()` is the worker's own clock.
 - A store method that throws or rejects, or resolves to something that cannot be structured-cloned, gives `parse_failed`.
-- A call has two minutes. When it runs out the call resolves to `timeout` and the worker is terminated, and so is a worker that throws an uncaught error or exits; other open calls on it get `network`. The worker is restarted once; a second failure disables the plugin as `crashed` until the app restarts. A busy loop is stopped the same way.
+- A call has two minutes. When it runs out the call resolves to `timeout` and the worker is terminated, and so is a worker that throws an uncaught error or exits; other open calls on it get `network`. The worker is restarted once; a second failure disables the plugin as `crashed` until the app restarts. A failure before every plugin has loaded disables it straight away. If the restarted worker reports a different manifest, because the plugin changed on disk, the plugin is disabled as `manifest_invalid` until the app restarts. The host never calls `search` on a plugin whose manifest does not declare it. A busy loop is stopped the same way.
 
 ## Contract test kit
 
