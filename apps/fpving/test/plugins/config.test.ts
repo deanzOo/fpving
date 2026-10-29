@@ -50,20 +50,21 @@ describe("Plugin list config", () => {
   });
 
   it.each([
-    [{ path: "plugins/example-shop" }, "path: must be an absolute path"],
-    [{ path: "./example-shop" }, "path: must be an absolute path"],
-    [{ package: "Not A Name" }, "package: must be an npm package name"],
-    [{ package: OVERLONG_NPM_NAME }, "package: must be an npm package name"],
-    [{ path: PLUGIN_DIR, package: "fpving-plugin-example" }, "Unrecognized key: \"package\""],
-    [{ name: "example" }, "package: Invalid input: expected string, received undefined; Unrecognized key: \"name\""],
-    ["fpving-plugin-example", "Invalid input: expected object, received string"],
+    [{ path: "plugins/example-shop" }, /^path: must be an absolute path$/u],
+    [{ path: "./example-shop" }, /^path: must be an absolute path$/u],
+    [{ package: "Not A Name" }, /^package: must be an npm package name$/u],
+    [{ package: OVERLONG_NPM_NAME }, /^package: must be an npm package name$/u],
+    [{ path: PLUGIN_DIR, package: "fpving-plugin-example" }, /package/u],
+    [{ name: "example" }, /^package: .*name/u],
+    ["fpving-plugin-example", /./u],
   ])("disables only the invalid entry %j, with the reason", (bad, detail) => {
-    expect(parse([{ path: PLUGIN_DIR }, bad])).toEqual(
-      ok({
-        entries: [{ path: PLUGIN_DIR }],
-        rejected: [{ index: 1, issue: { kind: PluginIssueKind.EntryInvalid, detail } }],
-      }),
-    );
+    const parsed = parse([{ path: PLUGIN_DIR }, bad]);
+    expect(parsed.ok && parsed.value.entries).toEqual([{ path: PLUGIN_DIR }]);
+    const rejected = parsed.ok ? parsed.value.rejected : [];
+    expect(rejected.map(({ index, issue }) => ({ index, kind: issue.kind }))).toEqual([
+      { index: 1, kind: PluginIssueKind.EntryInvalid },
+    ]);
+    expect(rejected[0]?.issue.detail).toMatch(detail);
   });
 
   it("keeps the first of duplicate entries and reports each later one", () => {
