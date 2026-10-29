@@ -114,7 +114,7 @@ Users list plugins in `plugins.json` in the data directory, by absolute folder p
 
 `SDK_VERSION` is the version of the running `@fpving/plugin-sdk`, read from its `package.json`. The host accepts a plugin only when `SDK_VERSION` satisfies its manifest's `sdkVersion`, decided by `satisfiesSemverRange` with npm's rules; otherwise the plugin is disabled as `sdk_incompatible`, with a reason naming the range and the version. A prerelease SDK satisfies only a range that names a prerelease of the same version.
 
-The host then maps each declared domain to its plugin and matches a URL's hostname exactly. A domain that two or more plugins declare goes to none of them, and each of them gets a `domain_conflict` warning naming the others, so the outcome never depends on load order. A plugin left with no domain is disabled. Plugins that share a manifest `id` are all disabled as `duplicate_id`, and their domains go to no one.
+The host then maps each declared domain to its plugin and matches a URL's hostname exactly. A domain that two or more plugins declare goes to none of them, and each of them gets a `domain_conflict` warning naming the others, so the outcome never depends on load order. A plugin left with no domain is disabled. Plugins that share a manifest `id` are all disabled as `duplicate_id` and claim none of their domains; a domain one of them declares still goes to another plugin when that plugin is its only other declarer.
 
 The config, compatibility and domain checks exist. Importing a plugin, validating its manifest at load time and running it in a worker thread are planned; an invalid plugin will be disabled with a reason while the app keeps running.
 
