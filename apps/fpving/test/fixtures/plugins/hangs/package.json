@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-hangs",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-crashes",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}

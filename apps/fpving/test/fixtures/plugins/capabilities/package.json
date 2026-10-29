@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-capabilities",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}

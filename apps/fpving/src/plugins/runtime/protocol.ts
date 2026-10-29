@@ -110,6 +110,8 @@ export type CapabilityResult = z.infer<typeof capabilityResultSchema>;
 export type HostMessage = z.infer<typeof hostMessageSchema>;
 /** A message from a worker to the host. */
 export type WorkerMessage = z.infer<typeof workerMessageSchema>;
+/** Why a worker could not load its plugin. */
+export type LoadFailure = Extract<WorkerMessage, { type: typeof MessageType.LoadFailed }>["issue"];
 /** What the host starts a worker with. */
 export type WorkerData = z.infer<typeof workerDataSchema>;
 

@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-throws-in-create",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}
