@@ -321,4 +321,19 @@ describe("Plain HTTP access for plugins", () => {
       expect(headerOf(requests[1]?.init, "user-agent")).toBe(USER_AGENT);
     },
   );
+
+  it("does not restore the plugin's credentials when a redirect chain returns to the first origin", async () => {
+    const back = redirectTo("https://shop.example/c");
+    const { client, requests } = replying(redirectTo("https://other.example/b"), back, () => new Response(""));
+    await client.get("https://shop.example/a", { headers: CREDENTIALS });
+    const chain = ["https://shop.example/a", "https://other.example/b", "https://shop.example/c"];
+    expect(requests.map(({ url }) => url)).toEqual(chain);
+    expect(credentialsSent(requests.at(-1)?.init)).toEqual([null, null, null]);
+  });
+
+  it("forwards a custom header such as x-api-key on a redirect to another origin, as fetch does", async () => {
+    const { client, requests } = replying(redirectTo("https://other.example/b"), () => new Response(""));
+    await client.get("https://shop.example/a", { headers: { "x-api-key": "k" } });
+    expect(headerOf(requests[1]?.init, "x-api-key")).toBe("k");
+  });
 });
