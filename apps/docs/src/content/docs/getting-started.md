@@ -25,13 +25,13 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 
 - The public plugin SDK: types, schemas, the error taxonomy and the contract test kit.
 - Pricing: exchange rate conversion, import tax, landed cost and the Israel country preset.
-- The domain entities and the ports the host and adapters will implement, with a shared repository contract suite.
+- The domain entities and the ports the host and adapters implement, with shared repository and store gateway contract suites.
 - The alert evaluator: price drop, back in stock and new cheapest, as a pure function.
-- Adding a product or a listing from a pasted URL, with URL normalization, behind a `StoreGateway` port the plugin host will implement.
+- Adding a product or a listing from a pasted URL, with URL normalization, behind the `StoreGateway` port, which the plugin host implements.
 - Assisted matching: searching the other stores, ranking and LLM-judging candidates, and accepting or rejecting them.
 - Scanning: re-fetching every tracked listing, recording prices, marking listings stale or gone, backing off blocked stores, and raising and notifying alerts.
 - The scan schedule policy: a scan every interval, one catch-up scan on boot, stale exchange rates refreshed first, and no overlapping scans. The timer that drives it is not built yet.
-- The plugin list in `DATA_DIR/plugins.json`, the check of each plugin's `sdkVersion` against the SDK, and the map from declared domains to plugins. Loading and running plugins is not built yet.
+- The plugin list in `DATA_DIR/plugins.json`, the check of each plugin's `sdkVersion` against the SDK, and the map from declared domains to plugins. The plugin host loads each listed plugin in its own worker thread, with call deadlines, one restart and a status for each plugin; the store gateway routes core's fetches and searches to it, and the pages a plugin cannot parse are saved under `DATA_DIR/debug/`.
 - Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
 - `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
 
