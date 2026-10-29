@@ -9,12 +9,12 @@ export interface CompatiblePlugin {
   readonly domains: Readonly<PluginManifest["domains"]>;
 }
 
-type DomainRegistry = Pick<StoreGateway, "declaredDomains" | "pluginFor">;
+export type DomainRegistry = Pick<StoreGateway, "declaredDomains" | "pluginFor">;
 
-export interface RegisteredPlugins {
+export interface RegisteredPlugins<P extends CompatiblePlugin> {
   readonly registry: DomainRegistry;
   /** One status per input plugin, in input order. */
-  readonly statuses: readonly { readonly id: PluginId; readonly status: PluginStatus }[];
+  readonly statuses: readonly { readonly plugin: P; readonly status: PluginStatus }[];
 }
 
 const sharingId = (plugins: readonly CompatiblePlugin[], id: PluginId): number =>
@@ -54,10 +54,10 @@ const statusOf = (plugin: CompatiblePlugin, claims: ReadonlyMap<string, readonly
  * two or more plugins declare goes to none of them, with a warning on each, so the result never depends on load
  * order; a plugin left with no hostname is disabled.
  *
- * @param plugins - The compatible plugins, in load order.
+ * @param plugins - The compatible plugins, in load order; each status carries its input plugin back.
  * @returns The registry and one status per plugin.
  */
-export const buildDomainRegistry = (plugins: readonly CompatiblePlugin[]): RegisteredPlugins => {
+export const buildDomainRegistry = <P extends CompatiblePlugin>(plugins: readonly P[]): RegisteredPlugins<P> => {
   const unique = plugins.filter(({ id }) => sharingId(plugins, id) === 1);
   const claims = claimDomains(unique);
   const owners = new Map<string, PluginId>();
@@ -75,7 +75,7 @@ export const buildDomainRegistry = (plugins: readonly CompatiblePlugin[]): Regis
           kind: PluginStatusKind.Disabled,
           reason: { kind: PluginIssueKind.DuplicateId, detail: `${String(count)} plugins have the id ${plugin.id}` },
         };
-    return { id: plugin.id, status };
+    return { plugin, status };
   });
   return {
     registry: {
