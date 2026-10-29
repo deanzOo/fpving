@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { err, ok } from "@fpving/plugin-sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -15,7 +15,10 @@ import {
 import { PluginIssueKind } from "../../src/plugins/status.ts";
 
 const DATA_DIR = "/data";
-const PLUGIN_DIR = "/home/pilot/plugins/example-shop";
+const HOME = resolve(tmpdir(), "pilot");
+const PLUGIN_DIR = join(HOME, "plugins", "example-shop");
+const ROOTED_NAME_DIR = resolve(tmpdir(), "fpving-plugin-example");
+const isWindows = process.platform === "win32";
 const OVERLONG_NPM_NAME = "x".repeat(MAX_NPM_NAME_LENGTH + 1);
 
 const parse = (value: unknown): ReturnType<typeof parsePluginsConfig> => parsePluginsConfig(JSON.stringify(value));
@@ -31,7 +34,8 @@ describe("Plugin list config", () => {
   });
 
   it("normalizes a folder path, so dot segments and a trailing slash name the same folder", () => {
-    expect(parse([{ path: "/home/pilot/x/../plugins/example-shop/" }])).toEqual(
+    const unnormalized = [HOME, "x", "..", "plugins", "example-shop", ""].join(sep);
+    expect(parse([{ path: unnormalized }])).toEqual(
       ok({ entries: [{ path: PLUGIN_DIR }], rejected: [] }),
     );
   });
@@ -73,7 +77,7 @@ describe("Plugin list config", () => {
     const parsed = parse([
       { path: PLUGIN_DIR },
       { package: "fpving-plugin-example" },
-      { path: `${PLUGIN_DIR}/` },
+      { path: `${PLUGIN_DIR}${sep}` },
       { package: "fpving-plugin-example" },
     ]);
     expect(parsed).toEqual(
@@ -88,7 +92,7 @@ describe("Plugin list config", () => {
   });
 
   it("does not treat a folder path and a package of the same text as duplicates", () => {
-    const entries = [{ path: "/fpving-plugin-example" }, { package: "fpving-plugin-example" }];
+    const entries = [{ path: ROOTED_NAME_DIR }, { package: "fpving-plugin-example" }];
     expect(parse(entries)).toEqual(ok({ entries, rejected: [] }));
   });
 
@@ -136,12 +140,12 @@ describe("Text file reader", () => {
   });
 
   it("returns the reason when the path cannot be read", async () => {
-    await writeFile(join(dir, "file"), "", "utf8");
-    const read = await readTextFile(join(dir, "file", PLUGINS_FILE));
-    expect(read.ok ? "" : read.error).toMatch(/ENOTDIR/u);
+    const read = await readTextFile(join(dir, "nul\0byte"));
+    expect(read.ok).toBe(false);
+    expect(read.ok ? "" : read.error).toMatch(/\S/u);
   });
 
-  it("refuses a named pipe instead of blocking on it", async () => {
+  it.skipIf(isWindows)("refuses a named pipe instead of blocking on it", async () => {
     execFileSync("mkfifo", [join(dir, PLUGINS_FILE)]);
     expect(await readTextFile(join(dir, PLUGINS_FILE))).toEqual(err(NOT_A_FILE));
   });
