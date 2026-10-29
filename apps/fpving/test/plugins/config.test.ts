@@ -135,6 +135,12 @@ describe("Text file reader", () => {
     expect(await readTextFile(join(dir, PLUGINS_FILE))).toEqual(err(NOT_A_FILE));
   });
 
+  it("returns the reason when the path cannot be read", async () => {
+    await writeFile(join(dir, "file"), "", "utf8");
+    const read = await readTextFile(join(dir, "file", PLUGINS_FILE));
+    expect(read.ok ? "" : read.error).toMatch(/ENOTDIR/u);
+  });
+
   it("refuses a named pipe instead of blocking on it", async () => {
     execFileSync("mkfifo", [join(dir, PLUGINS_FILE)]);
     expect(await readTextFile(join(dir, PLUGINS_FILE))).toEqual(err(NOT_A_FILE));
