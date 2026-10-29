@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { err, ok } from "@fpving/plugin-sdk";
 import type { Result } from "@fpving/plugin-sdk";
@@ -14,6 +14,9 @@ export const MAX_NPM_NAME_LENGTH = 214;
 const NPM_NAME = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u;
 const MISSING_FILE = "ENOENT";
 const NPM_NAME_RULE = "must be an npm package name";
+
+/** Why {@link readTextFile} refused a path that exists but is not a regular file, such as a folder or a pipe. */
+export const NOT_A_FILE = "not a regular file";
 
 const pathEntrySchema = z.strictObject({
   path: z.string().refine(isAbsolute, "must be an absolute path").transform((path) => resolve(path)),
@@ -121,9 +124,12 @@ export const readPluginsConfig = async (
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && "code" in error && error.code === MISSING_FILE;
 
-/** Reads a UTF-8 file from disk with `node:fs`. */
+/** Reads a UTF-8 file from disk with `node:fs`, refusing anything but a regular file so a pipe cannot block boot. */
 export const readTextFile: ReadTextFile = async (path) => {
   try {
+    if (!(await stat(path)).isFile()) {
+      return err(NOT_A_FILE);
+    }
     return ok(await readFile(path, "utf8"));
   } catch (error) {
     return isMissingFile(error) ? ok(null) : err(String(error));

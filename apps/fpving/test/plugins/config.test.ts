@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,6 +6,7 @@ import { err, ok } from "@fpving/plugin-sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   MAX_NPM_NAME_LENGTH,
+  NOT_A_FILE,
   parsePluginsConfig,
   PLUGINS_FILE,
   readPluginsConfig,
@@ -128,12 +130,13 @@ describe("Text file reader", () => {
     expect(await readTextFile(join(dir, PLUGINS_FILE))).toEqual(ok(null));
   });
 
-  it("returns the reason when the path cannot be read as a file", async () => {
+  it("refuses a directory without reading it", async () => {
     await mkdir(join(dir, PLUGINS_FILE));
-    const read = await readTextFile(join(dir, PLUGINS_FILE));
-    expect(read.ok).toBe(false);
-    if (!read.ok) {
-      expect(read.error).toMatch(/EISDIR/u);
-    }
+    expect(await readTextFile(join(dir, PLUGINS_FILE))).toEqual(err(NOT_A_FILE));
+  });
+
+  it("refuses a named pipe instead of blocking on it", async () => {
+    execFileSync("mkfifo", [join(dir, PLUGINS_FILE)]);
+    expect(await readTextFile(join(dir, PLUGINS_FILE))).toEqual(err(NOT_A_FILE));
   });
 });
