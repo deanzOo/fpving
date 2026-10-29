@@ -30,15 +30,10 @@ import type { Connection, HostServices, SpawnWorker } from "./connection.js";
 import { CallMethod, storeResultSchema } from "./protocol.js";
 import type { CallRequest } from "./protocol.js";
 
-/**
- * How long one store call may take before it resolves to `timeout` and its worker is restarted: two minutes. A call
- * can wait for the per-host limiter (two to three seconds per earlier request to the same host) and make several
- * requests, each up to the fifteen second HTTP timeout or the thirty second browser navigation timeout.
- */
-export const CALL_TIMEOUT_MS = 120_000;
+// Room for per-host limiter waits plus several 15 s HTTP or 30 s browser steps in one call.
+const CALL_TIMEOUT_MS = 120_000;
 
-/** How long a worker may take to import its plugin and report its manifest: thirty seconds. */
-export const LOAD_TIMEOUT_MS = 30_000;
+const LOAD_TIMEOUT_MS = 30_000;
 
 const MAX_WORKER_FAILURES = 2;
 const SHUT_DOWN = "the plugin host is shut down";

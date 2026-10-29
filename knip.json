@@ -5,7 +5,7 @@
       "entry": ["tools/**/*.ts", "tests/**/*.test.ts"],
       "project": ["*.ts", "tools/**/*.ts", "tests/**/*.ts"],
       "ignore": ["tests/tooling/fixtures/**"],
-      "ignoreBinaries": ["osv-scanner"]
+      "ignoreBinaries": ["osv-scanner", "mkfifo"]
     },
     "packages/*": { "project": ["src/**/*.ts"] },
     "packages/core": { "project": ["src/**/*.ts", "eval/**/*.ts"] },

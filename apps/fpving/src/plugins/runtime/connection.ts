@@ -13,8 +13,7 @@ import type {
   WorkerMessage,
 } from "./protocol.js";
 
-/** The parts of a `node:worker_threads` Worker the host uses. */
-export interface WorkerHandle {
+interface WorkerHandle {
   postMessage(message: HostMessage): void;
   on(event: "message" | "error" | "exit", listener: (value: unknown) => void): unknown;
   terminate(): Promise<number>;

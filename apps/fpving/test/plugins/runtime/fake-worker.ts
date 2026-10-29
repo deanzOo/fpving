@@ -4,7 +4,7 @@ import { vi } from "vitest";
 import type { Mock } from "vitest";
 import { MessageType } from "../../../src/plugins/runtime/protocol.ts";
 import type { HostMessage, WorkerData } from "../../../src/plugins/runtime/protocol.ts";
-import type { HostServices, WorkerHandle } from "../../../src/plugins/runtime/connection.ts";
+import type { HostServices, SpawnWorker } from "../../../src/plugins/runtime/connection.ts";
 
 export const MANIFEST: PluginManifest = {
   id: "example-shop",
@@ -29,7 +29,7 @@ export const fakeWorker = (data: WorkerData = DATA) => {
       listener(value);
     });
   };
-  const handle: WorkerHandle = {
+  const handle: ReturnType<SpawnWorker> = {
     postMessage: (message) => {
       received.push(message);
     },

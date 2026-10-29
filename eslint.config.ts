@@ -18,6 +18,7 @@ export default defineConfig(
       "apps/docs/.astro/**",
       "apps/docs/src/content.config.ts",
       "tests/tooling/fixtures/**",
+      "apps/fpving/test/fixtures/plugins/**",
     ],
   },
   js.configs.recommended,

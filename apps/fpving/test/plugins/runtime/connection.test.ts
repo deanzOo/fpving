@@ -12,6 +12,11 @@ const FETCH = { method: CallMethod.FetchListing, url: URL_1 } as const;
 
 const OPTIONS = { callTimeoutMs: CALL_TIMEOUT_MS, loadTimeoutMs: LOAD_TIMEOUT_MS };
 
+const WORKER_DEATHS = [
+  ["errors", "error", new Error("boom"), "the plugin worker failed: Error: boom"],
+  ["exits", "exit", 1, "the plugin worker exited with code 1"],
+] as const;
+
 const setup = () => {
   const worker = fakeWorker();
   const { services, mocks } = fakeServices();
@@ -66,10 +71,8 @@ describe("Plugin worker connection loading", () => {
     expect(failures).toEqual([]);
   });
 
-  it.each([
-    ["errors", "error", new Error("boom"), "the plugin worker failed: Error: boom"],
-    ["exits", "exit", 1, "the plugin worker exited with code 1"],
-  ] as const)("fails the load as load_failed when the worker %s before it reports", async (_, event, value, detail) => {
+  it.each(WORKER_DEATHS)("fails the load as load_failed when the worker %s before reporting", async (...death) => {
+    const [, event, value, detail] = death;
     const { worker, connection, failures } = setup();
     worker.emit(event, value);
     expect(await connection.loaded).toEqual(err({ kind: PluginIssueKind.LoadFailed, detail }));
@@ -140,10 +143,8 @@ describe("Plugin worker connection calls", () => {
     expect(failures).toEqual([]);
   });
 
-  it.each([
-    ["errors", "error", new Error("boom"), "the plugin worker failed: Error: boom"],
-    ["exits", "exit", 1, "the plugin worker exited with code 1"],
-  ] as const)("fails in-flight calls and reports one failure when the worker %s", async (_, event, value, detail) => {
+  it.each(WORKER_DEATHS)("fails in-flight calls and reports one failure when the worker %s", async (...death) => {
+    const [, event, value, detail] = death;
     const { worker, connection, failures } = await loadedSetup();
     const call = connection.call(FETCH);
     worker.emit(event, value);
