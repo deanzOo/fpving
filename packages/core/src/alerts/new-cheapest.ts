@@ -48,16 +48,18 @@ export interface CheapestResult {
   alert: AlertDraft | null;
 }
 
+const DROPPED: readonly ListingStatus[] = [ListingStatus.Gone, ListingStatus.Removed];
+
 /**
- * The cheapest listing to keep when none qualifies: the previous one, or null when that listing is gone. A previous
- * cheapest that is stale or out of stock is kept.
+ * The cheapest listing to keep when none qualifies: the previous one, or null when that listing is gone or removed.
+ * A previous cheapest that is stale or out of stock is kept.
  */
 export const keptCheapest = (
   productListings: readonly ListingWithLatest[],
   previousCheapestListingId: ListingId | null,
 ): ListingId | null =>
   productListings.some(
-    ({ listing }) => listing.id === previousCheapestListingId && listing.status === ListingStatus.Gone,
+    ({ listing }) => listing.id === previousCheapestListingId && DROPPED.includes(listing.status),
   )
     ? null
     : previousCheapestListingId;

@@ -194,13 +194,14 @@ describe("Scanning listings", () => {
       ]);
     });
 
-    it("fetches active and stale listings and skips gone ones and those of archived products", async () => {
+    it("fetches active and stale listings and skips gone and removed ones and those of archived products", async () => {
       const stale = { ...l2, status: ListingStatus.Stale };
       const gone = { ...l3, status: ListingStatus.Gone };
+      const removed = listing("r1", { status: ListingStatus.Removed });
       const archived = listing("a1", { productId: productIdSchema.parse("p2") });
       const { deps, stores } = await setup({
         products: [product("p1"), product("p2", { archivedAt: daysAgo(1) })],
-        listings: [l1, stale, gone, archived],
+        listings: [l1, stale, gone, removed, archived],
       });
       await scanListings(deps);
       expect(stores.fetched).toEqual([l1.url, stale.url]);
