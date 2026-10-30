@@ -400,6 +400,47 @@ describe("App settings changes", () => {
     expect(logText().match(/cannot spawn/gu)).toEqual(["cannot spawn"]);
   });
 
+  it("finishes a change in flight when shutdown starts, then stops the schedule that change started", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const workers: ReturnType<typeof fakeWorker>[] = [];
+    let readyUs = (): void => undefined;
+    const spawn: SpawnWorker = (data) => {
+      const worker = fakeWorker(data);
+      workers.push(worker);
+      const ready = (): void => {
+        worker.ready();
+      };
+      if (data.shipTo === "US") {
+        readyUs = ready;
+      } else {
+        queueMicrotask(ready);
+      }
+      return worker.handle;
+    };
+    const stopped: boolean[] = [];
+    const scheduler: Scheduler = {
+      every: () => {
+        const index = stopped.push(false) - 1;
+        return () => {
+          stopped[index] = true;
+        };
+      },
+    };
+    const running = await started(env(), { ...fakes().ports, scheduler, spawn });
+    const payload = { ...(await running.deps.repository.settings.get()), shipToCountry: "US" };
+    const putting = running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    await vi.waitFor(() => {
+      expect(workers.map((worker) => worker.data.shipTo)).toEqual(["IL", "US"]);
+    });
+    const shuttingDown = running.shutdown();
+    readyUs();
+    expect((await putting).statusCode).toBe(OK);
+    expect(await shuttingDown).toBe(true);
+    expect(stopped).toEqual([true, true]);
+    expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
+  });
+
   it("restarts nothing when only the drop threshold changes", async () => {
     const { running, workers, armed, put } = await startWithPlugin();
     await put({ priceDropMinBasisPoints: 100 });
