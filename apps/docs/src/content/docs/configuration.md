@@ -49,11 +49,11 @@ The host loads each entry in its own worker thread (`apps/fpving/src/plugins/run
 
 ## Data directory
 
-`DATA_DIR` is created on start with mode `0o700`, and an existing one is tightened to it. It holds the SQLite database `fpving.db` (WAL mode, so `fpving.db-wal` and `fpving.db-shm` appear while the app runs), `plugins.json`, `logs/`, `debug/` and the browser profile in `browser-profile/`. Before a migration changes an existing database it is copied to `fpving.db.<UTC time>.bak`; after a successful migration only the five newest backups are kept.
+`DATA_DIR` is created on start with mode `0o700`. An existing one keeps its mode, and the log warns when group or others can open it; run `chmod 700` on it. On Windows the mode is not enforced: the folder inherits its parent's ACL. It holds the SQLite database `fpving.db` (WAL mode, so `fpving.db-wal` and `fpving.db-shm` appear while the app runs), `plugins.json`, `logs/`, `debug/` and the browser profile in `browser-profile/`. Before a migration changes an existing database it is copied to `fpving.db.<UTC time>.bak`; after a successful migration only the five newest backups are kept, by the time in their names, always including the one just made. Only regular files named exactly that way are deleted, so a `.bak` of your own is left alone.
 
 ## Server
 
-The server listens on `127.0.0.1:PORT` only. It answers only requests whose `Host` header is `127.0.0.1:PORT` or `localhost:PORT` (others get 421), refuses state-changing requests sent from another origin (403), sends no CORS headers and accepts bodies up to 64 KiB. See [ADR 0023](../adr/0023-fastify-server-with-a-localhost-guard/).
+The server listens on `127.0.0.1:PORT` only. It answers only requests whose `Host` header is `127.0.0.1:PORT` or `localhost:PORT` (others get 421), refuses state-changing requests sent from another origin, or marked `Sec-Fetch-Site: cross-site` or `same-site` (403), sends no CORS headers and accepts bodies up to 64 KiB. See [ADR 0023](../adr/0023-fastify-server-with-a-localhost-guard/).
 
 ## Secrets
 
