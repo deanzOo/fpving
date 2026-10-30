@@ -1,11 +1,11 @@
 import { cpSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { generateSQLiteDrizzleJson } from "drizzle-kit/api";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { migrate } from "../../../src/adapters/sqlite/migrate.ts";
+import { KEPT_BACKUPS, migrate } from "../../../src/adapters/sqlite/migrate.ts";
 import * as schema from "../../../src/adapters/sqlite/schema.ts";
 import { cleanUpTemp, tempDir } from "./temp-db.ts";
 
@@ -103,6 +103,24 @@ describe("SQLite migrations", () => {
     expect(backups(dir)).toHaveLength(1);
     expect(contents(join(dir, backups(dir)[0] ?? ""))).toEqual(before);
     expect(tables(path)).toContain("extra");
+  });
+
+  it("keeps only the newest backups of its own file after migrating, leaving other files alone", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const stamps = Array.from({ length: KEPT_BACKUPS + LATER }, (_, day) => `2026-01-0${String(day + LATER)}`);
+    for (const stamp of stamps) {
+      writeFileSync(`${path}.${stamp}T00-00-00-000Z.bak`, "");
+    }
+    writeFileSync(join(dir, "other.db.2026-01-01T00-00-00-000Z.bak"), "");
+    const { backupPath } = migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"));
+    const kept = backups(dir).filter((name) => name.startsWith("fpving.db."));
+    expect(kept).toHaveLength(KEPT_BACKUPS);
+    expect(kept).toContain(basename(backupPath ?? ""));
+    expect(kept).not.toContain(`fpving.db.${stamps[0] ?? ""}T00-00-00-000Z.bak`);
+    expect(kept).not.toContain(`fpving.db.${stamps[1] ?? ""}T00-00-00-000Z.bak`);
+    expect(backups(dir)).toContain("other.db.2026-01-01T00-00-00-000Z.bak");
   });
 
   it("rolls back a failing migration, keeps the backup intact and names it in the error", () => {
