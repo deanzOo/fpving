@@ -15,7 +15,7 @@ import {
 } from "@fpving/core";
 import type { DuplicateUrl, Listing, NotFound, PriceSnapshot, Repository, Result } from "@fpving/core";
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import {
@@ -183,8 +183,26 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
             .orderBy(asc(listings.pluginId), asc(listings.productId), asc(listings.addedAt))
             .all()
             .map((row) => listingSchema.parse(row))),
+      remove: async (productId, id) =>
+        atomically((tx) => {
+          const removed = changedOne(tx.update(listings).set({ status: ListingStatus.Removed }).where(and(
+            eq(listings.id, id),
+            eq(listings.productId, productId),
+            ne(listings.status, ListingStatus.Removed),
+          )).run());
+          if (removed.ok) {
+            tx.update(products).set({ cheapestListingId: null })
+              .where(and(eq(products.id, productId), eq(products.cheapestListingId, id)))
+              .run();
+          }
+          return removed;
+        }, new Map<string, NotFound>()),
       updateStatus: async (id, update) =>
-        settle(() => changedOne(db.update(listings).set(update).where(eq(listings.id, id)).run())),
+        settle(() => {
+          const status = sql`case when ${listings.status} = ${ListingStatus.Removed} then ${listings.status}
+            else ${update.status} end`;
+          return changedOne(db.update(listings).set({ ...update, status }).where(eq(listings.id, id)).run());
+        }),
     },
     snapshots: {
       append: async (snapshot) =>

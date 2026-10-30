@@ -21,6 +21,7 @@ const notFound = err({ kind: RepositoryErrorKind.NotFound });
 const duplicateUrl = err({ kind: RepositoryErrorKind.DuplicateUrl });
 const done = ok(undefined);
 const copy = structuredClone;
+const SCANNED: readonly string[] = [ListingStatus.Active, ListingStatus.Stale];
 
 const bug = async (message: string): Promise<never> => Promise.reject(new Error(message));
 
@@ -135,7 +136,7 @@ export const inMemoryRepository = (): Repository => {
         Promise.resolve(
           copy(
             [...listings.values()]
-              .filter((row) => row.status !== ListingStatus.Gone && products.get(row.productId)?.archivedAt === null)
+              .filter((row) => SCANNED.includes(row.status) && products.get(row.productId)?.archivedAt === null)
               .toSorted(
                 (a, b) =>
                   byCodePoint(a.pluginId, b.pluginId)
@@ -144,12 +145,25 @@ export const inMemoryRepository = (): Repository => {
               ),
           ),
         ),
+      remove: async (productId, id) => {
+        const row = listings.get(id);
+        if (row?.productId !== productId || row.status === ListingStatus.Removed) {
+          return Promise.resolve(notFound);
+        }
+        listings.set(id, { ...row, status: ListingStatus.Removed });
+        const owner = products.get(productId);
+        if (owner?.cheapestListingId === id) {
+          products.set(productId, { ...owner, cheapestListingId: null });
+        }
+        return Promise.resolve(done);
+      },
       updateStatus: async (id, update) => {
         const row = listings.get(id);
         if (row === undefined) {
           return Promise.resolve(notFound);
         }
-        listings.set(id, { ...row, ...update });
+        const status = row.status === ListingStatus.Removed ? row.status : update.status;
+        listings.set(id, { ...row, ...update, status });
         return Promise.resolve(done);
       },
     },

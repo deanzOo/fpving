@@ -302,13 +302,44 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         const otherPlugin = { ...listing("l3", p1.id, url("three")), pluginId: OTHER_PLUGIN };
         const stale = { ...listing("l4", p1.id, url("four")), addedAt: JAN_2, status: ListingStatus.Stale };
         const gone = { ...listing("l5", p2.id, url("five")), status: ListingStatus.Gone };
+        const removed = { ...listing("l7", p2.id, url("seven")), status: ListingStatus.Removed };
         const archived = { ...product("p3"), archivedAt: JAN_2 };
         const ofArchived = listing("l6", archived.id, url("six"));
-        for (const row of [otherPlugin, stale, gone]) {
+        for (const row of [otherPlugin, stale, gone, removed]) {
           await repo.listings.addWithSnapshot(row, snapshot(`s-${row.id}`, row.id, JAN_2));
         }
         await repo.products.add(archived, ofArchived, snapshot("s6", ofArchived.id, JAN_2));
         expect(await repo.listings.listToScan()).toEqual([l1, stale, l2, otherPlugin]);
+      });
+
+      it("removes a product's listing, clearing the product's cheapest when it was that listing", async () => {
+        const l3 = listing("l3", p1.id, url("three"));
+        await repo.listings.addWithSnapshot(l3, snapshot("s3", l3.id, JAN_2));
+        await repo.products.setCheapest(p1.id, l3.id);
+        expect(await repo.listings.remove(p1.id, l1.id)).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual({ ...p1, cheapestListingId: l3.id });
+        expect(await repo.listings.remove(p1.id, l3.id)).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual(p1);
+        expect(await repo.listings.listByProduct(p1.id)).toEqual([
+          { ...l1, status: ListingStatus.Removed },
+          { ...l3, status: ListingStatus.Removed },
+        ]);
+        expect(await repo.snapshots.listSince(l1.id, JAN_1)).toEqual([s1]);
+      });
+
+      it("refuses to remove a missing, already removed or another product's listing, changing nothing", async () => {
+        expect(await repo.listings.remove(p1.id, missingListing)).toEqual(notFound);
+        expect(await repo.listings.remove(p2.id, l1.id)).toEqual(notFound);
+        expect(await repo.listings.remove(p1.id, l1.id)).toEqual(ok);
+        expect(await repo.listings.remove(p1.id, l1.id)).toEqual(notFound);
+        expect(await repo.listings.listByProduct(p2.id)).toEqual([l2]);
+      });
+
+      it("keeps a removed listing removed when its status is updated, as by a scan that was running", async () => {
+        await repo.listings.remove(p1.id, l1.id);
+        const update = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 1 };
+        expect(await repo.listings.updateStatus(l1.id, update)).toEqual(ok);
+        expect(await repo.listings.findByUrl(l1.url)).toEqual({ ...l1, ...update, status: ListingStatus.Removed });
       });
 
       it("returns copies, so changing a returned row does not change the stored one", async () => {

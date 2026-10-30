@@ -75,8 +75,13 @@ export interface ListingRepository {
    * then product id, then oldest first. Ids compare by code point.
    */
   listToScan(): Promise<Listing[]>;
-  /** Replaces a listing's status and streaks. */
+  /** Replaces a listing's status and streaks; a removed listing stays removed, so a running scan cannot revive it. */
   updateStatus(id: ListingId, update: ListingStatusUpdate): Promise<Result<void, NotFound>>;
+  /**
+   * Marks a listing of the product `productId` that is not removed yet removed, keeping its snapshots and alerts,
+   * and clears the product's cheapest listing when it was this one, in one step.
+   */
+  remove(productId: ProductId, id: ListingId): Promise<Result<void, NotFound>>;
 }
 
 /** Stores price snapshots, append-only. */
