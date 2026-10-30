@@ -37,6 +37,15 @@ const migrationsWith = (extraSql: string): string => {
   return folder;
 };
 
+const migrationsUpTo = (tag: string): string => {
+  const folder = join(tempDir(), "drizzle");
+  cpSync(APP_MIGRATIONS, folder, { recursive: true });
+  const journal = journalSchema.parse(JSON.parse(readFileSync(join(folder, JOURNAL), "utf8")));
+  const end = journal.entries.findIndex((entry) => entry.tag === tag) + 1;
+  writeFileSync(join(folder, JOURNAL), JSON.stringify({ ...journal, entries: journal.entries.slice(0, end) }));
+  return folder;
+};
+
 const tables = (path: string): string[] => {
   const client = new Database(path, { readonly: true });
   const names = z.array(z.string()).parse(
@@ -194,6 +203,30 @@ describe("SQLite migrations", () => {
     expect(migrate(path, migrationsWith(rebuild)).backupPath).not.toBeNull();
     expect(contents(path)["listings"]).toHaveLength(1);
     expect(contents(path)["products"]).toEqual([expect.objectContaining({ id: "p1" })]);
+  });
+
+  it("lets an existing database's listings be removed, keeping every row and still refusing an unknown status", () => {
+    const path = join(tempDir(), "fpving.db");
+    migrate(path, migrationsUpTo("0000_init"));
+    const client = new Database(path);
+    client.prepare("insert into products (id, name, created_at) values ('p1', 'Goggles', 1)").run();
+    const insertListing = client.prepare(
+      "insert into listings (id, product_id, plugin_id, url, title, status, origin, added_at, failure_streak, "
+      + "not_found_streak) values (?, 'p1', 'shop', ?, 'Goggles', ?, 'manual', 1, 0, 0)",
+    );
+    insertListing.run("l1", "https://shop.example/1", "active");
+    expect(() => insertListing.run("l2", "https://shop.example/2", "removed")).toThrow(/CHECK/u);
+    client.close();
+    migrate(path);
+    const after = new Database(path);
+    after.pragma("foreign_keys = ON");
+    after.prepare("update listings set status = 'removed' where id = 'l1'").run();
+    expect(() => after.prepare("update listings set status = 'deleted' where id = 'l1'").run()).toThrow(/CHECK/u);
+    after
+      .prepare("insert into price_snapshots values ('s1', 'l1', 1, 'IL', 100, 'USD', 'unknown', null, null, 1)")
+      .run();
+    after.close();
+    expect(contents(path)["listings"]).toEqual([expect.objectContaining({ id: "l1", status: "removed" })]);
   });
 
   it("refuses a migration that leaves a dangling foreign key, naming the backup it kept", () => {
