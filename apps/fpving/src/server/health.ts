@@ -22,7 +22,7 @@ export interface HealthSource {
   /** The plugin host's current plugin states. */
   plugins(): readonly PluginState[];
   /** How many `plugins.json` entries were rejected before reaching the host; they count as disabled. */
-  readonly rejectedEntries: number;
+  rejectedEntries(): number;
 }
 
 /**
@@ -38,7 +38,7 @@ export const registerHealthRoute = (server: AppServer, source: HealthSource): vo
     return {
       ok: true,
       version: source.version,
-      plugins: { loaded, disabled: states.length - loaded + source.rejectedEntries },
+      plugins: { loaded, disabled: states.length - loaded + source.rejectedEntries() },
     } as const;
   });
 };

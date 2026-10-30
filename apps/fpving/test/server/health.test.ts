@@ -32,8 +32,9 @@ describe("Health route", () => {
 
   it("reports the version and the loaded and disabled plugin counts, rejected entries as disabled", async () => {
     let states: readonly PluginState[] = [loaded, disabled, loaded];
-    server = createServer({ port: PORT, logger: recordingLogger() });
-    registerHealthRoute(server, { version: VERSION, plugins: () => states, rejectedEntries: REJECTED });
+    const starting = { isReady: () => false, openWhileStarting: [HEALTH_PATH] };
+    server = createServer({ port: PORT, logger: recordingLogger(), ...starting });
+    registerHealthRoute(server, { version: VERSION, plugins: () => states, rejectedEntries: () => REJECTED });
     const get = async () => server?.inject({ method: "GET", url: HEALTH_PATH, headers: HOST });
     const first = await get();
     expect(first?.statusCode).toBe(OK);

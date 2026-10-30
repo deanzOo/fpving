@@ -12,13 +12,21 @@ export const LOOPBACK_HOST = "127.0.0.1";
 export const MAX_REQUEST_BODY_BYTES = 65_536;
 
 /** The statuses the shell itself answers with. */
-export const HttpStatus = { Forbidden: 403, MisdirectedRequest: 421, InternalServerError: 500 } as const;
+export const HttpStatus = {
+  Forbidden: 403,
+  MisdirectedRequest: 421,
+  InternalServerError: 500,
+  ServiceUnavailable: 503,
+} as const;
 
 /** The bodies of guard refusals. */
 export const GuardRefusal = {
   Host: "the Host header must name this server on 127.0.0.1 or localhost",
   Origin: "cross-origin requests that change state are refused",
 } as const;
+
+/** What a route answers while the app is still starting. */
+export const STARTING = "fpving is starting";
 
 /** What a client error the app did not classify answers; its message goes to the log only. */
 export const CLIENT_ERROR = "request refused";
@@ -38,6 +46,10 @@ export interface ServerOptions {
   readonly port: number;
   /** Where unexpected errors are logged. */
   readonly logger: Logger;
+  /** Whether startup finished; until then only {@link ServerOptions.openWhileStarting} routes answer. */
+  readonly isReady: () => boolean;
+  /** Paths served while starting, such as the health route. */
+  readonly openWhileStarting: readonly string[];
 }
 
 const FIRST_CLIENT_ERROR = 400;
@@ -48,7 +60,9 @@ const clientErrorSchema = z.object({
 });
 
 /**
- * Creates the Fastify server with the Zod type provider and the localhost guards, without routes. A request whose
+ * Creates the Fastify server with the Zod type provider, the localhost guards and a readiness gate, without routes.
+ * Until `isReady()` is true every route but those in `openWhileStarting`, unknown paths included, answers 503 with
+ * {@link STARTING}, after the guards. A request whose
  * Host header is not `127.0.0.1:<port>` or `localhost:<port>` is refused with 421, which defeats DNS rebinding. A
  * request with a method other than GET, HEAD or OPTIONS that carries an `Origin` other than its own is refused with
  * 403, and so is one without `Origin` whose `Sec-Fetch-Site` is `cross-site` or `same-site`; one with neither, such as
@@ -60,7 +74,7 @@ const clientErrorSchema = z.object({
  * @returns The server, not yet listening.
  */
 export const createServer = (options: ServerOptions) => {
-  const { port, logger } = options;
+  const { port, logger, isReady, openWhileStarting } = options;
   const allowedHosts: readonly string[] = LOCAL_HOSTNAMES.map((name) => `${name}:${String(port)}`);
   const server = fastify({ logger: false, bodyLimit: MAX_REQUEST_BODY_BYTES }).withTypeProvider<ZodTypeProvider>();
   server.setValidatorCompiler(validatorCompiler);
@@ -75,6 +89,9 @@ export const createServer = (options: ServerOptions) => {
     const foreign = origin === undefined ? CROSS_SITE_FETCHES.includes(site) : origin !== `${HTTP_SCHEME}${host}`;
     if (!READ_METHODS.includes(request.method) && foreign) {
       return reply.status(HttpStatus.Forbidden).send({ error: GuardRefusal.Origin });
+    }
+    if (!isReady() && !openWhileStarting.includes(request.routeOptions.url ?? "")) {
+      return reply.status(HttpStatus.ServiceUnavailable).send({ error: STARTING });
     }
     return undefined;
   });

@@ -7,6 +7,7 @@ import {
   HttpStatus,
   INTERNAL_ERROR,
   MAX_REQUEST_BODY_BYTES,
+  STARTING,
 } from "../../src/server/server.ts";
 import type { AppServer } from "../../src/server/server.ts";
 import { recordingLogger } from "../support/recording-logger.ts";
@@ -19,6 +20,8 @@ const TOO_LARGE = 413;
 const ECHO = "/api/test/echo";
 const BOOM = "/api/test/boom";
 const TEAPOT = "/api/test/teapot";
+const OPEN = "/api/test/open";
+const UNAVAILABLE = 503;
 const SECRET_DETAIL = "database file /secret/path is locked";
 const LOCAL = `127.0.0.1:${String(PORT)}`;
 const LOCALHOST = `localhost:${String(PORT)}`;
@@ -26,10 +29,13 @@ const LOCALHOST = `localhost:${String(PORT)}`;
 describe("HTTP server shell", () => {
   let logger: ReturnType<typeof recordingLogger>;
   let server: AppServer;
+  let ready = true;
 
   beforeEach(async () => {
     logger = recordingLogger();
-    server = createServer({ port: PORT, logger });
+    ready = true;
+    server = createServer({ port: PORT, logger, isReady: () => ready, openWhileStarting: [OPEN] });
+    server.get(OPEN, () => ({ open: true }));
     server.post(ECHO, { schema: { body: z.object({ text: z.string() }) } }, (request) => request.body);
     server.get(ECHO, () => ({ echoed: true }));
     server.get(BOOM, () => {
@@ -139,6 +145,25 @@ describe("HTTP server shell", () => {
       const response = await post({ ...json, host: LOCAL }, { text: 1 });
       expect(response.statusCode).toBe(BAD_REQUEST);
       expect(z.object({ error: z.string() }).parse(response.json()).error).toMatch(/text/u);
+    });
+  });
+
+  describe("Readiness gate", () => {
+    it("answers 503 on every route but the open ones until the app is ready", async () => {
+      ready = false;
+      const get = async (url: string) => server.inject({ method: "GET", url, headers: { host: LOCAL } });
+      expect((await get(ECHO)).statusCode).toBe(UNAVAILABLE);
+      expect((await get(ECHO)).json()).toEqual({ error: STARTING });
+      expect((await get("/api/nope")).statusCode).toBe(UNAVAILABLE);
+      expect((await get(`${OPEN}?probe=1`)).statusCode).toBe(OK);
+      ready = true;
+      expect((await get(ECHO)).statusCode).toBe(OK);
+    });
+
+    it("still refuses a foreign Host before answering that it is starting", async () => {
+      ready = false;
+      const response = await server.inject({ method: "GET", url: ECHO, headers: { host: "evil.example" } });
+      expect(response.statusCode).toBe(HttpStatus.MisdirectedRequest);
     });
   });
 

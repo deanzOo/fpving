@@ -37,7 +37,7 @@ import type { SpawnWorker } from "../plugins/runtime/connection.js";
 import { spawnWorker, startPluginHost, WORKER_ENTRY } from "../plugins/runtime/host.js";
 import type { PluginHost, PluginState } from "../plugins/runtime/host.js";
 import { createPluginStoreGateway } from "../plugins/store-gateway.js";
-import { registerHealthRoute } from "../server/health.js";
+import { HEALTH_PATH, registerHealthRoute } from "../server/health.js";
 import { createServer, LOOPBACK_HOST } from "../server/server.js";
 import type { AppServer } from "../server/server.js";
 import { sequenceShutdown, SHUTDOWN_DEADLINE_MS, withinDeadline } from "./lifecycle.js";
@@ -203,7 +203,8 @@ export const startApp = async (
     limiter,
     profileDir: join(dataDir, BROWSER_PROFILE_DIR),
   });
-  const server = createServer({ port: env.PORT, logger });
+  let ready = false;
+  const server = createServer({ port: env.PORT, logger, isReady: () => ready, openWhileStarting: [HEALTH_PATH] });
   let plugins: PluginHost | null = null;
   let scans: SchedulerHandle | null = null;
   let pluginStates = (): readonly PluginState[] => [];
@@ -221,7 +222,7 @@ export const startApp = async (
   try {
     const settings = await repository.settings.get();
     const { entries, rejected } = await readPlugins(dataDir, logger);
-    registerHealthRoute(server, { version, plugins: () => pluginStates(), rejectedEntries: rejected.length });
+    registerHealthRoute(server, { version, plugins: () => pluginStates(), rejectedEntries: () => rejected.length });
     const address = await server.listen({ host: LOOPBACK_HOST, port: env.PORT });
     const host = await startPluginHost({
       entries,
@@ -246,6 +247,7 @@ export const startApp = async (
     };
     const running = await startScheduler(deps);
     scans = running;
+    ready = true;
     logger.info("fpving started", { version, address, plugins: entries.length });
     return ok({ env, server, deps, scans: running, plugins: host, logger, address, shutdown });
   } catch (error) {
