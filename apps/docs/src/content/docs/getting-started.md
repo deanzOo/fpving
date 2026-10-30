@@ -4,7 +4,7 @@ description: The planned first-run flow, how to run the server today, and what e
 ---
 
 :::caution[Not built yet]
-The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts and answers a health check; the UI and the domain routes are not built yet.
+The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts and answers a JSON API (see the [HTTP API reference](../reference/http-api/)); the UI is not built yet.
 :::
 
 ## Planned flow
@@ -35,7 +35,7 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
 - `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
 
-- The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health`, refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
+- The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health` and the domain routes (products, listings, match candidates, alerts, settings, plugins, scan now), refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
 
 To work on it, follow the setup in [Contributing](../contributing/).
 
