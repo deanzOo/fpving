@@ -104,3 +104,25 @@ export const createAnthropicLlmJudge = (createMessage: CreateMessage, logger: Lo
       ask("compare", verdictFormat, COMPARE_SYSTEM, compareMessage(source, candidate)),
   };
 };
+
+/** The detail of every answer from {@link keylessLlmJudge}. */
+export const NO_API_KEY = "no ANTHROPIC_API_KEY is set";
+
+/**
+ * The core {@link LlmJudge} the app uses when no API key is set. Every call is `unavailable` with {@link NO_API_KEY},
+ * so matching saves its candidates `unjudged` the way core defines, and nothing is sent. Each call is logged at debug
+ * level only, since the app logs the missing key once at startup.
+ *
+ * @param logger - Where calls are logged.
+ * @returns The judge.
+ */
+export const keylessLlmJudge = (logger: Logger): LlmJudge => {
+  const unavailable = (method: keyof LlmJudge): Result<never, LlmError> => {
+    logger.debug("LLM judge skipped", { method });
+    return err({ kind: LlmErrorKind.Unavailable, detail: NO_API_KEY });
+  };
+  return {
+    extractIdentity: async () => Promise.resolve(unavailable("extractIdentity")),
+    compare: async () => Promise.resolve(unavailable("compare")),
+  };
+};
