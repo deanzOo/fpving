@@ -101,7 +101,8 @@ describe("Accepting a match candidate", () => {
     const { deps, repository, productId, exact, older } = await withCandidates();
     const added = await addListing(deps, productId, EXACT_URL);
     const tracking = added.ok ? added.value.listing : undefined;
-    const alreadyTracked = err({ kind: AddErrorKind.AlreadyTracked, listing: tracking });
+    const product = await repository.products.get(productId);
+    const alreadyTracked = err({ kind: AddErrorKind.AlreadyTracked, listing: tracking, product });
     expect(await acceptCandidate(deps, exact.id)).toEqual(alreadyTracked);
     expect(await pendingIds(repository)).toEqual([exact.id, older.id]);
   });
