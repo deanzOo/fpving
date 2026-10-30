@@ -2,8 +2,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, st
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { productIdSchema } from "@fpving/core";
-import type { Scheduler } from "@fpving/core";
+import type { Scheduler, Settings } from "@fpving/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { migrate } from "../../src/adapters/sqlite/migrate.ts";
 import { openSqliteRepository } from "../../src/adapters/sqlite/repository.ts";
 import type { ClosableBrowserDriver } from "../../src/adapters/transport/playwright-browser-driver.ts";
@@ -13,6 +14,8 @@ import type { App, AppPorts } from "../../src/app/start.ts";
 import { PLUGINS_FILE } from "../../src/plugins/config.ts";
 import type { SpawnWorker } from "../../src/plugins/runtime/connection.ts";
 import { HEALTH_PATH } from "../../src/server/health.ts";
+import { apiRoutes } from "../../src/server/api-routes.ts";
+import { PluginIssueKind, PluginStatusKind } from "../../src/plugins/status.ts";
 import { fakeWorker } from "../plugins/runtime/fake-worker.ts";
 import { fakePorts, freePort, FX, occupy } from "../support/app-fixtures.ts";
 import { fixturePlugin } from "../support/plugin-workers.ts";
@@ -22,6 +25,9 @@ const OK = 200;
 const NOT_FOUND = 404;
 const UNAVAILABLE = 503;
 const PLUGIN_LOAD_MS = 20_000;
+const MS_PER_HOUR = 3_600_000;
+const ACCEPTED = 202;
+const INTERNAL_ERROR = 500;
 const OWNER_ONLY = 0o700;
 const PERMISSIONS = 0o777;
 const OPEN_DIR = 0o755;
@@ -61,8 +67,9 @@ const started = async (source: Record<string, string>, overrides: Partial<AppPor
   return app;
 };
 
-const health = async (running: App) =>
-  running.server.inject({ method: "GET", url: HEALTH_PATH, headers: { host: `127.0.0.1:${String(port)}` } });
+const host = () => ({ host: `127.0.0.1:${String(port)}` });
+
+const health = async (running: App) => running.server.inject({ method: "GET", url: HEALTH_PATH, headers: host() });
 
 const logText = (): string => readFileSync(join(dataDir, LOG_FILE), "utf8");
 
@@ -100,15 +107,27 @@ describe("App startup", () => {
     const running = await started(env(), ports);
     expect((await health(running)).json()).toMatchObject({ plugins: { loaded: 1, disabled: 1 } });
     expect(running.deps.stores.declaredDomains().length).toBeGreaterThan(0);
+    const rows = await running.server.inject({ method: "GET", url: apiRoutes.listPlugins.url, headers: host() });
+    expect(z.array(z.object({ source: z.string(), status: z.string() })).parse(rows.json())).toEqual([
+      { source: fixturePlugin("good").path, status: PluginStatusKind.Loaded },
+      { source: `${PLUGINS_FILE}[1]`, status: PluginStatusKind.Disabled },
+    ]);
     expect(logText()).toContain("plugins.json entry rejected");
   }, PLUGIN_LOAD_MS);
 
-  it("starts with no plugins and logs why when plugins.json is not valid JSON", async () => {
+  it("starts with no plugins and lists an unusable plugins.json as one disabled row", async () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), "{ nope");
     const running = await started(env(), fakes().ports);
-    expect((await health(running)).json()).toMatchObject({ plugins: { loaded: 0, disabled: 0 } });
+    expect((await health(running)).json()).toMatchObject({ plugins: { loaded: 0, disabled: 1 } });
     expect(logText()).toContain("plugins.json is unusable");
+    const rows = await running.server.inject({ method: "GET", url: apiRoutes.listPlugins.url, headers: host() });
+    const row = z.object({ source: z.string(), status: z.string(), issues: z.array(z.object({ kind: z.string() })) });
+    expect(z.array(row).parse(rows.json())).toEqual([{
+      source: PLUGINS_FILE,
+      status: PluginStatusKind.Disabled,
+      issues: [{ kind: PluginIssueKind.ConfigInvalid }],
+    }]);
   });
 
   it("judges without the LLM when no API key is set, and says so once in the log", async () => {
@@ -284,6 +303,93 @@ describe("App startup cancelled by a shutdown request", () => {
     };
     const result = await startApp(env(), { ...fakes().ports, browser }, controller.signal);
     expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.Cancelled, clean: false } });
+  });
+});
+
+describe("App settings changes", () => {
+  const readyWorkers = () => {
+    const workers: ReturnType<typeof fakeWorker>[] = [];
+    const spawn: SpawnWorker = (data) => {
+      const worker = fakeWorker(data);
+      workers.push(worker);
+      queueMicrotask(() => {
+        worker.ready();
+      });
+      return worker.handle;
+    };
+    return { workers, spawn };
+  };
+
+  const startWithPlugin = async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const { workers, spawn } = readyWorkers();
+    const fake = fakes();
+    const running = await started(env(), { ...fake.ports, spawn });
+    const put = async (change: Partial<Settings>) => {
+      const current = await running.deps.repository.settings.get();
+      const payload = { ...current, ...change };
+      return running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    };
+    return { running, workers, armed: fake.armed, put };
+  };
+
+  it("restarts the plugin host with a new ship-to country and re-arms the schedule", async () => {
+    const { running, workers, armed, put } = await startWithPlugin();
+    const stores = running.deps.stores;
+    expect((await put({ shipToCountry: "US" })).statusCode).toBe(OK);
+    expect(workers.map((worker) => ({ shipTo: worker.data.shipTo, terminated: worker.terminations() > 0 }))).toEqual([
+      { shipTo: "IL", terminated: true },
+      { shipTo: "US", terminated: false },
+    ]);
+    expect(running.deps.stores).not.toBe(stores);
+    expect(armed).toEqual([armed[0], armed[0]]);
+    expect(running.plugins.plugins()[0]?.status.kind).toBe(PluginStatusKind.Loaded);
+    await running.shutdown();
+    expect(workers[1]?.terminations()).toBe(1);
+  });
+
+  it("restarts the plugin host with a new display currency", async () => {
+    const { workers, put } = await startWithPlugin();
+    await put({ displayCurrency: "EUR" });
+    expect(workers.map((worker) => worker.data.currencyPreference)).toEqual(["ILS", "EUR"]);
+  });
+
+  it("re-arms the schedule with a new scan interval without restarting the plugins, and scans on it", async () => {
+    const { running, workers, armed, put } = await startWithPlugin();
+    await put({ scanIntervalHours: 1 });
+    expect(workers).toHaveLength(1);
+    expect(armed).toEqual([armed[0], MS_PER_HOUR]);
+    const scan = await running.server.inject({ method: "POST", url: apiRoutes.startScan.url, headers: host() });
+    expect(scan.statusCode).toBe(ACCEPTED);
+  });
+
+  it("answers 500 when the plugin host cannot restart, and still applies the next change", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const ready = readyWorkers();
+    const spawn: SpawnWorker = (data) => {
+      if (data.shipTo === "US") {
+        throw new Error("cannot spawn");
+      }
+      return ready.spawn(data);
+    };
+    const running = await started(env(), { ...fakes().ports, spawn });
+    const put = async (shipToCountry: Settings["shipToCountry"]) => {
+      const payload = { ...(await running.deps.repository.settings.get()), shipToCountry };
+      return running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    };
+    expect((await put("US")).statusCode).toBe(INTERNAL_ERROR);
+    expect(logText()).toContain("settings change failed");
+    expect((await put("IL")).statusCode).toBe(OK);
+    expect(ready.workers.map((worker) => worker.data.shipTo)).toEqual(["IL", "IL"]);
+  });
+
+  it("restarts nothing when only the drop threshold changes", async () => {
+    const { running, workers, armed, put } = await startWithPlugin();
+    await put({ priceDropMinBasisPoints: 100 });
+    expect({ workers: workers.length, armed: armed.length }).toEqual({ workers: 1, armed: 1 });
+    expect(await running.deps.repository.settings.get()).toMatchObject({ priceDropMinBasisPoints: 100 });
   });
 });
 

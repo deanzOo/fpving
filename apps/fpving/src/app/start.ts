@@ -8,12 +8,11 @@ import type {
   HttpClient,
   IdGenerator,
   LlmJudge,
-  MatchDeps,
   Notifier,
   Result,
   Scheduler,
-  SchedulerDeps,
   SchedulerHandle,
+  Settings,
 } from "@fpving/core";
 import { anthropicMessages, createAnthropicLlmJudge, keylessLlmJudge } from "../adapters/anthropic/llm-judge.js";
 import { createFileDebugSink } from "../adapters/debug/file-debug-sink.js";
@@ -37,11 +36,15 @@ import type { SpawnWorker } from "../plugins/runtime/connection.js";
 import { spawnWorker, startPluginHost, WORKER_ENTRY } from "../plugins/runtime/host.js";
 import type { PluginHost, PluginState } from "../plugins/runtime/host.js";
 import { createPluginStoreGateway } from "../plugins/store-gateway.js";
+import { registerApiRoutes } from "../server/api.js";
 import { HEALTH_PATH, registerHealthRoute } from "../server/health.js";
+import { pluginRows } from "../server/plugin-rows.js";
 import { createServer, LOOPBACK_HOST } from "../server/server.js";
 import type { AppServer } from "../server/server.js";
 import { sequenceShutdown, SHUTDOWN_DEADLINE_MS, withinDeadline } from "./lifecycle.js";
 import type { ShutdownStep } from "./lifecycle.js";
+import { createSettingsApplier } from "./settings.js";
+import type { AppDeps, LiveParts } from "./settings.js";
 
 /** The database file in `DATA_DIR`. */
 export const DB_FILE = "fpving.db";
@@ -93,9 +96,10 @@ export interface AppPorts {
 export interface App {
   readonly env: Env;
   readonly server: AppServer;
-  /** Every port core's use cases take. */
-  readonly deps: MatchDeps & SchedulerDeps;
+  /** Every port core's use cases take, as they are now; a settings change can replace the store gateway. */
+  readonly deps: AppDeps;
   readonly scans: SchedulerHandle;
+  /** The plugin host now; a settings change can replace it. */
   readonly plugins: PluginHost;
   readonly logger: ClosableLogger;
   /** Where the server listens, `http://127.0.0.1:PORT`. */
@@ -151,12 +155,12 @@ const readPlugins = async (dataDir: string, logger: ClosableLogger) => {
   const config = await readPluginsConfig(dataDir, readTextFile);
   if (!config.ok) {
     logger.error("plugins.json is unusable, no plugins load", { kind: config.error.kind, detail: config.error.detail });
-    return { entries: [], rejected: [] };
+    return { entries: [], rejected: [], issue: config.error };
   }
   for (const { index, issue } of config.value.rejected) {
     logger.warn("plugins.json entry rejected", { index, kind: issue.kind, detail: issue.detail });
   }
-  return config.value;
+  return { ...config.value, issue: null };
 };
 
 const judgeFor = (env: Env, logger: ClosableLogger): LlmJudge => {
@@ -219,6 +223,7 @@ export const startApp = async (
   let ready = false;
   let pluginStates = (): readonly PluginState[] => [];
   let rejectedEntries = 0;
+  let plugins: Awaited<ReturnType<typeof readPlugins>> = { entries: [], rejected: [], issue: null };
   try {
     const version = readAppVersion();
     const limiter = createDomainLimiter(systemTiming);
@@ -240,6 +245,7 @@ export const startApp = async (
       plugins: () => pluginStates(),
       rejectedEntries: () => rejectedEntries,
     });
+    const api = registerApiRoutes(server);
     opened({ name: ShutdownStepName.Server, run: async () => server.close() });
     const address = await server.listen({ host: LOOPBACK_HOST, port: env.PORT });
     checkpoint();
@@ -248,23 +254,28 @@ export const startApp = async (
     const { repository, close: closeDatabase } = openSqliteRepository(dbPath);
     opened({ name: ShutdownStepName.Database, run: closeDatabase });
     const settings = await repository.settings.get();
-    const { entries, rejected } = await readPlugins(dataDir, logger);
-    rejectedEntries = rejected.length;
+    plugins = await readPlugins(dataDir, logger);
+    rejectedEntries = plugins.rejected.length + (plugins.issue === null ? 0 : 1);
     checkpoint();
-    const host = await startPluginHost({
-      entries,
+    const spawn = overrides.spawn ?? spawnWorker(WORKER_ENTRY);
+    const startHost = async ({ shipToCountry, displayCurrency }: Settings) => startPluginHost({
+      entries: plugins.entries,
       services: { http, browser, logger },
-      shipTo: settings.shipToCountry,
-      currencyPreference: settings.displayCurrency,
-      spawn: overrides.spawn ?? spawnWorker(WORKER_ENTRY),
+      shipTo: shipToCountry,
+      currencyPreference: displayCurrency,
+      spawn,
     });
-    opened({ name: ShutdownStepName.Plugins, run: async () => host.shutdown() });
-    pluginStates = () => host.plugins();
+    const host = await startHost(settings);
+    let currentHost = (): PluginHost => host;
+    opened({ name: ShutdownStepName.Plugins, run: async () => currentHost().shutdown() });
+    pluginStates = () => currentHost().plugins();
     checkpoint();
     const clock = overrides.clock ?? systemClock;
+    const debugSink = createFileDebugSink({ dataDir, clock });
+    const gatewayFor = (current: PluginHost) => createPluginStoreGateway({ host: current, debugSink, logger });
     const deps = {
       repository,
-      stores: createPluginStoreGateway({ host, debugSink: createFileDebugSink({ dataDir, clock }), logger }),
+      stores: gatewayFor(host),
       ids: overrides.ids ?? uuidIdGenerator,
       clock,
       notifier: overrides.notifier ?? createOsNotifier(notifyBackendFor(platform)),
@@ -273,11 +284,40 @@ export const startApp = async (
       rates: overrides.rates ?? createHttpFxRates(globalThis.fetch),
       scheduler: overrides.scheduler ?? createTimerScheduler(),
     };
-    const scans = await startScheduler(deps);
-    opened({ name: ShutdownStepName.Scans, run: async () => scans.stop() });
+    const parts: LiveParts = { host, deps, scans: await startScheduler(deps) };
+    const settingsApplier = createSettingsApplier({ live: parts, startHost, gatewayFor });
+    opened({
+      name: ShutdownStepName.Scans,
+      run: async () => {
+        await settingsApplier.settled();
+        await parts.scans.stop();
+      },
+    });
+    currentHost = () => parts.host;
+    api.attach({
+      deps: () => parts.deps,
+      scans: () => parts.scans,
+      plugins: () => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue),
+      applySettings: async (next) => settingsApplier.apply(next),
+    });
     ready = true;
-    logger.info("fpving started", { version, address, plugins: entries.length });
-    return ok({ env, server, deps, scans, plugins: host, logger, address, shutdown });
+    logger.info("fpving started", { version, address, plugins: plugins.entries.length });
+    return ok({
+      env,
+      server,
+      get deps() {
+        return parts.deps;
+      },
+      get scans() {
+        return parts.scans;
+      },
+      get plugins() {
+        return parts.host;
+      },
+      logger,
+      address,
+      shutdown,
+    });
   } catch (error) {
     const cancelled = signal.aborted;
     logger.error(cancelled ? "startup cancelled" : "startup failed", { detail: inspect(error) });
