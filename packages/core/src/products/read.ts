@@ -4,14 +4,14 @@ import type { ListingWithLatest } from "../alerts/draft.js";
 import { ListingStatus } from "../entities.js";
 import type { Listing, PriceSnapshot, Product } from "../entities.js";
 import type { ListingId, ProductId } from "../ids.js";
-
-const EPOCH = new Date(0);
 import { cheapestBy } from "../alerts/new-cheapest.js";
 import { landedCostExact } from "../pricing/landed-cost.js";
 import { roundMinor } from "../pricing/money.js";
 import { liveProduct } from "./add.js";
 import type { CoreDeps, ProductNotFound } from "./add.js";
 import { AddErrorKind } from "./errors.js";
+
+const EPOCH = new Date(0);
 
 /** A product's cheapest listing and its landed cost in the display currency. */
 export interface CheapestPrice {
