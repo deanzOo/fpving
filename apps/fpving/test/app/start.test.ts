@@ -73,6 +73,19 @@ const health = async (running: App) => running.server.inject({ method: "GET", ur
 
 const logText = (): string => readFileSync(join(dataDir, LOG_FILE), "utf8");
 
+const readyWorkers = () => {
+  const workers: ReturnType<typeof fakeWorker>[] = [];
+  const spawn: SpawnWorker = (data) => {
+    const worker = fakeWorker(data);
+    workers.push(worker);
+    queueMicrotask(() => {
+      worker.ready();
+    });
+    return worker.handle;
+  };
+  return { workers, spawn };
+};
+
 describe("App startup", () => {
   it("wires every port into core and answers health with no plugins.json", async () => {
     const { ports } = fakes();
@@ -307,19 +320,6 @@ describe("App startup cancelled by a shutdown request", () => {
 });
 
 describe("App settings changes", () => {
-  const readyWorkers = () => {
-    const workers: ReturnType<typeof fakeWorker>[] = [];
-    const spawn: SpawnWorker = (data) => {
-      const worker = fakeWorker(data);
-      workers.push(worker);
-      queueMicrotask(() => {
-        worker.ready();
-      });
-      return worker.handle;
-    };
-    return { workers, spawn };
-  };
-
   const startWithPlugin = async () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
@@ -397,15 +397,7 @@ describe("App shutdown", () => {
   it("stops the schedule, then the server, the plugin host, the browser, the database and the log, once", async () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
-    const workers: ReturnType<typeof fakeWorker>[] = [];
-    const spawn: SpawnWorker = (data) => {
-      const worker = fakeWorker(data);
-      workers.push(worker);
-      queueMicrotask(() => {
-        worker.ready();
-      });
-      return worker.handle;
-    };
+    const { workers, spawn } = readyWorkers();
     const seen: Record<string, unknown>[] = [];
     const holder: { app?: App } = {};
     const observe = async (step: string): Promise<void> => {

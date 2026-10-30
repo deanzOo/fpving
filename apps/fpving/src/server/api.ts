@@ -163,13 +163,14 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     ...apiRoutes.addListing,
     handler: async ({ params, body }, reply) => {
       const added = await addListing(deps(), params.productId, body.url);
-      if (!added.ok) {
-        const { status, body: refusal } = added.error.kind === AddErrorKind.ProductNotFound
-          ? productNotFound
-          : addFailure(added.error);
-        return reply.code(status).send(refusal);
+      if (added.ok) {
+        return reply.code(RouteStatus.Created).send(added.value);
       }
-      return reply.code(RouteStatus.Created).send(added.value);
+      if (added.error.kind === AddErrorKind.ProductNotFound) {
+        return reply.code(productNotFound.status).send(productNotFound.body);
+      }
+      const { status, body: refusal } = addFailure(added.error);
+      return reply.code(status).send(refusal);
     },
   });
 
