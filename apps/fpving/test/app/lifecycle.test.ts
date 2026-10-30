@@ -6,6 +6,7 @@ import {
   SHUTDOWN_DEADLINE_MS,
   SHUTDOWN_MESSAGE,
   sequenceShutdown,
+  withinDeadline,
 } from "../../src/app/lifecycle.ts";
 import { recordingLogger } from "../support/recording-logger.ts";
 
@@ -99,6 +100,19 @@ describe("Shutdown on request", () => {
     source.emit("SIGINT");
     await vi.advanceTimersByTimeAsync(0);
     expect(exit).toHaveBeenCalledWith(ExitCode.Clean);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("Shutdown deadline", () => {
+  it("resolves to the work's result in time, or false with a logged error once the deadline passes", async () => {
+    vi.useFakeTimers();
+    const logger = recordingLogger();
+    expect(await withinDeadline(Promise.resolve(true), SHUTDOWN_DEADLINE_MS, logger)).toBe(true);
+    const late = withinDeadline(never(), SHUTDOWN_DEADLINE_MS, logger);
+    await vi.advanceTimersByTimeAsync(SHUTDOWN_DEADLINE_MS);
+    expect(await late).toBe(false);
+    expect(logger.events.map(({ message }) => message)).toEqual(["shutdown missed its deadline"]);
     expect(vi.getTimerCount()).toBe(0);
   });
 });

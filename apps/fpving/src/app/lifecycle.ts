@@ -46,6 +46,29 @@ export const sequenceShutdown = (steps: readonly ShutdownStep[], logger: Logger)
   return async () => (running ??= runAll());
 };
 
+/**
+ * Waits for a shutdown, but no longer than the deadline.
+ *
+ * @param work - The running shutdown.
+ * @param deadlineMs - How long to wait.
+ * @param logger - Where a missed deadline is logged.
+ * @returns The shutdown's result, or false when the deadline passed first.
+ */
+export const withinDeadline = async (work: Promise<boolean>, deadlineMs: number, logger: Logger): Promise<boolean> => {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<false>((resolve) => {
+    timer = setTimeout(() => {
+      logger.error("shutdown missed its deadline", { deadlineMs });
+      resolve(false);
+    }, deadlineMs);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 interface ShutdownSource {
   on(event: (typeof SHUTDOWN_SIGNALS)[number], listener: () => void): unknown;
   on(event: "message", listener: (message: unknown) => void): unknown;
@@ -80,15 +103,7 @@ export const handleShutdown = (handling: ShutdownHandling): void => {
     }
     requested = true;
     logger.info("shutting down");
-    let timer: NodeJS.Timeout | undefined;
-    const deadline = new Promise<false>((resolve) => {
-      timer = setTimeout(() => {
-        logger.error("shutdown missed its deadline", { deadlineMs });
-        resolve(false);
-      }, deadlineMs);
-    });
-    void Promise.race([shutdown(), deadline]).then((clean) => {
-      clearTimeout(timer);
+    void withinDeadline(shutdown(), deadlineMs, logger).then((clean) => {
       exit(clean ? ExitCode.Clean : ExitCode.Failed);
     });
   };
