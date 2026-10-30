@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
@@ -26,11 +26,28 @@ const danglingKeys = (client: Database.Database): string | null => {
   return rows.length === 0 ? null : `${String(rows.length)} dangling foreign key(s) (${tables})`;
 };
 
-const pruneBackups = (path: string): void => {
+const BACKUP_STAMP = /^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/u;
+
+const backupTime = (prefix: string, name: string): number | null => {
+  const stamp = name.slice(prefix.length, -BACKUP_SUFFIX.length);
+  return name.startsWith(prefix) && name.endsWith(BACKUP_SUFFIX) && BACKUP_STAMP.test(stamp)
+    ? Date.parse(stamp.replace(BACKUP_STAMP, "$1:$2:$3.$4Z"))
+    : null;
+};
+
+const pruneBackups = (path: string, fresh: string | null): void => {
+  const dir = dirname(path);
   const prefix = `${basename(path)}.`;
-  const names = readdirSync(dirname(path)).filter((name) => name.startsWith(prefix) && name.endsWith(BACKUP_SUFFIX));
-  for (const name of names.toSorted().reverse().slice(KEPT_BACKUPS)) {
-    rmSync(join(dirname(path), name));
+  const freshName = fresh === null ? null : basename(fresh);
+  const older = readdirSync(dir)
+    .filter((name) => name !== freshName && lstatSync(join(dir, name)).isFile())
+    .flatMap((name) => {
+      const time = backupTime(prefix, name);
+      return time === null ? [] : [{ name, time }];
+    })
+    .toSorted((a, b) => b.time - a.time);
+  for (const { name } of older.slice(fresh === null ? KEPT_BACKUPS : KEPT_BACKUPS - 1)) {
+    rmSync(join(dir, name));
   }
 };
 
@@ -47,7 +64,8 @@ const backUp = (client: Database.Database, path: string): string => {
  * database as it was and throws, naming the backup. Foreign keys are off while migrating, so a migration may rebuild a
  * referenced table; afterwards `foreign_key_check` must come back empty, or it throws, naming the backup, since those
  * migrations are already committed. After a successful run only the newest {@link KEPT_BACKUPS} backups of the file
- * are kept; their UTC timestamps sort by name. Run it before opening any repository connection to the file.
+ * are kept, by the time in their names, always including the one just made; only regular files named exactly as this
+ * function names backups are ever deleted. Run it before opening any repository connection to the file.
  *
  * @param path - The database file.
  * @param migrationsFolder - The drizzle-kit migrations; the app's own by default.
@@ -71,7 +89,7 @@ export const migrate = (path: string, migrationsFolder = MIGRATIONS_FOLDER): { b
     if (dangling !== null) {
       throw new Error(`Migrating ${path} left ${dangling}; ${backupNote}`);
     }
-    pruneBackups(path);
+    pruneBackups(path, backupPath);
     return { backupPath };
   } finally {
     client.close();

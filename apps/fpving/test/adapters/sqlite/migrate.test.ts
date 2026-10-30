@@ -1,4 +1,4 @@
-import { cpSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
@@ -121,6 +121,41 @@ describe("SQLite migrations", () => {
     expect(kept).not.toContain(`fpving.db.${stamps[0] ?? ""}T00-00-00-000Z.bak`);
     expect(kept).not.toContain(`fpving.db.${stamps[1] ?? ""}T00-00-00-000Z.bak`);
     expect(backups(dir)).toContain("other.db.2026-01-01T00-00-00-000Z.bak");
+  });
+
+  it("prunes only regular files named like its own backups, so a user's .bak or a folder survives", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const stamped = (day: number): string => `fpving.db.2026-01-0${String(day)}T00-00-00-000Z.bak`;
+    for (let day = 1; day <= KEPT_BACKUPS + LATER; day += 1) {
+      writeFileSync(join(dir, stamped(day)), "");
+    }
+    writeFileSync(join(dir, "fpving.db.0-mine.bak"), "mine");
+    writeFileSync(join(dir, "fpving.db.manual.bak"), "mine");
+    mkdirSync(join(dir, "fpving.db.2025-01-01T00-00-00-000Z.bak"));
+    migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"));
+    const names = readdirSync(dir);
+    expect(names).toEqual(expect.arrayContaining(["fpving.db.0-mine.bak", "fpving.db.manual.bak"]));
+    expect(names).toContain("fpving.db.2025-01-01T00-00-00-000Z.bak");
+    expect(names).not.toContain(stamped(1));
+    expect(names).not.toContain(stamped(LATER + 1));
+  });
+
+  it("never prunes the backup it just made, even when the clock went backwards", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const future = (year: number): string => `fpving.db.${String(year)}-01-01T00-00-00-000Z.bak`;
+    const FUTURE_YEAR = 2990;
+    for (let offset = 0; offset < KEPT_BACKUPS; offset += 1) {
+      writeFileSync(join(dir, future(FUTURE_YEAR + offset)), "");
+    }
+    const { backupPath } = migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"));
+    const kept = backups(dir);
+    expect(kept).toHaveLength(KEPT_BACKUPS);
+    expect(kept).toContain(basename(backupPath ?? ""));
+    expect(kept).not.toContain(future(FUTURE_YEAR));
   });
 
   it("rolls back a failing migration, keeps the backup intact and names it in the error", () => {
