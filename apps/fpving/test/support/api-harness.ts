@@ -16,6 +16,8 @@ import { createServer } from "../../src/server/server.ts";
 import { FX } from "./app-fixtures.ts";
 import { recordingLogger } from "./recording-logger.ts";
 
+const ID_DIGITS = 4;
+
 /** The port every harness request's Host header names. */
 export const API_PORT = 4321;
 
@@ -82,7 +84,6 @@ export const startApiHarness = async () => {
   const { repository, close } = openSqliteRepository(dbPath);
   const logger = recordingLogger();
   const stores = fakeGateway();
-  const ID_DIGITS = 4;
   let next = 0;
   let millis = Date.parse("2026-10-30T10:00:00.000Z");
   const deps = {
