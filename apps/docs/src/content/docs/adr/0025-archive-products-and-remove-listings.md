@@ -40,5 +40,6 @@ The API needs to delete a product and remove a listing, but snapshots, alerts an
   - A URL tracked by any other listing answers 409 `already_tracked`, naming that product by id and name. That includes a removed listing of another product and a listing of an archived product added to a different product.
   - No schema change.
 - A scan running while a listing is removed or a product archived leaves that listing, or the whole product, out of its cheapest listing and its alerts.
+- A settings change that starts a new plugin host now saves the settings before the gateway moves to the new host, so a failed save shuts the new host down and leaves the app as it was. Calls still running through the old gateway get up to five seconds to finish before the old host shuts down, and an old host that fails to shut down is logged as a warning while the change succeeds.
 - Good: deleting or removing by mistake is undone by pasting the URL again.
 - Bad: a listing can only move between products by being restored on its own product; there is no move.
