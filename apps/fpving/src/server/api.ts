@@ -10,6 +10,7 @@ import {
   pendingCandidates,
   productDetail,
   rejectCandidate,
+  removeListing,
   watchlist,
 } from "@fpving/core";
 import type {
@@ -49,6 +50,7 @@ const Message = {
   ProductNotFound: "no product has this id",
   NotPending: "no pending match candidate has this id",
   AlertNotFound: "no alert has this id",
+  ListingNotFound: "the product has no listing with this id that is not removed",
   NoSourceListing: "the product has no manually added listing to match from",
   AlreadySuggested: "another search saved candidates for this product meanwhile; search again",
   PluginUnavailable: "the plugin for this store is not loaded; see the plugins screen",
@@ -91,6 +93,7 @@ const matchFailure = (error: FindMatchesError) => {
 };
 
 const productNotFound = failure(RouteStatus.NotFound, AddErrorKind.ProductNotFound, Message.ProductNotFound);
+const listingNotFound = failure(RouteStatus.NotFound, ApiErrorKind.ListingNotFound, Message.ListingNotFound);
 const notPending = failure(RouteStatus.NotFound, MatchErrorKind.NotPending, Message.NotPending);
 const restarting = failure(RouteStatus.ServiceUnavailable, ApiErrorKind.Restarting, Message.Restarting);
 
@@ -202,6 +205,18 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       }
       const { status, body: refusal } = addFailure(added.error);
       return reply.code(status).send(refusal);
+    },
+  });
+
+  server.route({
+    ...apiRoutes.removeListing,
+    handler: async ({ params: { productId, listingId } }, reply) => {
+      const removed = await removeListing(deps(), productId, listingId);
+      if (removed.ok) {
+        return reply.code(RouteStatus.NoContent).send(null);
+      }
+      const { status, body } = removed.error.kind === AddErrorKind.ProductNotFound ? productNotFound : listingNotFound;
+      return reply.code(status).send(body);
     },
   });
 

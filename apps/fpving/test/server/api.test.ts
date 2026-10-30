@@ -209,6 +209,33 @@ describe("Listings API", () => {
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ProductNotFound);
   });
 
+  it("removes a listing from its product, answering 204, so its detail no longer shows it", async () => {
+    const { product, listing } = await addProduct();
+    const second = await api.request("POST", `/api/products/${product.id}/listings`, { url: OTHER_PAGE });
+    const kept = z.object({ listing: wire }).parse(second.json()).listing.id;
+    const response = await api.request("DELETE", `/api/products/${product.id}/listings/${listing.id}`);
+    expect(response.statusCode).toBe(RouteStatus.NoContent);
+    const detail = detailWire.parse((await api.request("GET", `/api/products/${product.id}`)).json());
+    expect(detail.listings.map((row) => row.listing.id)).toEqual([kept]);
+  });
+
+  it("answers 404 listing_not_found for a listing that is not the product's or already removed", async () => {
+    const { product, listing } = await addProduct();
+    await api.request("DELETE", `/api/products/${product.id}/listings/${listing.id}`);
+    for (const id of [listing.id, "nope"]) {
+      const response = await api.request("DELETE", `/api/products/${product.id}/listings/${id}`);
+      expect({ status: response.statusCode, kind: errorOf(response.json()).kind })
+        .toEqual({ status: RouteStatus.NotFound, kind: ApiErrorKind.ListingNotFound });
+    }
+  });
+
+  it("answers 404 product_not_found when removing a listing of an archived product", async () => {
+    const { product, listing } = await addProduct();
+    await api.request("DELETE", `/api/products/${product.id}`);
+    const response = await api.request("DELETE", `/api/products/${product.id}/listings/${listing.id}`);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ProductNotFound);
+  });
+
   it("answers 409 already_tracked for a URL another listing tracks", async () => {
     const { product } = await addProduct();
     const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: PAGE });

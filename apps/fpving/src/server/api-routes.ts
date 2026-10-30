@@ -34,6 +34,7 @@ export const RouteStatus = {
 const countSchema = z.int().nonnegative();
 const urlBodySchema = z.object({ url: z.string().min(1) });
 const productParams = z.object({ productId: productIdSchema });
+const listingParams = z.object({ productId: productIdSchema, listingId: listingIdSchema });
 const candidateParams = z.object({ candidateId: matchCandidateIdSchema });
 const alertParams = z.object({ alertId: alertIdSchema });
 const addedListingSchema = z.object({ listing: listingSchema, snapshot: priceSnapshotSchema });
@@ -136,6 +137,12 @@ export const apiRoutes = {
       body: urlBodySchema,
       response: { [Created]: addedListingSchema, ...addErrors, [NotFound]: apiErrorSchema },
     },
+  },
+  removeListing: {
+    method: "DELETE",
+    url: "/api/products/:productId/listings/:listingId",
+    summary: "Removes a listing from its product: never scanned again and left out of prices, keeping its history.",
+    schema: { params: listingParams, response: { [NoContent]: z.null(), [NotFound]: apiErrorSchema } },
   },
   listCandidates: {
     method: "GET",
