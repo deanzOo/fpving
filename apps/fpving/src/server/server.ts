@@ -59,7 +59,7 @@ export const createServer = (options: ServerOptions) => {
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
   server.addHook("onRequest", async (request, reply) => {
-    const host = request.headers.host?.toLowerCase() ?? "";
+    const host = request.host.toLowerCase();
     if (!allowedHosts.includes(host)) {
       return reply.status(HttpStatus.MisdirectedRequest).send({ error: GuardRefusal.Host });
     }

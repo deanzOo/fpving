@@ -70,6 +70,12 @@ describe("HTTP server shell", () => {
     });
   });
 
+  it("ignores X-Forwarded-Host, so a proxy header cannot vouch for a foreign Host", async () => {
+    const headers = { "host": `evil.example:${String(PORT)}`, "x-forwarded-host": LOCAL };
+    const response = await server.inject({ method: "GET", url: ECHO, headers });
+    expect(response.statusCode).toBe(HttpStatus.MisdirectedRequest);
+  });
+
   describe("Origin guard", () => {
     it("accepts a state-changing request with no Origin, such as from curl", async () => {
       const response = await post({ ...json, host: LOCAL });

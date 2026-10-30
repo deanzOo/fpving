@@ -9,7 +9,7 @@ import {
 } from "../../src/app/lifecycle.ts";
 import { recordingLogger } from "../support/recording-logger.ts";
 
-const never = async (): Promise<void> => new Promise(() => undefined);
+const never = async (): Promise<boolean> => new Promise(() => undefined);
 
 afterEach(() => {
   vi.useRealTimers();
