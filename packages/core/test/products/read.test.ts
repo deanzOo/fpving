@@ -20,6 +20,8 @@ import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
 
 const CHEAP = 5000;
 const DEAR = 9000;
+const TIE_USD_MINOR = 1001;
+const TIE_ILS_MINOR = 3604;
 const OLDER_DAYS = 2;
 const settings = settingsSchema.parse(DEFAULT_SETTINGS);
 
@@ -94,6 +96,18 @@ describe("The watchlist", () => {
     ]);
     const expected = { listingId: "l1", landedCost: landed(priced) };
     expect(await watchlist({ repository })).toMatchObject([{ cheapest: expected }]);
+  });
+
+  it("picks the cheapest on the exact landed cost, as alerts do, and rounds only the price it shows", async () => {
+    const repository = await withRates();
+    const exactlyCheaper = snapshot("s2", "l2", price(TIE_USD_MINOR));
+    await watched(repository, product("p1", NOW), [
+      [listing("l1"), snapshot("s1", "l1", { itemPrice: { amountMinor: TIE_ILS_MINOR, currency: "ILS" } })],
+      [listing("l2", { addedAt: NOW }), exactlyCheaper],
+    ]);
+    expect(await watchlist({ repository })).toMatchObject([
+      { cheapest: { listingId: "l2", landedCost: landed(exactlyCheaper) } },
+    ]);
   });
 
   it("has no cheapest price for a product none of whose listings can be priced", async () => {

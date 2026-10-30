@@ -7,7 +7,8 @@ import type { ListingId, ProductId } from "../ids.js";
 
 const EPOCH = new Date(0);
 import { cheapestBy } from "../alerts/new-cheapest.js";
-import { landedCost } from "../pricing/landed-cost.js";
+import { landedCostExact } from "../pricing/landed-cost.js";
+import { roundMinor } from "../pricing/money.js";
 import { liveProduct } from "./add.js";
 import type { CoreDeps, ProductNotFound } from "./add.js";
 import { AddErrorKind } from "./errors.js";
@@ -37,9 +38,10 @@ export interface ProductDetail {
 }
 
 /**
- * The watched products, newest first, each with its cheapest landed price: the {@link landedCost} in the display
- * currency of the latest snapshot of each listing, over the latest stored exchange rates, among the listings a new
- * cheapest alert compares (active, in stock, quoted for the saved ship-to country, with known shipping). A listing
+ * The watched products, newest first, each with its cheapest landed price: the landed cost in the display currency
+ * of the latest snapshot of each listing, over the latest stored exchange rates, among the listings a new cheapest
+ * alert compares (active, in stock, quoted for the saved ship-to country, with known shipping). Listings are ranked
+ * on the exact cost, as alerts rank them, and only the cost shown is rounded to a minor unit. A listing
  * whose cost cannot be computed is left out; without stored rates no product has a cheapest price.
  *
  * @param deps - The repository.
@@ -58,8 +60,8 @@ export const watchlist = async ({ repository }: Pick<CoreDeps, "repository">): P
     const entries = listings.flatMap((listing): ListingWithLatest[] =>
       latest.filter((row) => row.listingId === listing.id).map((row) => ({ listing, latest: row })));
     const cheapest = cheapestBy(entries, settings.shipToCountry, (row) => {
-      const cost = landedCost(row, settings, rates);
-      return cost.ok ? cost.value.amountMinor : null;
+      const cost = landedCostExact(row, settings, rates);
+      return cost.ok ? cost.value : null;
     });
     return {
       product,
@@ -67,7 +69,7 @@ export const watchlist = async ({ repository }: Pick<CoreDeps, "repository">): P
         ? null
         : {
             listingId: cheapest.entry.listing.id,
-            landedCost: { amountMinor: cheapest.landedMinor, currency: settings.displayCurrency },
+            landedCost: { amountMinor: roundMinor(cheapest.landedMinor), currency: settings.displayCurrency },
           },
     };
   }));
