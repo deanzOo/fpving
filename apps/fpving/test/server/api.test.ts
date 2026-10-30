@@ -352,10 +352,11 @@ describe("Alerts API", () => {
     expect(ids((await api.request("GET", "/api/alerts?unread=false")).json())).toEqual(["a-2", "a-1"]);
   });
 
-  it("answers 404 not_found when marking an unknown alert read", async () => {
+  it("answers 404 alert_not_found when marking an unknown alert read, unlike an unknown path", async () => {
     const response = await api.request("POST", "/api/alerts/nope/read");
     expect(response.statusCode).toBe(RouteStatus.NotFound);
-    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.NotFound);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.AlertNotFound);
+    expect(errorOf((await api.request("POST", "/api/alerts/nope/unread")).json()).kind).toBe(ApiErrorKind.NotFound);
   });
 
   it("marks every unread alert read and says how many", async () => {

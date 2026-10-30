@@ -15,6 +15,7 @@ export const ApiErrorKind = {
   NotFound: "not_found",
   ...AddErrorKind,
   ...MatchErrorKind,
+  AlertNotFound: "alert_not_found",
   PluginUnavailable: "plugin_unavailable",
   ScanRunning: "scan_running",
   Restarting: "restarting",

@@ -7,7 +7,6 @@ import {
   findMatches,
   MatchErrorKind,
   rejectCandidate,
-  RepositoryErrorKind,
 } from "@fpving/core";
 import type {
   AddProductError,
@@ -253,7 +252,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       const { repository, clock } = deps();
       const marked = await repository.alerts.markRead(alertId, clock.now());
       if (!marked.ok) {
-        const { status, body } = failure(RouteStatus.NotFound, RepositoryErrorKind.NotFound, Message.AlertNotFound);
+        const { status, body } = failure(RouteStatus.NotFound, ApiErrorKind.AlertNotFound, Message.AlertNotFound);
         return reply.code(status).send(body);
       }
       return reply.code(RouteStatus.NoContent).send(null);
