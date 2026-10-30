@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
@@ -39,11 +39,10 @@ const pruneBackups = (path: string, fresh: string | null): void => {
   const dir = dirname(path);
   const prefix = `${basename(path)}.`;
   const freshName = fresh === null ? null : basename(fresh);
-  const older = readdirSync(dir)
-    .filter((name) => name !== freshName && lstatSync(join(dir, name)).isFile())
-    .flatMap((name) => {
-      const time = backupTime(prefix, name);
-      return time === null ? [] : [{ name, time }];
+  const older = readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => {
+      const time = entry.name === freshName ? null : backupTime(prefix, entry.name);
+      return time === null || !entry.isFile() ? [] : [{ name: entry.name, time }];
     })
     .toSorted((a, b) => b.time - a.time);
   for (const { name } of older.slice(fresh === null ? KEPT_BACKUPS : KEPT_BACKUPS - 1)) {
