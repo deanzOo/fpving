@@ -36,28 +36,22 @@ const candidateParams = z.object({ candidateId: matchCandidateIdSchema });
 const alertParams = z.object({ alertId: alertIdSchema });
 const addedListingSchema = z.object({ listing: listingSchema, snapshot: priceSnapshotSchema });
 
-/**
- * A product with its listings, oldest first, and each listing's full price history, oldest first, so the last
- * snapshot is the newest. Every listing has at least its first snapshot.
- */
-export const productDetailSchema = z.object({
+const productDetailSchema = z.object({
   product: productSchema,
   listings: z.array(z.object({ listing: listingSchema, history: z.array(priceSnapshotSchema).min(1) })),
 });
 
-/** One row of the plugins screen: a `plugins.json` entry, a rejected entry or the unusable file itself. */
-export const pluginRowSchema = z.object({
+const pluginRowSchema = z.object({
   source: z.string().min(1),
   manifest: manifestSchema.nullable(),
   status: z.enum(PluginStatusKind),
   issues: z.array(z.object({ kind: z.enum(PluginIssueKind), detail: z.string() })),
 });
 
-/** A plugins screen row as {@link pluginRowSchema} accepts it. */
+/** One row of the plugins screen: a `plugins.json` entry, a rejected entry or the unusable file itself. */
 export type PluginRow = z.infer<typeof pluginRowSchema>;
 
-/** Whether a scan the API started is running, the newest recorded run and what the last finished API scan did. */
-export const scanStatusSchema = z.object({
+const scanStatusSchema = z.object({
   running: z.boolean(),
   latestRun: scanRunSchema.nullable(),
   lastResult: z.object({
@@ -68,7 +62,7 @@ export const scanStatusSchema = z.object({
   }).nullable(),
 });
 
-/** A scan status as {@link scanStatusSchema} accepts it. */
+/** Whether a scan the API started is running, the newest recorded run and what the last finished API scan did. */
 export type ScanStatus = z.infer<typeof scanStatusSchema>;
 
 const { Ok, Created, Accepted, NoContent, NotFound, Conflict, UnprocessableContent, BadGateway } = RouteStatus;
@@ -87,7 +81,7 @@ export const apiRoutes = {
   getProduct: {
     method: "GET",
     url: "/api/products/:productId",
-    summary: "A product with its listings and each listing's price history, oldest first.",
+    summary: "A product with its listings and each listing's price history, oldest first, so the last is the newest.",
     schema: { params: productParams, response: { [Ok]: productDetailSchema, [NotFound]: apiErrorSchema } },
   },
   addProduct: {
