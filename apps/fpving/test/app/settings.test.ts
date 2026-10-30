@@ -1,10 +1,12 @@
 import { DEFAULT_SETTINGS, ok, settingsSchema } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { MockInstance } from "vitest";
 import { keylessLlmJudge } from "../../src/adapters/anthropic/llm-judge.ts";
 import { createSettingsApplier } from "../../src/app/settings.ts";
 import type { AppDeps } from "../../src/app/settings.ts";
 import { startPluginHost } from "../../src/plugins/runtime/host.ts";
+import type { PluginHost } from "../../src/plugins/runtime/host.ts";
 import { cleanUpTemp, openTempSqliteRepository } from "../adapters/sqlite/temp-db.ts";
 import { fakeServices } from "../plugins/runtime/fake-worker.ts";
 import { fakeGateway } from "../support/api-harness.ts";
@@ -16,20 +18,35 @@ const US: Settings = { ...settingsSchema.parse(DEFAULT_SETTINGS), shipToCountry:
 afterEach(cleanUpTemp);
 
 const applierHarness = async () => {
-  const repository = await openTempSqliteRepository();
+  const sqlite = await openTempSqliteRepository();
+  const saving = vi.fn(async (settings: Settings) => sqlite.settings.save(settings));
+  const repository = { ...sqlite, settings: { ...sqlite.settings, save: saving } };
   const logger = recordingLogger();
   const armed: number[] = [];
-  const startHost = vi.fn(async (settings: Settings) => startPluginHost({
-    entries: [],
-    services: fakeServices().services,
-    shipTo: settings.shipToCountry,
-    currencyPreference: settings.displayCurrency,
-  }));
+  const hosts: PluginHost[] = [];
+  const spies: MockInstance<PluginHost["shutdown"]>[] = [];
+  const events: string[] = [];
+  const startHost = vi.fn(async (settings: Settings) => {
+    const host = await startPluginHost({
+      entries: [],
+      services: fakeServices().services,
+      shipTo: settings.shipToCountry,
+      currencyPreference: settings.displayCurrency,
+    });
+    const index = hosts.push(host) - 1;
+    const shutdown = host.shutdown.bind(host);
+    spies.push(vi.spyOn(host, "shutdown").mockImplementation(async () => {
+      events.push(`host ${String(index)} shut down`);
+      return shutdown();
+    }));
+    return host;
+  });
   const applied = await repository.settings.get();
   const host = await startHost(applied);
+  const old = fakeGateway();
   const deps: AppDeps = {
     repository,
-    stores: fakeGateway().gateway,
+    stores: old.gateway,
     ids: { next: () => "id" },
     clock: { now: () => new Date(0) },
     notifier: { notify: async () => Promise.resolve(ok(undefined)) },
@@ -47,7 +64,8 @@ const applierHarness = async () => {
   const scans = { scanNow: vi.fn(), stop, scanning: () => false, lastReport: () => null };
   const live = { host, deps, scans };
   const applier = createSettingsApplier({ live, applied, startHost, gatewayFor: () => fakeGateway().gateway });
-  return { applier, live, startHost, armed, repository };
+  const shutdowns = () => spies.map((spy) => spy.mock.calls.length);
+  return { applier, live, startHost, armed, repository, saving, hosts, spies, shutdowns, events, old, logger };
 };
 
 describe("Settings applier", () => {
@@ -86,5 +104,16 @@ describe("Settings applier", () => {
     startHost.mockRejectedValueOnce(new Error("cannot spawn"));
     await expect(applier.apply(US)).rejects.toThrow("cannot spawn");
     expect(applier.restarting()).toBe(false);
+  });
+
+  it("keeps only the old host running and the old settings saved when saving fails, so a retry works", async () => {
+    const { applier, live, hosts, shutdowns, saving, repository } = await applierHarness();
+    saving.mockRejectedValueOnce(new Error("disk full"));
+    await expect(applier.apply(US)).rejects.toThrow("disk full");
+    expect({ live: live.host === hosts[0], shutdowns: shutdowns() }).toEqual({ live: true, shutdowns: [0, 1] });
+    expect(await repository.settings.get()).toMatchObject({ shipToCountry: "IL" });
+    await applier.apply(US);
+    expect({ live: live.host === hosts.at(-1), shutdowns: shutdowns() }).toEqual({ live: true, shutdowns: [1, 1, 0] });
+    expect(await repository.settings.get()).toMatchObject({ shipToCountry: "US" });
   });
 });

@@ -45,8 +45,9 @@ const pluginsChanged = (before: Settings, after: Settings): boolean =>
 /**
  * Applies settings changes one at a time, each compared with the settings the running parts were started with. A new
  * ship-to country or display currency, which plugin workers receive when they start, starts a new plugin host; once
- * it is up the gateway moves over to it, the settings are saved, then the old host is shut down. A host that fails to
- * start leaves the old one running and saves nothing, so the same change can be retried. That or a new scan interval,
+ * it is up the settings are saved, the gateway moves over to it, then the old host is shut down. A host that fails to
+ * start, or settings that fail to save, which also shuts the new host down, leave the old host running and the old
+ * settings saved, so the same change can be retried. That or a new scan interval,
  * which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which waits for a
  * running scan, so no scan loses its plugins halfway; it is started again whether or not the change succeeded. A
  * change that needs no restart is only saved. A failed change rejects for its caller; the next change still runs.
@@ -65,13 +66,19 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
     await live.scans.stop();
     try {
       const old = live.host;
-      if (restartPlugins) {
-        live.host = await startHost(next);
-        live.deps = { ...live.deps, stores: gatewayFor(live.host) };
+      const host = restartPlugins ? await startHost(next) : old;
+      try {
+        await repository.settings.save(next);
+      } catch (error) {
+        if (host !== old) {
+          await host.shutdown();
+        }
+        throw error;
       }
-      await repository.settings.save(next);
       applied = next;
-      if (old !== live.host) {
+      if (host !== old) {
+        live.host = host;
+        live.deps = { ...live.deps, stores: gatewayFor(host) };
         await old.shutdown();
       }
     } finally {
