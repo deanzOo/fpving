@@ -15,7 +15,7 @@ import {
 } from "@fpving/core";
 import type { DuplicateUrl, Listing, NotFound, PriceSnapshot, Repository, Result } from "@fpving/core";
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import {
@@ -53,6 +53,7 @@ const done = ok(undefined);
 const LATEST_RANK = 1;
 const BUSY_TIMEOUT_MS = 5000;
 const SCANNED_STATUSES = [ListingStatus.Active, ListingStatus.Stale];
+const ACTIVE = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 0 };
 
 const settle = async <T>(work: () => T): Promise<T> =>
   new Promise((resolve) => {
@@ -145,6 +146,20 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
             .map((row) => productSchema.parse(row))),
       rename: async (id, name) => settle(() => updateLive(id, { name })),
       archive: async (id, archivedAt) => settle(() => updateLive(id, { archivedAt })),
+      restore: async (id, snapshot) =>
+        atomically((tx) => {
+          const restored = changedOne(tx.update(products).set({ archivedAt: null })
+            .where(and(eq(products.id, id), isNotNull(products.archivedAt))).run());
+          if (restored.ok) {
+            const listing = changedOne(tx.update(listings).set(ACTIVE)
+              .where(and(eq(listings.id, snapshot.listingId), eq(listings.productId, id))).run());
+            if (!listing.ok) {
+              bug("restoring with a snapshot of another product's listing");
+            }
+            tx.insert(priceSnapshots).values(toSnapshotRow(snapshot)).run();
+          }
+          return restored;
+        }, new Map<string, NotFound>()),
       setCheapest: async (id, cheapestListingId) =>
         atomically((tx) => {
           const updated = changedOne(
@@ -196,6 +211,20 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
               .run();
           }
           return removed;
+        }, new Map<string, NotFound>()),
+      restore: async (productId, snapshot) =>
+        atomically((tx) => {
+          const restored = isLive(tx, productId)
+            ? changedOne(tx.update(listings).set(ACTIVE).where(and(
+                eq(listings.id, snapshot.listingId),
+                eq(listings.productId, productId),
+                eq(listings.status, ListingStatus.Removed),
+              )).run())
+            : err(notFound);
+          if (restored.ok) {
+            tx.insert(priceSnapshots).values(toSnapshotRow(snapshot)).run();
+          }
+          return restored;
         }, new Map<string, NotFound>()),
       updateStatus: async (id, update) =>
         settle(() => {

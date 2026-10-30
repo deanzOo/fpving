@@ -22,6 +22,7 @@ const duplicateUrl = err({ kind: RepositoryErrorKind.DuplicateUrl });
 const done = ok(undefined);
 const copy = structuredClone;
 const SCANNED: readonly string[] = [ListingStatus.Active, ListingStatus.Stale];
+const ACTIVE = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 0 };
 
 const bug = async (message: string): Promise<never> => Promise.reject(new Error(message));
 
@@ -106,6 +107,23 @@ export const inMemoryRepository = (): Repository => {
         Promise.resolve(copy(newestFirst(products.values(), (row) => row.createdAt).filter((row) => !row.archivedAt))),
       rename: async (id, name) => Promise.resolve(updateLive(id, { name })),
       archive: async (id, at) => Promise.resolve(updateLive(id, { archivedAt: copy(at) })),
+      restore: async (id, snapshot) => {
+        const row = products.get(id);
+        if (row?.archivedAt === null || row === undefined) {
+          return Promise.resolve(notFound);
+        }
+        const listing = listings.get(snapshot.listingId);
+        if (listing?.productId !== id) {
+          return bug("restoring with a snapshot of another product's listing");
+        }
+        if (snapshots.has(snapshot.id)) {
+          return bug("duplicate snapshot id");
+        }
+        products.set(id, { ...row, archivedAt: null });
+        listings.set(listing.id, { ...listing, ...ACTIVE });
+        snapshots.set(snapshot.id, copy(snapshot));
+        return Promise.resolve(done);
+      },
       setCheapest: async (id, cheapestListingId) => {
         const row = products.get(id);
         if (row === undefined) {
@@ -155,6 +173,19 @@ export const inMemoryRepository = (): Repository => {
         if (owner?.cheapestListingId === id) {
           products.set(productId, { ...owner, cheapestListingId: null });
         }
+        return Promise.resolve(done);
+      },
+      restore: async (productId, snapshot) => {
+        const row = listings.get(snapshot.listingId);
+        if (row?.productId !== productId || row.status !== ListingStatus.Removed
+          || products.get(productId)?.archivedAt !== null) {
+          return Promise.resolve(notFound);
+        }
+        if (snapshots.has(snapshot.id)) {
+          return bug("duplicate snapshot id");
+        }
+        listings.set(row.id, { ...row, ...ACTIVE });
+        snapshots.set(snapshot.id, copy(snapshot));
         return Promise.resolve(done);
       },
       updateStatus: async (id, update) => {

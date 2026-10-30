@@ -50,6 +50,12 @@ export interface ProductRepository {
   /** Archives a product that is not archived yet at `at`; it then counts as gone everywhere but {@link get}. */
   archive(id: ProductId, at: Date): Promise<Result<void, NotFound>>;
   /**
+   * Un-archives the archived product `id`, makes the listing of `snapshot` active again with no failures and appends
+   * the snapshot, in one step, keeping every earlier snapshot. `not_found` when the product is missing or not
+   * archived. Rejects when the snapshot's listing is not the product's.
+   */
+  restore(id: ProductId, snapshot: PriceSnapshot): Promise<Result<void, NotFound>>;
+  /**
    * Replaces a product's cheapest listing, or clears it with null. Rejects when the listing does not exist or is
    * another product's.
    */
@@ -82,6 +88,12 @@ export interface ListingRepository {
    * and clears the product's cheapest listing when it was this one, in one step.
    */
   remove(productId: ProductId, id: ListingId): Promise<Result<void, NotFound>>;
+  /**
+   * Makes the removed listing of `snapshot`, of the product `productId` that is not archived, active again with no
+   * failures and appends the snapshot, in one step, keeping every earlier snapshot. `not_found` when the listing is
+   * missing, another product's or not removed, or the product is archived.
+   */
+  restore(productId: ProductId, snapshot: PriceSnapshot): Promise<Result<void, NotFound>>;
 }
 
 /** Stores price snapshots, append-only. */

@@ -238,6 +238,33 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.products.get(p2.id)).toEqual({ ...p2, archivedAt: JAN_2 });
       });
 
+      it("restores an archived product, making its listing active with a new snapshot, keeping history", async () => {
+        await seed();
+        const gone = { status: ListingStatus.Gone, failureStreak: FAILURES, notFoundStreak: 2 };
+        await repo.listings.updateStatus(l1.id, gone);
+        await repo.products.archive(p1.id, JAN_2);
+        const s3 = snapshot("s3", l1.id, JAN_3);
+        expect(await repo.products.restore(p1.id, s3)).toEqual(ok);
+        expect(await repo.products.list()).toEqual([p2, p1]);
+        expect(await repo.listings.findByUrl(l1.url)).toEqual(l1);
+        expect(await repo.snapshots.listSince(l1.id, JAN_1)).toEqual([s1, s3]);
+      });
+
+      it("refuses to restore a missing product or one that is not archived, changing nothing", async () => {
+        await seed();
+        expect(await repo.products.restore(p1.id, snapshot("s3", l1.id, JAN_3))).toEqual(notFound);
+        expect(await repo.products.restore(missingProduct, snapshot("s4", l1.id, JAN_3))).toEqual(notFound);
+        expect(await repo.snapshots.listSince(l1.id, JAN_1)).toEqual([s1]);
+      });
+
+      it("rejects restoring a product with a snapshot of another product's listing as a bug", async () => {
+        await seed();
+        await repo.products.archive(p1.id, JAN_2);
+        await expect(repo.products.restore(p1.id, snapshot("s3", l2.id, JAN_3))).rejects.toThrow();
+        expect(await repo.products.get(p1.id)).toEqual({ ...p1, archivedAt: JAN_2 });
+        expect(await repo.snapshots.listSince(l2.id, JAN_1)).toEqual([s2]);
+      });
+
       it("rejects a product id that is already stored as a bug", async () => {
         await repo.products.add(p1, l1, s1);
         const l3 = listing("l3", p1.id, url("three"));
@@ -348,6 +375,29 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         const update = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 1 };
         expect(await repo.listings.updateStatus(l1.id, update)).toEqual(ok);
         expect(await repo.listings.findByUrl(l1.url)).toEqual({ ...l1, ...update, status: ListingStatus.Removed });
+      });
+
+      it("restores a removed listing of a live product as active with a new snapshot, keeping history", async () => {
+        const stale = { status: ListingStatus.Stale, failureStreak: FAILURES, notFoundStreak: 1 };
+        await repo.listings.updateStatus(l1.id, stale);
+        await repo.listings.remove(p1.id, l1.id);
+        const s3 = snapshot("s3", l1.id, JAN_3);
+        expect(await repo.listings.restore(p1.id, s3)).toEqual(ok);
+        expect(await repo.listings.findByUrl(l1.url)).toEqual(l1);
+        expect(await repo.snapshots.listSince(l1.id, JAN_1)).toEqual([s1, s3]);
+      });
+
+      it("refuses to restore a listing missing, not removed, another product's or of an archived product", async () => {
+        expect(await repo.listings.restore(p1.id, snapshot("s3", l1.id, JAN_3))).toEqual(notFound);
+        expect(await repo.listings.restore(p1.id, snapshot("s4", missingListing, JAN_3))).toEqual(notFound);
+        await repo.listings.remove(p1.id, l1.id);
+        expect(await repo.listings.restore(p2.id, snapshot("s5", l1.id, JAN_3))).toEqual(notFound);
+        await repo.listings.remove(p2.id, l2.id);
+        await repo.products.archive(p2.id, JAN_2);
+        expect(await repo.listings.restore(p2.id, snapshot("s6", l2.id, JAN_3))).toEqual(notFound);
+        expect(await repo.listings.listByProduct(p2.id)).toEqual([{ ...l2, status: ListingStatus.Removed }]);
+        expect(await repo.snapshots.listSince(l1.id, JAN_1)).toEqual([s1]);
+        expect(await repo.snapshots.listSince(l2.id, JAN_1)).toEqual([s2]);
       });
 
       it("returns copies, so changing a returned row does not change the stored one", async () => {
