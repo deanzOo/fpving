@@ -299,6 +299,7 @@ export const startApp = async (
       scans: () => parts.scans,
       plugins: () => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue),
       applySettings: async (next) => settingsApplier.apply(next),
+      restarting: () => settingsApplier.restarting(),
     });
     ready = true;
     logger.info("fpving started", { version, address, plugins: plugins.entries.length });

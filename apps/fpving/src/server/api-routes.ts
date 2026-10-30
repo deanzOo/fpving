@@ -27,6 +27,7 @@ export const RouteStatus = {
   Conflict: 409,
   UnprocessableContent: 422,
   BadGateway: 502,
+  ServiceUnavailable: 503,
 } as const;
 
 const countSchema = z.int().nonnegative();
@@ -65,12 +66,14 @@ const scanStatusSchema = z.object({
 /** Whether a scan the API started is running, the newest recorded run and what the last finished API scan did. */
 export type ScanStatus = z.infer<typeof scanStatusSchema>;
 
-const { Ok, Created, Accepted, NoContent, NotFound, Conflict, UnprocessableContent, BadGateway } = RouteStatus;
+const { Ok, Created, Accepted, NoContent, NotFound, Conflict, UnprocessableContent, BadGateway, ServiceUnavailable }
+  = RouteStatus;
 const addErrors = {
   [RouteStatus.BadRequest]: apiErrorSchema,
   [UnprocessableContent]: apiErrorSchema,
   [Conflict]: apiErrorSchema,
   [BadGateway]: apiErrorSchema,
+  [ServiceUnavailable]: apiErrorSchema,
 };
 
 /**
@@ -121,7 +124,7 @@ export const apiRoutes = {
           failedSearches: z.array(z.object({ pluginId: pluginIdSchema, error: storeErrorSchema })),
           foreignResults: z.array(z.object({ pluginId: pluginIdSchema, count: countSchema })),
         }),
-        [NotFound]: apiErrorSchema, [Conflict]: apiErrorSchema,
+        [NotFound]: apiErrorSchema, [Conflict]: apiErrorSchema, [ServiceUnavailable]: apiErrorSchema,
       },
     },
   },
@@ -183,7 +186,9 @@ export const apiRoutes = {
     method: "POST",
     url: "/api/scan",
     summary: "Starts a scan of every listing in the background; one at a time.",
-    schema: { response: { [Accepted]: scanStatusSchema, [Conflict]: apiErrorSchema } },
+    schema: {
+      response: { [Accepted]: scanStatusSchema, [Conflict]: apiErrorSchema, [ServiceUnavailable]: apiErrorSchema },
+    },
   },
   getScan: {
     method: "GET",

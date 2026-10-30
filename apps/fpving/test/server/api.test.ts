@@ -459,6 +459,30 @@ describe("Scan API", () => {
   });
 });
 
+describe("API during a settings restart", () => {
+  it.each([
+    ["adding a product", apiRoutes.addProduct.url, { url: PAGE }],
+    ["adding a listing", "/api/products/p/listings", { url: OTHER_PAGE }],
+    ["searching for matches", "/api/products/p/candidates/search", undefined],
+    ["accepting a candidate", "/api/candidates/c/accept", undefined],
+    ["starting a scan", apiRoutes.startScan.url, undefined],
+  ])("answers 503 restarting to %s, which needs the plugins", async (_label, url, payload) => {
+    api.restarting.current = true;
+    const response = await api.request("POST", url, payload);
+    expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.Restarting);
+  });
+
+  it("starts no scan while restarting", async () => {
+    const { current } = api.scans;
+    const scanNow = vi.fn(async () => current.scanNow());
+    api.scans.current = { scanNow, stop: async () => current.stop() };
+    api.restarting.current = true;
+    await api.request("POST", apiRoutes.startScan.url);
+    expect(scanNow).not.toHaveBeenCalled();
+  });
+});
+
 const routeList = Object.values(apiRoutes).map(({ method, url }) => ({ method, url: url.replaceAll(/:\w+/gu, "x") }));
 const mutating = routeList.filter(({ method }) => method !== "GET");
 

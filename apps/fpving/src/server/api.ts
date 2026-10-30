@@ -34,6 +34,8 @@ export interface ApiRuntime {
   plugins(): readonly PluginRow[];
   /** Saves the settings and restarts what depends on them. */
   applySettings(settings: Settings): Promise<void>;
+  /** Whether a settings change is restarting the schedule or the plugins right now. */
+  restarting(): boolean;
 }
 
 /** What a route answers when it is reached before the runtime is attached; the readiness gate prevents that. */
@@ -50,6 +52,7 @@ const Message = {
   AlreadySuggested: "another search saved candidates for this product meanwhile; search again",
   PluginUnavailable: "the plugin for this store is not loaded; see the plugins screen",
   ScanRunning: "a scan is already running",
+  Restarting: "the plugins and the scan schedule are restarting for a settings change; try again shortly",
 } as const;
 
 const failure = <S extends (typeof RouteStatus)[keyof typeof RouteStatus]>(
@@ -88,6 +91,7 @@ const matchFailure = (error: FindMatchesError) => {
 
 const productNotFound = failure(RouteStatus.NotFound, AddErrorKind.ProductNotFound, Message.ProductNotFound);
 const notPending = failure(RouteStatus.NotFound, MatchErrorKind.NotPending, Message.NotPending);
+const restarting = failure(RouteStatus.ServiceUnavailable, ApiErrorKind.Restarting, Message.Restarting);
 
 /**
  * Registers every route of {@link apiRoutes}. Fastify takes routes only before `listen`, while the runtime exists
@@ -150,6 +154,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.addProduct,
     handler: async ({ body }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       const added = await addProduct(deps(), body.url);
       if (!added.ok) {
         const { status, body: refusal } = addFailure(added.error);
@@ -162,6 +169,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.addListing,
     handler: async ({ params, body }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       const added = await addListing(deps(), params.productId, body.url);
       if (added.ok) {
         return reply.code(RouteStatus.Created).send(added.value);
@@ -189,6 +199,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.findMatches,
     handler: async ({ params: { productId } }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       const found = await findMatches(deps(), productId);
       if (!found.ok) {
         const { status, body } = matchFailure(found.error);
@@ -201,6 +214,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.acceptCandidate,
     handler: async ({ params: { candidateId } }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       const accepted = await acceptCandidate(deps(), candidateId);
       if (!accepted.ok) {
         const { status, body } = accepted.error.kind === MatchErrorKind.NotPending
@@ -276,6 +292,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.startScan,
     handler: async (_request, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       if (scanning !== null) {
         const { status, body } = failure(RouteStatus.Conflict, ApiErrorKind.ScanRunning, Message.ScanRunning);
         return reply.code(status).send(body);

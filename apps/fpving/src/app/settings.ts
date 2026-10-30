@@ -31,6 +31,8 @@ export interface SettingsApplierOptions {
 export interface SettingsApplier {
   apply(settings: Settings): Promise<void>;
   close(): Promise<void>;
+  /** Whether a change is restarting the schedule or the plugin host right now. */
+  restarting(): boolean;
 }
 
 const CLOSED = "the app is shutting down; settings are no longer applied";
@@ -57,14 +59,9 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
   let applied = options.applied;
   let queue = Promise.resolve();
   let closed = false;
-  const reconfigure = async (next: Settings): Promise<void> => {
+  let restarting = false;
+  const restart = async (next: Settings, restartPlugins: boolean): Promise<void> => {
     const { repository } = live.deps;
-    const restartPlugins = pluginsChanged(applied, next);
-    if (!restartPlugins && applied.scanIntervalHours === next.scanIntervalHours) {
-      await repository.settings.save(next);
-      applied = next;
-      return;
-    }
     await live.scans.stop();
     try {
       const old = live.host;
@@ -81,6 +78,20 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
       live.scans = await startScheduler(live.deps);
     }
   };
+  const reconfigure = async (next: Settings): Promise<void> => {
+    const restartPlugins = pluginsChanged(applied, next);
+    if (!restartPlugins && applied.scanIntervalHours === next.scanIntervalHours) {
+      await live.deps.repository.settings.save(next);
+      applied = next;
+      return;
+    }
+    restarting = true;
+    try {
+      await restart(next, restartPlugins);
+    } finally {
+      restarting = false;
+    }
+  };
   return {
     apply: async (next) => {
       if (closed) {
@@ -91,6 +102,7 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
       queue = run.then(settledEither, settledEither);
       return run;
     },
+    restarting: () => restarting,
     close: async () => {
       closed = true;
       return queue;

@@ -56,4 +56,33 @@ describe("Settings applier", () => {
     expect({ hosts: startHost.mock.calls.length, armed }).toEqual({ hosts: 1, armed: [] });
     expect(await repository.settings.get()).toMatchObject({ shipToCountry: "IL" });
   });
+
+  it("says it is restarting while a change restarts the plugin host, and not before or after", async () => {
+    const { applier, startHost } = await applierHarness();
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = startHost.getMockImplementation();
+    startHost.mockImplementationOnce(async (settings) => {
+      await held;
+      return original === undefined ? Promise.reject(new Error("no host")) : original(settings);
+    });
+    expect(applier.restarting()).toBe(false);
+    const applying = applier.apply(US);
+    await vi.waitFor(() => {
+      expect(startHost.mock.calls.map(([settings]) => settings.shipToCountry)).toEqual(["IL", "US"]);
+    });
+    expect(applier.restarting()).toBe(true);
+    release();
+    await applying;
+    expect(applier.restarting()).toBe(false);
+  });
+
+  it("stops saying it is restarting when the plugin host failed to start", async () => {
+    const { applier, startHost } = await applierHarness();
+    startHost.mockRejectedValueOnce(new Error("cannot spawn"));
+    await expect(applier.apply(US)).rejects.toThrow("cannot spawn");
+    expect(applier.restarting()).toBe(false);
+  });
 });
