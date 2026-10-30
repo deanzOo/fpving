@@ -363,7 +363,7 @@ describe("App settings changes", () => {
     expect(scan.statusCode).toBe(ACCEPTED);
   });
 
-  it("keeps the old settings and plugins when the host cannot restart, so retrying the same change works", async () => {
+  const startRefusingUsOnce = async () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
     const ready = readyWorkers();
@@ -379,29 +379,24 @@ describe("App settings changes", () => {
     const payload = { ...(await running.deps.repository.settings.get()), shipToCountry: "US" };
     const put = async () =>
       running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    return { running, workers: ready.workers, put };
+  };
+
+  it("keeps the old settings and plugins when the host cannot restart, so retrying the same change works", async () => {
+    const { running, workers, put } = await startRefusingUsOnce();
     expect((await put()).statusCode).toBe(INTERNAL_ERROR);
     expect(await running.deps.repository.settings.get()).toMatchObject({ shipToCountry: "IL" });
     expect(running.plugins.plugins()[0]?.status.kind).toBe(PluginStatusKind.Loaded);
-    expect(ready.workers.map((worker) => worker.terminations())).toEqual([0]);
+    expect(workers.map((worker) => worker.terminations())).toEqual([0]);
     expect((await put()).statusCode).toBe(OK);
     expect(await running.deps.repository.settings.get()).toMatchObject({ shipToCountry: "US" });
-    expect(ready.workers.map((worker) => ({ shipTo: worker.data.shipTo, terminated: worker.terminations() > 0 })))
+    expect(workers.map((worker) => ({ shipTo: worker.data.shipTo, terminated: worker.terminations() > 0 })))
       .toEqual([{ shipTo: "IL", terminated: true }, { shipTo: "US", terminated: false }]);
   });
 
   it("logs a failed change once, as the request that failed", async () => {
-    mkdirSync(dataDir, { recursive: true });
-    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
-    const ready = readyWorkers();
-    const spawn: SpawnWorker = (data) => {
-      if (data.shipTo === "US") {
-        throw new Error("cannot spawn");
-      }
-      return ready.spawn(data);
-    };
-    const running = await started(env(), { ...fakes().ports, spawn });
-    const payload = { ...(await running.deps.repository.settings.get()), shipToCountry: "US" };
-    await running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    const { put } = await startRefusingUsOnce();
+    await put();
     expect(logText().match(/cannot spawn/gu)).toEqual(["cannot spawn"]);
   });
 
