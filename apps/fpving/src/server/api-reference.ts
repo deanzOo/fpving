@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { apiRoutes } from "./api-routes.js";
+import { apiErrorSchema } from "./errors.js";
 
 const FRONTMATTER = [
   "---",
@@ -29,6 +30,7 @@ interface RouteSchemas {
 const toJson = (schema: z.ZodType, io: "input" | "output"): string =>
   JSON.stringify(z.toJSONSchema(schema, {
     io,
+    reused: "ref",
     unrepresentable: "any",
     override: ({ zodSchema, jsonSchema }) => {
       if (zodSchema._zod.def.type === "date") {
@@ -39,25 +41,33 @@ const toJson = (schema: z.ZodType, io: "input" | "output"): string =>
 
 const block = (title: string, json: string): string => `#### ${title}\n\n\`\`\`json\n${json}\n\`\`\`\n`;
 
+const ENVELOPE = "The error envelope.";
+
+const envelopeSection = `## Error envelope\n\nEvery error answer below.\n\n${
+  block("Response", toJson(apiErrorSchema, "output"))
+}`;
+
 const renderRoute = (method: string, url: string, summary: string, schema: RouteSchemas): string => {
   const request = REQUEST_PARTS.flatMap((part) => {
     const partSchema = schema[part];
     return partSchema === undefined ? [] : [block(`Request ${part}`, toJson(partSchema, "input"))];
   });
-  const responses = Object.entries(schema.response).map(([status, response]) =>
-    block(`Response ${status}`, toJson(response, "output")));
+  const responses = Object.entries(schema.response).map(([status, response]) => response === apiErrorSchema
+    ? `#### Response ${status}\n\n${ENVELOPE}\n`
+    : block(`Response ${status}`, toJson(response, "output")));
   return [`## ${method} ${url}\n\n${summary}\n`, ...request, ...responses].join("\n");
 };
 
 /**
- * Renders the HTTP API reference page from {@link apiRoutes}: one section per route with the JSON Schema of each
- * request part and of each answer. Dates are ISO 8601 strings on the wire.
+ * Renders the HTTP API reference page from {@link apiRoutes}: the error envelope once, then one section per route
+ * with the JSON Schema of each request part and of each answer, an error answer naming the envelope. A sub-schema
+ * repeated within one schema is shown once under `$defs`. Dates are ISO 8601 strings on the wire.
  *
  * @returns The Markdown page with its Starlight frontmatter.
  */
 export const renderApiReference = (): string =>
-  `${FRONTMATTER}\n${Object.values(apiRoutes).map(({ method, url, summary, schema }) =>
-    renderRoute(method, url, summary, schema)).join("\n")}`;
+  `${FRONTMATTER}\n${[envelopeSection, ...Object.values(apiRoutes).map(({ method, url, summary, schema }) =>
+    renderRoute(method, url, summary, schema))].join("\n")}`;
 
 /**
  * Writes {@link renderApiReference} to `output`, creating its folder.

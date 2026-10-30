@@ -22,6 +22,12 @@ describe("HTTP API reference page", () => {
     expect(page).toContain("\"kind\": {");
   });
 
+  it("shows the error envelope once and names it in each error answer", () => {
+    const page = renderApiReference();
+    expect(page.match(/"misdirected_request"/gu)).toHaveLength(1);
+    expect(page).toContain("#### Response 404\n\nThe error envelope.");
+  });
+
   it("describes dates as ISO date-time strings", () => {
     expect(renderApiReference()).toContain("\"format\": \"date-time\"");
   });
