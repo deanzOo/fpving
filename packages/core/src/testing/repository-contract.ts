@@ -146,6 +146,11 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
     const missingProduct = productIdSchema.parse("missing");
     const missingListing = listingIdSchema.parse("missing");
 
+    const expectActive = async (row: Listing, history: readonly PriceSnapshot[]): Promise<void> => {
+      expect(await repo.listings.findByUrl(row.url)).toEqual(row);
+      expect(await repo.snapshots.listSince(row.id, JAN_1)).toEqual(history);
+    };
+
     const seed = async (): Promise<void> => {
       await repo.products.add(p1, l1, s1);
       await repo.products.add(p2, l2, s2);
@@ -246,8 +251,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         const s3 = snapshot("s3", l1.id, JAN_3);
         expect(await repo.products.restore(p1.id, s3)).toEqual(ok);
         expect(await repo.products.list()).toEqual([p2, p1]);
-        expect(await repo.listings.findByUrl(l1.url)).toEqual(l1);
-        expect(await repo.snapshots.listSince(l1.id, JAN_1)).toEqual([s1, s3]);
+        await expectActive(l1, [s1, s3]);
       });
 
       it("refuses to restore a missing product or one that is not archived, changing nothing", async () => {
@@ -383,8 +387,7 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await repo.listings.remove(p1.id, l1.id);
         const s3 = snapshot("s3", l1.id, JAN_3);
         expect(await repo.listings.restore(p1.id, s3)).toEqual(ok);
-        expect(await repo.listings.findByUrl(l1.url)).toEqual(l1);
-        expect(await repo.snapshots.listSince(l1.id, JAN_1)).toEqual([s1, s3]);
+        await expectActive(l1, [s1, s3]);
       });
 
       it("refuses to restore a listing missing, not removed, another product's or of an archived product", async () => {

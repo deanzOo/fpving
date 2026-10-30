@@ -105,7 +105,10 @@ export const alreadyTracked = async (repository: Repository, url: string): Promi
 
 type Resolved = Pick<Target, "url" | "pluginId">;
 
-const resolve = ({ stores }: CoreDeps, input: string): Result<Resolved, InvalidUrl | NoPluginForDomain> => {
+const resolve = async (
+  { repository, stores }: CoreDeps,
+  input: string,
+): Promise<Result<Resolved & { tracked: Listing | null }, InvalidUrl | NoPluginForDomain>> => {
   const normalized = normalizeListingUrl(input, stores.declaredDomains());
   if (!normalized.ok) {
     return normalized;
@@ -114,7 +117,7 @@ const resolve = ({ stores }: CoreDeps, input: string): Result<Resolved, InvalidU
   const pluginId = stores.pluginFor(url);
   return pluginId === null
     ? err({ kind: AddErrorKind.NoPluginForDomain, host: new URL(url).hostname })
-    : ok({ url, pluginId });
+    : ok({ url, pluginId, tracked: await repository.listings.findByUrl(url) });
 };
 
 const fetchTarget = async ({ stores }: CoreDeps, { url, pluginId }: Resolved): Promise<Result<Target, FetchFailed>> => {
@@ -208,11 +211,11 @@ const restoreProduct = async (
  * @returns What was stored, or why nothing was.
  */
 export const addProduct = async (deps: CoreDeps, url: string): Promise<Result<AddedProduct, AddProductError>> => {
-  const resolved = resolve(deps, url);
+  const resolved = await resolve(deps, url);
   if (!resolved.ok) {
     return resolved;
   }
-  const tracked = await deps.repository.listings.findByUrl(resolved.value.url);
+  const { tracked } = resolved.value;
   if (tracked !== null) {
     return restoreProduct(deps, resolved.value, tracked);
   }
@@ -274,11 +277,11 @@ export const addListing = async (
   productId: ProductId,
   url: string,
 ): Promise<Result<AddedListing, AddListingError>> => {
-  const resolved = resolve(deps, url);
+  const resolved = await resolve(deps, url);
   if (!resolved.ok) {
     return resolved;
   }
-  const tracked = await deps.repository.listings.findByUrl(resolved.value.url);
+  const { tracked } = resolved.value;
   if (tracked !== null) {
     return restoreListing(deps, productId, resolved.value, tracked);
   }
