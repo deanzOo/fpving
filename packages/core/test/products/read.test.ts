@@ -96,6 +96,12 @@ describe("The watchlist", () => {
     expect(await watchlist({ repository })).toMatchObject([{ cheapest: expected }]);
   });
 
+  it("has no cheapest price for a product none of whose listings can be priced", async () => {
+    const repository = await withRates();
+    await watched(repository, product("p1", NOW), [[listing("l1"), snapshot("s1", "l1", { inStock: false })]]);
+    expect(await watchlist({ repository })).toMatchObject([{ cheapest: null }]);
+  });
+
   it("has no cheapest price for a product before any exchange rates were fetched", async () => {
     const repository = inMemoryRepository();
     await watched(repository, product("p1", NOW), [[listing("l1"), snapshot("s1", "l1")]]);
