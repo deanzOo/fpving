@@ -8,7 +8,9 @@ import {
   markAllAlertsRead,
   MatchErrorKind,
   pendingCandidates,
+  productDetail,
   rejectCandidate,
+  watchlist,
 } from "@fpving/core";
 import type {
   AddProductError,
@@ -41,8 +43,6 @@ export interface ApiRuntime {
 
 /** What a route answers when it is reached before the runtime is attached; the readiness gate prevents that. */
 export const NOT_ATTACHED = "the API runtime is not attached";
-
-const EPOCH = new Date(0);
 
 const Message = {
   InvalidUrl: "not an absolute http or https URL",
@@ -137,18 +137,38 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   };
 
   server.route({
+    ...apiRoutes.listProducts,
+    handler: async (_request, reply) => reply.code(RouteStatus.Ok).send(await watchlist(deps())),
+  });
+
+  server.route({
     ...apiRoutes.getProduct,
     handler: async ({ params: { productId } }, reply) => {
-      const { repository } = deps();
-      const product = await repository.products.get(productId);
-      if (product === null) {
-        return reply.code(productNotFound.status).send(productNotFound.body);
-      }
-      const listings = await Promise.all((await repository.listings.listByProduct(productId)).map(async (listing) => ({
-        listing,
-        history: await repository.snapshots.listSince(listing.id, EPOCH),
-      })));
-      return reply.code(RouteStatus.Ok).send({ product, listings });
+      const detail = await productDetail(deps(), productId);
+      return detail.ok
+        ? reply.code(RouteStatus.Ok).send(detail.value)
+        : reply.code(productNotFound.status).send(productNotFound.body);
+    },
+  });
+
+  server.route({
+    ...apiRoutes.renameProduct,
+    handler: async ({ params: { productId }, body: { name } }, reply) => {
+      const renamed = await deps().repository.products.rename(productId, name);
+      return renamed.ok
+        ? reply.code(RouteStatus.NoContent).send(null)
+        : reply.code(productNotFound.status).send(productNotFound.body);
+    },
+  });
+
+  server.route({
+    ...apiRoutes.archiveProduct,
+    handler: async ({ params: { productId } }, reply) => {
+      const { repository, clock } = deps();
+      const archived = await repository.products.archive(productId, clock.now());
+      return archived.ok
+        ? reply.code(RouteStatus.NoContent).send(null)
+        : reply.code(productNotFound.status).send(productNotFound.body);
     },
   });
 

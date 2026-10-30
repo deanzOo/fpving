@@ -144,6 +144,57 @@ describe("Products API", () => {
   });
 });
 
+describe("Watchlist API", () => {
+  const entries = z.array(z.object({
+    product: z.object({ id: z.string() }),
+    cheapest: z.object({ listingId: z.string(), landedCost: z.object({ currency: z.string() }) }).nullable(),
+  }));
+  const watchlist = async () => entries.parse((await api.request("GET", "/api/products")).json());
+
+  it("lists the watched products newest first, each with its cheapest landed price", async () => {
+    const settings = await api.repository.settings.get();
+    await api.repository.settings.save({ ...settings, displayCurrency: "USD" });
+    await api.scans.current.scanNow();
+    const first = await addProduct();
+    const second = await addProduct(OTHER_PAGE);
+    const listed = await watchlist();
+    expect(listed.map(({ product, cheapest }) => [product.id, cheapest?.listingId, cheapest?.landedCost.currency]))
+      .toEqual([[second.product.id, second.listing.id, "USD"], [first.product.id, first.listing.id, "USD"]]);
+  });
+
+  it("renames a product, answering 204", async () => {
+    const { product } = await addProduct();
+    const response = await api.request("PATCH", `/api/products/${product.id}`, { name: "Quad frame" });
+    expect(response.statusCode).toBe(RouteStatus.NoContent);
+    expect((await api.request("GET", `/api/products/${product.id}`)).json()).toMatchObject({
+      product: { name: "Quad frame" },
+    });
+  });
+
+  it("refuses an empty name with 400", async () => {
+    const { product } = await addProduct();
+    const response = await api.request("PATCH", `/api/products/${product.id}`, { name: "" });
+    expect(response.statusCode).toBe(RouteStatus.BadRequest);
+  });
+
+  it("deletes a product by archiving it: gone from the list, its detail and its candidates", async () => {
+    const { product } = await addProduct();
+    const response = await api.request("DELETE", `/api/products/${product.id}`);
+    expect(response.statusCode).toBe(RouteStatus.NoContent);
+    expect(await watchlist()).toEqual([]);
+    for (const [method, url] of [
+      ["GET", `/api/products/${product.id}`],
+      ["GET", `/api/products/${product.id}/candidates`],
+      ["PATCH", `/api/products/${product.id}`],
+      ["DELETE", `/api/products/${product.id}`],
+    ] as const) {
+      const refused = await api.request(method, url, method === "PATCH" ? { name: "x" } : undefined);
+      expect({ url, status: refused.statusCode, kind: errorOf(refused.json()).kind })
+        .toEqual({ url, status: RouteStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
+    }
+  });
+});
+
 describe("Listings API", () => {
   it("adds a pasted URL to a product as a manual listing, answering 201", async () => {
     const { product } = await addProduct();

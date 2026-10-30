@@ -1,5 +1,6 @@
 import {
   alertIdSchema,
+  listingIdSchema,
   alertSchema,
   listingSchema,
   matchCandidateIdSchema,
@@ -11,7 +12,7 @@ import {
   scanRunSchema,
   settingsSchema,
 } from "@fpving/core";
-import { manifestSchema, storeErrorSchema } from "@fpving/plugin-sdk";
+import { manifestSchema, moneySchema, storeErrorSchema } from "@fpving/plugin-sdk";
 import { z } from "zod";
 import { PluginIssueKind, PluginStatusKind } from "../plugins/status.js";
 import { apiErrorSchema } from "./errors.js";
@@ -41,6 +42,11 @@ const productDetailSchema = z.object({
   product: productSchema,
   listings: z.array(z.object({ listing: listingSchema, history: z.array(priceSnapshotSchema).min(1) })),
 });
+
+const watchlistSchema = z.array(z.object({
+  product: productSchema,
+  cheapest: z.object({ listingId: listingIdSchema, landedCost: moneySchema }).nullable(),
+}));
 
 const pluginRowSchema = z.object({
   source: z.string().min(1),
@@ -84,11 +90,33 @@ const addErrors = {
  * routes are registered from this table and the API reference page is generated from it.
  */
 export const apiRoutes = {
+  listProducts: {
+    method: "GET",
+    url: "/api/products",
+    summary: "The watched products, newest first, each with its cheapest landed price in the display currency.",
+    schema: { response: { [Ok]: watchlistSchema } },
+  },
   getProduct: {
     method: "GET",
     url: "/api/products/:productId",
-    summary: "A product with its listings and each listing's price history, oldest first, so the last is the newest.",
+    summary: "A product with its listings and each listing's price history, oldest first; 404 once archived.",
     schema: { params: productParams, response: { [Ok]: productDetailSchema, [NotFound]: apiErrorSchema } },
+  },
+  renameProduct: {
+    method: "PATCH",
+    url: "/api/products/:productId",
+    summary: "Renames a product; the name is the only field a product has to edit.",
+    schema: {
+      params: productParams,
+      body: z.object({ name: productSchema.shape.name }),
+      response: { [NoContent]: z.null(), [NotFound]: apiErrorSchema },
+    },
+  },
+  archiveProduct: {
+    method: "DELETE",
+    url: "/api/products/:productId",
+    summary: "Stops watching a product. It is archived, keeping its history, and answers 404 everywhere afterwards.",
+    schema: { params: productParams, response: { [NoContent]: z.null(), [NotFound]: apiErrorSchema } },
   },
   addProduct: {
     method: "POST",
