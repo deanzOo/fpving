@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExitCode, SHUTDOWN_MESSAGE } from "../../src/app/lifecycle.ts";
 import { runApp } from "../../src/app/run.ts";
+import type { ClosableBrowserDriver } from "../../src/adapters/transport/playwright-browser-driver.ts";
 import type { AppPorts } from "../../src/app/start.ts";
 import { PLUGINS_FILE } from "../../src/plugins/config.ts";
 import type { SpawnWorker } from "../../src/plugins/runtime/connection.ts";
@@ -89,5 +90,18 @@ describe("Running the app", () => {
     expect(running.err()).toContain("shutting down");
     expect(armed).toEqual([]);
     await (await occupy(port))();
+  });
+
+  it("exits 1 when a startup cancelled by a shutdown request could not clean up", async () => {
+    const browser: ClosableBrowserDriver = {
+      fetchPage: async () => Promise.reject(new Error("unused")),
+      close: async () => Promise.reject(new Error("browser stuck")),
+    };
+    const running = run(env(), { ...fakePorts().ports, browser });
+    running.events.emit("SIGTERM");
+    await running.done;
+    await vi.waitFor(() => {
+      expect(running.exit).toHaveBeenCalledWith(ExitCode.Failed);
+    });
   });
 });

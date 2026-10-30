@@ -42,7 +42,10 @@ export const runApp = async (options: RunOptions): Promise<void> => {
     shutdown: async () => {
       cancel.abort();
       const started = await startup;
-      return started.ok ? started.value.shutdown() : started.error.kind === StartupErrorKind.Cancelled;
+      if (started.ok) {
+        return started.value.shutdown();
+      }
+      return started.error.kind === StartupErrorKind.Cancelled && started.error.clean;
     },
   });
   const started = await startup;

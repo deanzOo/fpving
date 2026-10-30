@@ -256,6 +256,30 @@ describe("App startup cancelled by a shutdown request", () => {
     expect(logText()).toContain("startup cancelled");
     await (await occupy(port))();
   });
+
+  it("honours a request made while the database opens before any plugin worker starts", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const controller = new AbortController();
+    let checks = 0;
+    Object.defineProperty(controller.signal, "aborted", { get: () => (checks += 1) > 1 });
+    const { ports, spawned } = fakes();
+    const result = await startApp(env(), ports, controller.signal);
+    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.Cancelled, clean: true } });
+    expect(spawned).toEqual([]);
+    await (await occupy(port))();
+  });
+
+  it("reports a cancelled startup whose cleanup failed as not clean", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const browser: ClosableBrowserDriver = {
+      fetchPage: async () => Promise.reject(new Error("unused")),
+      close: async () => Promise.reject(new Error("browser stuck")),
+    };
+    const result = await startApp(env(), { ...fakes().ports, browser }, controller.signal);
+    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.Cancelled, clean: false } });
+  });
 });
 
 describe("App shutdown", () => {

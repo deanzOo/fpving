@@ -62,11 +62,15 @@ export const StartupErrorKind = {
   Cancelled: "cancelled",
 } as const;
 
-/** A startup failure; `message` is one line for the terminal and never contains the API key. */
-export interface StartupError {
-  readonly kind: (typeof StartupErrorKind)[keyof typeof StartupErrorKind];
-  readonly message: string;
-}
+type FailureKind = Exclude<(typeof StartupErrorKind)[keyof typeof StartupErrorKind], typeof StartupErrorKind.Cancelled>;
+
+/**
+ * A startup failure; `message` is one line for the terminal and never contains the API key. A cancelled startup
+ * says whether closing what it had opened succeeded within the shutdown deadline.
+ */
+export type StartupError
+  = | { readonly kind: FailureKind; readonly message: string }
+    | { readonly kind: typeof StartupErrorKind.Cancelled; readonly message: string; readonly clean: boolean };
 
 /**
  * The ports the app wires from real adapters by default, and the OS it checks file modes for. Tests pass any of
@@ -115,7 +119,7 @@ const ShutdownStepName = {
 const SHUTDOWN_ORDER: readonly string[] = Object.values(ShutdownStepName);
 const CANCELLED = "startup was cancelled by a shutdown request";
 
-const failed = (kind: StartupError["kind"], message: string): Result<never, StartupError> => err({ kind, message });
+const failed = (kind: FailureKind, message: string): Result<never, StartupError> => err({ kind, message });
 
 /**
  * Whether a folder mode lets users other than the owner in. Windows has no such bits, so it is never reported there.
@@ -241,6 +245,7 @@ export const startApp = async (
     const settings = await repository.settings.get();
     const { entries, rejected } = await readPlugins(dataDir, logger);
     rejectedEntries = rejected.length;
+    checkpoint();
     const host = await startPluginHost({
       entries,
       services: { http, browser, logger },
@@ -271,9 +276,9 @@ export const startApp = async (
   } catch (error) {
     const cancelled = signal.aborted;
     logger.error(cancelled ? "startup cancelled" : "startup failed", { detail: inspect(error) });
-    await withinDeadline(shutdown(), SHUTDOWN_DEADLINE_MS, logger);
+    const clean = await withinDeadline(shutdown(), SHUTDOWN_DEADLINE_MS, logger);
     return cancelled
-      ? failed(StartupErrorKind.Cancelled, CANCELLED)
+      ? err({ kind: StartupErrorKind.Cancelled, message: CANCELLED, clean })
       : failed(StartupErrorKind.StartupFailed, String(error));
   }
 };
