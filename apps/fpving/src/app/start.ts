@@ -48,8 +48,7 @@ export const DB_FILE = "fpving.db";
 /** The log file, relative to `DATA_DIR`. */
 export const LOG_FILE = join("logs", "fpving.log");
 
-/** The browser profile folder in `DATA_DIR`. */
-export const BROWSER_PROFILE_DIR = "browser-profile";
+const BROWSER_PROFILE_DIR = "browser-profile";
 
 const OWNER_ONLY_DIR = 0o700;
 
@@ -92,12 +91,12 @@ export interface App {
   readonly plugins: PluginHost;
   readonly logger: ClosableLogger;
   /** Binds the server to `127.0.0.1:PORT` and resolves to its address. */
-  listen(): Promise<string>;
+  readonly listen: () => Promise<string>;
   /**
    * Stops the scan schedule, closes the server, shuts the plugin host down, closes the browser, the database and the
    * log, in that order. Idempotent; resolves false when a step failed.
    */
-  shutdown(): Promise<boolean>;
+  readonly shutdown: () => Promise<boolean>;
 }
 
 const failed = (kind: StartupError["kind"], message: string): Result<never, StartupError> => err({ kind, message });

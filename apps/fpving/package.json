@@ -9,6 +9,7 @@
   },
   "types": "./dist/index.d.ts",
   "scripts": {
+    "start": "tsc -b && node --env-file-if-exists=../../.env dist/main.js",
     "db:generate": "node --conditions=@fpving/source node_modules/drizzle-kit/bin.cjs generate"
   },
   "dependencies": {

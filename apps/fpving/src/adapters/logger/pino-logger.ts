@@ -3,11 +3,9 @@ import type { Logger } from "@fpving/core";
 import type { LogLevel } from "../../config/env.js";
 import { openRotatingFile } from "./rotating-file.js";
 
-/** The size a log file may reach before it is rotated: 10 MiB. */
-export const LOG_MAX_BYTES = 10_485_760;
+const LOG_MAX_BYTES = 10_485_760;
 
-/** How many rotated log files are kept beside the current one. */
-export const LOG_KEPT_FILES = 5;
+const LOG_KEPT_FILES = 5;
 
 /** What a masked field holds. */
 export const REDACTED = "[redacted]";
@@ -23,9 +21,9 @@ export interface PinoLoggerOptions {
   readonly level: LogLevel;
   /** The log file; missing directories are created. */
   readonly file: string;
-  /** The rotation size; {@link LOG_MAX_BYTES} by default. */
+  /** The rotation size; 10 MiB by default. */
   readonly maxFileBytes?: number;
-  /** How many rotated files to keep; {@link LOG_KEPT_FILES} by default. */
+  /** How many rotated files to keep; five by default. */
   readonly keptFiles?: number;
 }
 
