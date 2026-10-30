@@ -30,3 +30,15 @@ The API needs to delete a product and remove a listing, but snapshots, alerts an
 - Good: one rule for 409 whatever started the running scan.
 - Bad: archived products and removed listings stay in the database forever; there is no purge.
 - Bad: the last scan's report lives in the schedule, so a settings change that restarts the schedule forgets it until the next scan.
+
+## Amendment, 2026-10-30: archived products refuse new listings, and re-adding a URL restores it
+
+- Adding a listing to an archived product, or accepting one of its candidates, answers 404 `product_not_found`. `listings.addWithSnapshot` and `matchCandidates.accept` refuse an archived product with `not_found` in the same step as the insert, so an archive during the store fetch is caught too.
+- Archive and remove keep the listing row, and listing URLs stay unique, so a deleted product or a removed listing used to be a dead end: its URL answered 409 forever. Re-adding the URL now restores it. Considered: leaving archived and removed rows out of the uniqueness check, which needs a schema change, and only explaining the 409, which leaves the dead end. Chosen: restore on re-add.
+  - Adding a product with the URL of a listing of an archived product fetches it again and, in one step (`products.restore`), un-archives the product, makes that listing active with no failures and appends the new snapshot. Its history, candidates and alerts are kept.
+  - Adding the URL of a removed listing to that listing's own product does the same for the listing (`listings.restore`).
+  - A URL tracked by any other listing answers 409 `already_tracked`, naming that product by id and name. That includes a removed listing of another product and a listing of an archived product added to a different product.
+  - No schema change.
+- A scan running while a listing is removed or a product archived leaves that listing, or the whole product, out of its cheapest listing and its alerts.
+- Good: deleting or removing by mistake is undone by pasting the URL again.
+- Bad: a listing can only move between products by being restored on its own product; there is no move.
