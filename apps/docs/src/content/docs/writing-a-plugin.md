@@ -4,10 +4,10 @@ description: The plugin contract, the context the host provides, and the contrac
 ---
 
 :::caution[Pre-release]
-The SDK contract below exists in `@fpving/plugin-sdk` and is covered by tests, but nothing is released yet and it may still change. The host that loads plugins, isolates them in worker threads and schedules them is planned, not built.
+The SDK contract below exists in `@fpving/plugin-sdk` and is covered by tests, but nothing is released yet and it may still change. The host loads plugins and isolates them in worker threads; wiring them into scans and the app is planned, not built.
 :::
 
-Plugins are for personal use. Respect each site's terms of service. Plugins are designed to run in worker threads (not built yet) for crash containment, not as a security sandbox: install only plugins you trust.
+Plugins are for personal use. Respect each site's terms of service. Each plugin runs in its own worker thread for crash containment, not as a security sandbox: install only plugins you trust.
 
 ## Contract
 
@@ -34,9 +34,9 @@ A `FetchedListing` is `{ title, itemPrice, shipping, inStock, images }`:
 
 A `SearchCandidate` is `{ url, title, itemPrice? }`, where `url` is an absolute URL string.
 
-The host will parse everything a plugin returns with these schemas (`fetchedListingSchema`, `searchCandidateSchema`, `storeErrorSchema`) before it reaches core.
+The host parses everything a plugin returns with these schemas (`fetchedListingSchema`, `searchCandidateSchema`, `storeErrorSchema`) before it reaches core. Output that fails them becomes `parse_failed` with detail `invalid plugin output`.
 
-Plugins are designed to run in worker threads, so every value crossing the host and plugin boundary is plain data that survives `structuredClone`. URLs are absolute http(s) strings everywhere, never `URL` objects.
+Plugins run in worker threads, so every value crossing the host and plugin boundary is plain data that survives `structuredClone`. URLs are absolute http(s) strings everywhere, never `URL` objects.
 
 ## Errors
 
@@ -46,24 +46,24 @@ Store methods never throw for expected failures. They resolve to `err({ kind, de
 | --------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `not_found`           | The product page is gone, for example HTTP 404.                                                                     |
 | `blocked`             | A captcha or bot wall.                                                                                              |
-| `parse_failed`        | The page loaded but could not be read. Attach the page as `rawPage`; the host will save it as a ready-made fixture. |
+| `parse_failed`        | The page loaded but could not be read. Attach the page as `rawPage`; the host saves it as a ready-made fixture.     |
 | `timeout`             | The host HTTP client or browser timed out.                                                                          |
 | `network`             | Any other transport failure.                                                                                        |
 | `unsupported_ship_to` | The store does not ship to `ctx.shipTo`.                                                                            |
 
-`rawPage` exists only on `parse_failed`.
+`rawPage` exists only on `parse_failed`. The host saves it to `DATA_DIR/debug/<plugin id>/<time>-<hash>.html`, where the hash is a SHA-256 prefix of the URL; a page over five megabytes is not saved. The result your store returned still reaches core unchanged.
 
 ## Host-provided context
 
 `ctx` is a `PluginContext`:
 
-- `http.get(url, options?)` takes an absolute http(s) URL string and resolves to `{ status, body, headers }` or a `TransportError`.
+- `http.get(url, options?)` takes an absolute http(s) URL string and resolves to `{ status, body, headers }` or a `TransportError`. Redirects are always followed. `authorization`, `proxy-authorization` and `cookie` are dropped once a redirect leaves the origin, but any other header you set, such as `x-api-key`, goes to the redirect target too, and you cannot prevent that, so never put a secret in a custom header.
 - `browser.fetchPage(url)` renders a page and resolves to `{ status, html, finalUrl }`, where `finalUrl` is the URL string after redirects, or a `TransportError`.
 - `logger` has `debug`, `info`, `warn` and `error(message, fields?)`. Never log secrets, cookies or page bodies.
 - `clock.now()` is the current time.
 - `shipTo` is an ISO 3166-1 alpha-2 country code and `currencyPreference` an ISO 4217 code. Report prices in the store's own currency.
 
-A `TransportError` has kind `timeout` or `network`, so a store can return it unchanged. Plugins do not bring their own Playwright or HTTP client. The host will own per-domain rate limits, jitter, timeouts, the browser profile and the user-agent.
+A `TransportError` has kind `timeout` or `network`, so a store can return it unchanged. Plugins do not bring their own Playwright or HTTP client. The host owns per-domain rate limits, jitter, timeouts, the browser profile and the user-agent.
 
 ```ts
 import {
@@ -110,7 +110,25 @@ export default plugin;
 
 ## Loading
 
-Planned: on boot the host will import each configured plugin, validate its manifest, check that the running SDK satisfies `sdkVersion` and register it. An invalid plugin will be logged and disabled while the app keeps running.
+Users list plugins in `plugins.json` in the data directory, by absolute folder path or npm package name. See [Configuration](../configuration/#plugins).
+
+`SDK_VERSION` is the version of the running `@fpving/plugin-sdk`, read from its `package.json`. The host accepts a plugin only when `SDK_VERSION` satisfies its manifest's `sdkVersion`, decided by `satisfiesSemverRange` with npm's rules; otherwise the plugin is disabled as `sdk_incompatible`, with a reason naming the range and the version. A prerelease SDK satisfies only a range that names a prerelease of the same version.
+
+The host then maps each declared domain to its plugin and matches a URL's hostname exactly. A domain that two or more plugins declare goes to none of them, and each of them gets a `domain_conflict` warning naming the others, so the outcome never depends on load order. A plugin left with no domain is disabled. Plugins that share a manifest `id` are all disabled as `duplicate_id` and claim none of their domains; a domain one of them declares still goes to another plugin when that plugin is its only other declarer.
+
+Each entry gets its own worker thread, which imports the plugin:
+
+- A folder entry is loaded the way `require(folder)` finds it: the `main` of the folder's `package.json`, else `index.js`. Folder resolution does not read `exports`, so set `main` to your built ESM entry.
+- A package entry is imported by name from the app's own directory, with Node's ESM resolution, so `exports` and its `import` condition apply. See [Configuration](../configuration/#plugins).
+- The plugin is the module's default export when that is an object, as in the example above, else the module itself, so named `manifest` and `createStore` exports work too. Anything else, or a manifest that fails `manifestSchema`, disables the plugin as `manifest_invalid`; a module that cannot be imported, or a `createStore` that throws, as `load_failed`. A plugin has thirty seconds to load.
+- `createStore` is called once per worker. The store must have `fetchListing`, and `search` when the manifest declares it, or the plugin is `manifest_invalid`.
+
+At run time:
+
+- `http.get` and `browser.fetchPage` are served by the host, so its rate limits, timeouts and URL policy apply. `logger` calls are written to the host log with your `pluginId` added. `clock.now()` is the worker's own clock.
+- A store method that throws or rejects, or resolves to something that cannot be structured-cloned, gives `parse_failed`.
+- A call has two minutes. When it runs out the call resolves to `timeout` and the worker is terminated, and so is a worker that throws an uncaught error or exits; other open calls on it get `network`. The worker is restarted once; a second failure disables the plugin as `crashed` until the app restarts. A failure before every plugin has loaded disables it straight away. If the restarted worker reports a different manifest, because the plugin changed on disk, the plugin is disabled as `manifest_invalid` until the app restarts. The host never calls `search` on a plugin whose manifest does not declare it, and lists only loaded plugins that declare it as searchable. A busy loop is stopped the same way.
+- A plugin disabled after it loaded, for example as `crashed`, keeps its domains for the session, so a link to its store still names it, but every call to it resolves to `network` with the detail `the plugin is not loaded` without reaching a worker. A plugin disabled at startup never enters the domain registry, so its domains resolve to no plugin.
 
 ## Contract test kit
 
@@ -171,4 +189,4 @@ A store that throws fails the check with the thrown error. To run the same check
 
 ## Distribution
 
-This repository ships no store plugins. Keep yours in your own repository or a local folder and link it through `plugins.config.ts` (planned).
+This repository ships no store plugins. Keep yours in your own repository or a local folder and list it in `plugins.json`.

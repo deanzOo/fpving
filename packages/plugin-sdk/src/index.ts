@@ -1,6 +1,7 @@
 /**
  * The store plugin contract: plugin types, the schemas the host validates plugin output with, the store error
- * taxonomy, ISO currency and country codes, and `Result`.
+ * taxonomy, ISO currency and country codes, `Result`, and the SDK version with the semver check the host applies to
+ * a manifest's `sdkVersion`.
  *
  * @module plugin-sdk
  */
@@ -36,3 +37,5 @@ export type { Amount, Money } from "./money.js";
 export type { SearchQuery, Store, StorePlugin } from "./plugin.js";
 export { err, ok } from "./result.js";
 export type { Result } from "./result.js";
+export { satisfiesSemverRange } from "./semver.js";
+export { SDK_VERSION } from "./version.js";

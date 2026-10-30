@@ -26,6 +26,7 @@ export default defineConfig({
         "packages/core/src/testing/index.ts",
         "apps/*/src/index.ts",
         "apps/fpving/src/adapters/transport/launch-chromium.ts",
+        "apps/fpving/src/plugins/runtime/worker-entry.ts",
         "tools/*-cli.ts",
         "apps/docs/**",
       ],

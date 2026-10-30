@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-good",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}

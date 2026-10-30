@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-bad-manifest",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}

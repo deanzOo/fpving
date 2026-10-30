@@ -3,5 +3,7 @@
 offline = true
 no_progress = true
 include_fragments = "full"
+# resolve directory links to their page, so a fragment on another page is checked against it
+index_files = ["index.html"]
 remap = ["^file://(.*)/dist/fpving(/|$) file://$1/dist/"]
 exclude = ["/api/fpving/.+[^/]#"]

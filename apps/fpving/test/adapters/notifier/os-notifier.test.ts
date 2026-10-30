@@ -155,7 +155,7 @@ describe("Choosing the notifier backend for the platform", () => {
     expect(files).toEqual(["osascript"]);
   });
 
-  it("runs the real execFile on macOS by default", () => {
+  it("builds a backend other than node-notifier on macOS when no exec is given", () => {
     expect(notifyBackendFor("darwin")).not.toBe(nodeNotifierBackend);
   });
 

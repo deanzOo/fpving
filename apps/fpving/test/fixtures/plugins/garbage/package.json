@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-garbage",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}

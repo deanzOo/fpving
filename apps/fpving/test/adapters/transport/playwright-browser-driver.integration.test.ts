@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
 import type { BrowserContext, Page } from "playwright";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createDomainLimiter } from "../../../src/adapters/transport/domain-limiter.ts";
 import { launchChromium } from "../../../src/adapters/transport/launch-chromium.ts";
 import { createPlaywrightBrowserDriver } from "../../../src/adapters/transport/playwright-browser-driver.ts";
@@ -139,8 +139,6 @@ describe.skipIf(!chromiumInstalled)(
       const publicUrl = (path: string): string => `${pageServer.origin.replace("127.0.0.1", PUBLIC_NAME)}${path}`;
 
       beforeAll(async () => {
-        privateServer = await startLocalServer();
-        pageServer = await startLocalServer({ target: privateServer.origin });
         strictProfile = await mkdtemp(join(tmpdir(), "fpving-profile-"));
         strict = createPlaywrightBrowserDriver({
           launch: launchResolvingPublicName,
@@ -149,10 +147,18 @@ describe.skipIf(!chromiumInstalled)(
         });
       }, BROWSER_TIMEOUT_MS);
 
-      afterAll(async () => {
-        await strict.close();
+      beforeEach(async () => {
+        privateServer = await startLocalServer();
+        pageServer = await startLocalServer({ target: privateServer.origin });
+      });
+
+      afterEach(async () => {
         await pageServer.close();
         await privateServer.close();
+      });
+
+      afterAll(async () => {
+        await strict.close();
         await rm(strictProfile, { recursive: true, force: true });
       }, BROWSER_TIMEOUT_MS);
 

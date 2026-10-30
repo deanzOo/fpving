@@ -106,7 +106,7 @@ const isTimeout = (error: unknown): boolean => error instanceof DOMException && 
  * Creates the SDK {@link HttpClient} on `fetch`. Any status is a completed response, including 404 and 403, because
  * plugins decide what those mean; only a deadline or a transport failure is an error. Redirects are followed here, up
  * to {@link MAX_REDIRECTS}, and each `Location` is resolved against the URL that sent it and checked like the first.
- * Once a redirect leaves the origin, `authorization`, `proxy-authorization` and `cookie` are no longer sent.
+ * Once a redirect leaves the origin, `authorization`, `proxy-authorization` and `cookie` are not sent again.
  *
  * @param options - The injected `fetch`, limiter and user agent.
  * @returns The client.
