@@ -5,7 +5,8 @@ import { landedCostExact } from "../pricing/landed-cost.js";
 import type { ListingId, ProductId } from "../ids.js";
 import type { AlertDraft, AlertSettings, ListingWithLatest } from "./draft.js";
 
-interface Ranked {
+/** A listing with its newest snapshot and its landed cost in minor units of the display currency. */
+export interface Ranked {
   entry: ListingWithLatest;
   landedMinor: number;
 }
@@ -16,6 +17,30 @@ const compare = (a: Ranked, b: Ranked): number =>
   a.landedMinor - b.landedMinor
   || a.entry.listing.addedAt.getTime() - b.entry.listing.addedAt.getTime()
   || compareIds(a.entry.listing.id, b.entry.listing.id);
+
+/**
+ * The cheapest of a product's listings that are active, in stock, quoted for `shipToCountry` and with known shipping,
+ * by `cost`, which yields null for a listing it cannot price. Ties go to the earlier `addedAt`, then the lower
+ * listing id by code point. Undefined when none qualifies.
+ */
+export const cheapestBy = (
+  productListings: readonly ListingWithLatest[],
+  shipToCountry: AlertSettings["shipToCountry"],
+  cost: (latest: ListingWithLatest["latest"]) => number | null,
+): Ranked | undefined =>
+  productListings
+    .filter(
+      ({ listing: l, latest }) =>
+        l.status === ListingStatus.Active
+        && latest.shipTo === shipToCountry
+        && latest.inStock
+        && latest.shipping.kind === ShippingKind.Known,
+    )
+    .flatMap((entry): Ranked[] => {
+      const landedMinor = cost(entry.latest);
+      return landedMinor === null ? [] : [{ entry, landedMinor }];
+    })
+    .sort(compare)[0];
 
 /** The cheapest listing by landed cost, and the alert if it is not the one that was cheapest before. */
 export interface CheapestResult {
@@ -54,20 +79,10 @@ export const newCheapest = (
   settings: AlertSettings,
   now: Date,
 ): CheapestResult => {
-  const ranked = productListings
-    .filter(
-      ({ listing: l, latest }) =>
-        l.status === ListingStatus.Active
-        && latest.shipTo === settings.shipToCountry
-        && latest.inStock
-        && latest.shipping.kind === ShippingKind.Known,
-    )
-    .flatMap((entry): Ranked[] => {
-      const cost = landedCostExact(entry.latest, settings, rates);
-      return cost.ok ? [{ entry, landedMinor: cost.value }] : [];
-    })
-    .sort(compare);
-  const cheapest = ranked[0];
+  const cheapest = cheapestBy(productListings, settings.shipToCountry, (latest) => {
+    const cost = landedCostExact(latest, settings, rates);
+    return cost.ok ? cost.value : null;
+  });
   if (cheapest === undefined) {
     return { cheapestListingId: keptCheapest(productListings, previousCheapestListingId), alert: null };
   }
