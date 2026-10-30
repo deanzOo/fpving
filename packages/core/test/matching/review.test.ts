@@ -143,6 +143,12 @@ describe("Listing a product's pending candidates", () => {
     expect(await pendingCandidates(deps, productId)).toEqual(ok([exact]));
   });
 
+  it("answers product_not_found for an archived product", async () => {
+    const { deps, repository, productId } = await withCandidates();
+    await repository.products.archive(productId, NOW);
+    expect(await pendingCandidates(deps, productId)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+  });
+
   it("answers product_not_found for a product that does not exist", async () => {
     const { deps } = await withCandidates();
     const result = await pendingCandidates(deps, productIdSchema.parse("missing"));

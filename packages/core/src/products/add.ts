@@ -74,6 +74,12 @@ export interface Target {
   readonly fetched: FetchedListing;
 }
 
+/** The product with id `id` unless it is missing or archived, in which case it counts as gone: null. */
+export const liveProduct = async (repository: Repository, id: ProductId): Promise<Product | null> => {
+  const product = await repository.products.get(id);
+  return product?.archivedAt === null ? product : null;
+};
+
 /** The `already_tracked` error for a url the repository refused as tracked, naming the listing tracking it. */
 export const alreadyTracked = async (repository: Repository, url: string): Promise<Result<never, AlreadyTracked>> => {
   const listing = await repository.listings.findByUrl(url);

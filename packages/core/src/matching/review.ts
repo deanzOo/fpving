@@ -5,7 +5,7 @@ import type { MatchCandidate } from "../entities.js";
 import type { MatchCandidateId, ProductId } from "../ids.js";
 import type { Repository } from "../ports/repository.js";
 import { RepositoryErrorKind } from "../ports/repository.js";
-import { alreadyTracked, newListing } from "../products/add.js";
+import { alreadyTracked, liveProduct, newListing } from "../products/add.js";
 import type {
   CoreDeps,
   AddedListing,
@@ -89,7 +89,7 @@ export const rejectCandidate = async (
 };
 
 /**
- * A product's pending match candidates, highest similarity first.
+ * A product's pending match candidates, highest similarity first. An archived product counts as gone.
  *
  * @param deps - The repository.
  * @param productId - The product.
@@ -99,6 +99,6 @@ export const pendingCandidates = async (
   { repository }: Pick<CoreDeps, "repository">,
   productId: ProductId,
 ): Promise<Result<MatchCandidate[], ProductNotFound>> =>
-  (await repository.products.get(productId)) === null
+  (await liveProduct(repository, productId)) === null
     ? err({ kind: AddErrorKind.ProductNotFound })
     : ok(await repository.matchCandidates.listPendingFor(productId));

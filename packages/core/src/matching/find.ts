@@ -6,6 +6,7 @@ import { matchCandidateIdSchema } from "../ids.js";
 import type { PluginId, ProductId } from "../ids.js";
 import type { LlmError, LlmJudge, ProductIdentity } from "../ports/llm-judge.js";
 import type { Repository } from "../ports/repository.js";
+import { liveProduct } from "../products/add.js";
 import type { CoreDeps, ProductNotFound } from "../products/add.js";
 import { AddErrorKind } from "../products/errors.js";
 import { normalizeListingUrl } from "../products/normalize-url.js";
@@ -75,7 +76,7 @@ const sourceListing = async (
   repository: Repository,
   productId: ProductId,
 ): Promise<Result<Listing, SourceListingError>> => {
-  if ((await repository.products.get(productId)) === null) {
+  if ((await liveProduct(repository, productId)) === null) {
     return err({ kind: AddErrorKind.ProductNotFound });
   }
   const listings = await repository.listings.listByProduct(productId);
@@ -156,6 +157,7 @@ const searchAll = async ({ stores }: MatchDeps, plugins: PluginId[], query: Sear
  * LLM where it answers.
  *
  * @remarks
+ * - An archived product counts as gone: `product_not_found`, and nothing is searched.
  * - The source is the product's earliest manual listing. The LLM extracts its identity, and every searchable store
  *   except the source's is searched in parallel for its brand and model. When no identity can be extracted, the
  *   stores are searched for the source title instead, and candidates are scored against it.
