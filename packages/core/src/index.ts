@@ -11,6 +11,7 @@ export type {
   Result,
 } from "@fpving/plugin-sdk";
 export { evaluate } from "./alerts/evaluate.js";
+export { markAllAlertsRead } from "./alerts/read.js";
 export type { Evaluation, EvaluateInput } from "./alerts/evaluate.js";
 export type { AlertDraft, AlertSettings, ListingWithLatest } from "./alerts/draft.js";
 export { MatchErrorKind } from "./matching/errors.js";
@@ -26,7 +27,7 @@ export type {
   NoSourceListing,
   SourceListingError,
 } from "./matching/find.js";
-export { acceptCandidate, rejectCandidate } from "./matching/review.js";
+export { acceptCandidate, pendingCandidates, rejectCandidate } from "./matching/review.js";
 export type { AcceptCandidateError, NotPending } from "./matching/review.js";
 export { addListing, addProduct } from "./products/add.js";
 export type {

@@ -13,6 +13,8 @@ import {
   matchCandidateIdSchema,
   MatchErrorKind,
   ok,
+  pendingCandidates,
+  productIdSchema,
   rejectCandidate,
   snapshotIdSchema,
 } from "../../src/index.ts";
@@ -131,5 +133,19 @@ describe("Rejecting a match candidate", () => {
     await rejectCandidate(deps, exact.id);
     expect(await rejectCandidate(deps, exact.id)).toEqual(notPending);
     expect(await rejectCandidate(deps, missing)).toEqual(notPending);
+  });
+});
+
+describe("Listing a product's pending candidates", () => {
+  it("lists the product's pending candidates, highest similarity first", async () => {
+    const { deps, productId, exact, older } = await withCandidates();
+    await rejectCandidate(deps, older.id);
+    expect(await pendingCandidates(deps, productId)).toEqual(ok([exact]));
+  });
+
+  it("answers product_not_found for a product that does not exist", async () => {
+    const { deps } = await withCandidates();
+    const result = await pendingCandidates(deps, productIdSchema.parse("missing"));
+    expect(result).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
   });
 });

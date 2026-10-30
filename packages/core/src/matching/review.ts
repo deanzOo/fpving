@@ -2,11 +2,18 @@ import { err, ok } from "@fpving/plugin-sdk";
 import type { Result } from "@fpving/plugin-sdk";
 import { ListingOrigin } from "../entities.js";
 import type { MatchCandidate } from "../entities.js";
-import type { MatchCandidateId } from "../ids.js";
+import type { MatchCandidateId, ProductId } from "../ids.js";
 import type { Repository } from "../ports/repository.js";
 import { RepositoryErrorKind } from "../ports/repository.js";
 import { alreadyTracked, newListing } from "../products/add.js";
-import type { CoreDeps, AddedListing, AlreadyTracked, FetchFailed, Target } from "../products/add.js";
+import type {
+  CoreDeps,
+  AddedListing,
+  AlreadyTracked,
+  FetchFailed,
+  ProductNotFound,
+  Target,
+} from "../products/add.js";
 import { AddErrorKind } from "../products/errors.js";
 import { MatchErrorKind } from "./errors.js";
 
@@ -80,3 +87,18 @@ export const rejectCandidate = async (
   const rejected = await repository.matchCandidates.reject(id);
   return rejected.ok ? rejected : notPending;
 };
+
+/**
+ * A product's pending match candidates, highest similarity first.
+ *
+ * @param deps - The repository.
+ * @param productId - The product.
+ * @returns The candidates, or `product_not_found` for an unknown product.
+ */
+export const pendingCandidates = async (
+  { repository }: Pick<CoreDeps, "repository">,
+  productId: ProductId,
+): Promise<Result<MatchCandidate[], ProductNotFound>> =>
+  (await repository.products.get(productId)) === null
+    ? err({ kind: AddErrorKind.ProductNotFound })
+    : ok(await repository.matchCandidates.listPendingFor(productId));

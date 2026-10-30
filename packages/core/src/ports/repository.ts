@@ -92,6 +92,8 @@ export interface MatchCandidateRepository {
   save(candidates: readonly MatchCandidate[]): Promise<Result<void, DuplicateUrl>>;
   /** Every pending candidate, highest similarity first, equal similarities by id in code point order. */
   listPending(): Promise<MatchCandidate[]>;
+  /** A product's pending candidates, in the order of {@link MatchCandidateRepository.listPending}. */
+  listPendingFor(productId: ProductId): Promise<MatchCandidate[]>;
   /**
    * Marks a pending candidate accepted and adds its listing with the listing's first snapshot in one step, or does
    * none of it. Rejects when the listing is not for the candidate's product or the snapshot not the listing's.
@@ -128,6 +130,8 @@ export interface AlertRepository {
   list(filter: { readonly unreadOnly: boolean }): Promise<Alert[]>;
   /** Marks an alert read at `at`. */
   markRead(id: AlertId, at: Date): Promise<Result<void, NotFound>>;
+  /** Marks every unread alert read at `at` in one step and resolves to how many there were. */
+  markAllRead(at: Date): Promise<number>;
 }
 
 /** Stores scan runs. */

@@ -46,6 +46,13 @@ export const inMemoryRepository = (): Repository => {
   const suggested = (row: Pick<MatchCandidate, "productId" | "url">, pool: Iterable<MatchCandidate>): boolean =>
     [...pool].some((other) => other.productId === row.productId && other.url === row.url);
 
+  const pending = (): MatchCandidate[] =>
+    copy(
+      [...candidates.values()]
+        .filter((row) => row.status === CandidateStatus.Pending)
+        .toSorted((a, b) => b.similarityScore - a.similarityScore || byCodePoint(a.id, b.id)),
+    );
+
   const insertListing = async (
     listing: Listing,
     firstSnapshot: PriceSnapshot,
@@ -182,14 +189,8 @@ export const inMemoryRepository = (): Repository => {
         }
         return Promise.resolve(done);
       },
-      listPending: async () =>
-        Promise.resolve(
-          copy(
-            [...candidates.values()]
-              .filter((row) => row.status === CandidateStatus.Pending)
-              .toSorted((a, b) => b.similarityScore - a.similarityScore || byCodePoint(a.id, b.id)),
-          ),
-        ),
+      listPending: async () => Promise.resolve(pending()),
+      listPendingFor: async (productId) => Promise.resolve(pending().filter((row) => row.productId === productId)),
       accept: async (id, listing, firstSnapshot) => {
         const row = candidates.get(id);
         if (row?.status !== CandidateStatus.Pending) {
@@ -258,6 +259,13 @@ export const inMemoryRepository = (): Repository => {
         }
         alerts.set(id, { ...row, readAt: copy(at) });
         return Promise.resolve(done);
+      },
+      markAllRead: async (at) => {
+        const unread = [...alerts.values()].filter((row) => row.readAt === null);
+        for (const row of unread) {
+          alerts.set(row.id, { ...row, readAt: copy(at) });
+        }
+        return Promise.resolve(unread.length);
       },
     },
     scanRuns: {

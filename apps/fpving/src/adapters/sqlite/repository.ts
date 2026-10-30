@@ -16,6 +16,7 @@ import {
 import type { DuplicateUrl, Listing, NotFound, PriceSnapshot, Repository, Result } from "@fpving/core";
 import Database from "better-sqlite3";
 import { and, asc, desc, eq, getTableColumns, gte, inArray, isNull, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import {
   fromCandidateRow,
@@ -102,6 +103,12 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
     tx.insert(priceSnapshots).values(toSnapshotRow(firstSnapshot)).run();
     return done;
   };
+
+  const pendingCandidates = (filter?: SQL) =>
+    db.select().from(matchCandidates).where(and(eq(matchCandidates.status, CandidateStatus.Pending), filter))
+      .orderBy(desc(matchCandidates.similarity), asc(matchCandidates.id))
+      .all()
+      .map(fromCandidateRow);
 
   const urlRefusals = new Map<string, DuplicateUrl>([[Constraint.Unique, duplicateUrl]]);
   const listingRefusals = new Map<string, NotFound | DuplicateUrl>([
@@ -204,12 +211,8 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
           }
           return done;
         }, urlRefusals),
-      listPending: async () =>
-        settle(() =>
-          db.select().from(matchCandidates).where(eq(matchCandidates.status, CandidateStatus.Pending))
-            .orderBy(desc(matchCandidates.similarity), asc(matchCandidates.id))
-            .all()
-            .map(fromCandidateRow)),
+      listPending: async () => settle(() => pendingCandidates()),
+      listPendingFor: async (productId) => settle(() => pendingCandidates(eq(matchCandidates.productId, productId))),
       accept: async (id, listing, firstSnapshot) =>
         atomically<NotFound | DuplicateUrl>((tx) => {
           const [decided] = tx.update(matchCandidates).set({ status: CandidateStatus.Accepted })
@@ -273,6 +276,8 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
             .map((row) => alertSchema.parse(row))),
       markRead: async (id, at) =>
         settle(() => changedOne(db.update(alerts).set({ readAt: at }).where(eq(alerts.id, id)).run())),
+      markAllRead: async (at) =>
+        settle(() => db.update(alerts).set({ readAt: at }).where(isNull(alerts.readAt)).run().changes),
     },
     scanRuns: {
       record: async (run) =>

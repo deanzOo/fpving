@@ -5,7 +5,9 @@ import {
   addProduct,
   AddErrorKind,
   findMatches,
+  markAllAlertsRead,
   MatchErrorKind,
+  pendingCandidates,
   rejectCandidate,
 } from "@fpving/core";
 import type {
@@ -186,12 +188,10 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.listCandidates,
     handler: async ({ params: { productId } }, reply) => {
-      const { repository } = deps();
-      if ((await repository.products.get(productId)) === null) {
-        return reply.code(productNotFound.status).send(productNotFound.body);
-      }
-      const pending = await repository.matchCandidates.listPending();
-      return reply.code(RouteStatus.Ok).send(pending.filter((row) => row.productId === productId));
+      const pending = await pendingCandidates(deps(), productId);
+      return pending.ok
+        ? reply.code(RouteStatus.Ok).send(pending.value)
+        : reply.code(productNotFound.status).send(productNotFound.body);
     },
   });
 
@@ -261,13 +261,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
 
   server.route({
     ...apiRoutes.markAllAlertsRead,
-    handler: async (_request, reply) => {
-      const { repository, clock } = deps();
-      const now = clock.now();
-      const unread = await repository.alerts.list({ unreadOnly: true });
-      const marked = await Promise.all(unread.map(async ({ id }) => repository.alerts.markRead(id, now)));
-      return reply.code(RouteStatus.Ok).send({ marked: marked.filter((result) => result.ok).length });
-    },
+    handler: async (_request, reply) => reply.code(RouteStatus.Ok).send({ marked: await markAllAlertsRead(deps()) }),
   });
 
   server.route({

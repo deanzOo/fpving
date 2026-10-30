@@ -359,6 +359,17 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.matchCandidates.listPending()).toEqual([high, low]);
       });
 
+      it("lists one product's pending candidates in the same order, leaving out others' and decided ones", async () => {
+        const low = candidate("c1", p1.id, url("c1"), LOW_SIMILARITY);
+        const high = candidate("c2", p1.id, url("c2"), HIGH_SIMILARITY);
+        const other = candidate("c3", p2.id, url("c3"), HIGH_SIMILARITY);
+        const rejected = candidate("c4", p1.id, url("c4"), HIGH_SIMILARITY);
+        expect(await repo.matchCandidates.save([low, high, other, rejected])).toEqual(ok);
+        expect(await repo.matchCandidates.reject(rejected.id)).toEqual(ok);
+        expect(await repo.matchCandidates.listPendingFor(p1.id)).toEqual([high, low]);
+        expect(await repo.matchCandidates.listPendingFor(missingProduct)).toEqual([]);
+      });
+
       it("breaks similarity ties by candidate id, comparing ids by code point", async () => {
         const first = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
         const second = candidate("c2", p1.id, url("c2"), HIGH_SIMILARITY);
@@ -534,6 +545,17 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         }
         const ids = (await repo.alerts.list({ unreadOnly: false })).map((row) => row.id);
         expect(ids).toEqual(["a3", "a2", "a1"]);
+      });
+
+      it("marks every unread alert read at one instant, says how many, and leaves read ones as they were", async () => {
+        for (const id of ["a1", "a2", "a3"]) {
+          await repo.alerts.save(alert(id, l1, JAN_1, s1.id));
+        }
+        expect(await repo.alerts.markRead(alertIdSchema.parse("a1"), JAN_2)).toEqual(ok);
+        expect(await repo.alerts.markAllRead(JAN_3)).toBe(["a2", "a3"].length);
+        const readAt = (await repo.alerts.list({ unreadOnly: false })).map((row) => [row.id, row.readAt]);
+        expect(readAt).toEqual([["a3", JAN_3], ["a2", JAN_3], ["a1", JAN_2]]);
+        expect(await repo.alerts.markAllRead(JAN_3)).toBe(0);
       });
 
       it("reports not_found when marking an alert read that does not exist", async () => {
