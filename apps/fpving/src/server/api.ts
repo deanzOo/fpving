@@ -98,7 +98,7 @@ const restarting = failure(RouteStatus.ServiceUnavailable, ApiErrorKind.Restarti
  * Registers every route of {@link apiRoutes}. Fastify takes routes only before `listen`, while the runtime exists
  * only once startup completed, so the handlers read it through the returned `attach`; the readiness gate keeps
  * requests away until then. Handlers call core's use cases or the repository and map each `Result` to a typed reply.
- * Only one scan the API started runs at a time; a second request while it runs answers 409.
+ * Scan now answers 409 while any scan runs, scheduled or not, and the scan status covers every scan.
  *
  * @param server - The server, before `listen`.
  * @returns `attach`, which hands the routes the runtime.
@@ -112,27 +112,27 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     return attached;
   };
   const deps = () => runtime().deps();
-  let scanning: Promise<void> | null = null;
-  let lastResult: ScanStatus["lastResult"] = null;
-  const scanStatus = async (): Promise<ScanStatus> => ({
-    running: scanning !== null,
-    latestRun: await deps().repository.scanRuns.latest(),
-    lastResult,
-  });
+  const scanStatus = async (): Promise<ScanStatus> => {
+    const scans = runtime().scans();
+    const last = scans.lastReport();
+    const { plugins, alerts, transitions } = last?.report ?? { plugins: [], alerts: [], transitions: [] };
+    return {
+      running: scans.scanning(),
+      latestRun: await deps().repository.scanRuns.latest(),
+      lastResult: last === null
+        ? null
+        : { finishedAt: last.finishedAt, plugins, alerts: alerts.length, transitions: transitions.length },
+    };
+  };
   const runScan = async (): Promise<void> => {
-    const { logger, clock } = deps();
+    const { logger } = deps();
     try {
       const report = await runtime().scans().scanNow();
       if (!report.ok) {
         logger.warn("scan not started", { kind: report.error.kind });
-        return;
       }
-      const { plugins, alerts, transitions } = report.value;
-      lastResult = { finishedAt: clock.now(), plugins, alerts: alerts.length, transitions: transitions.length };
     } catch (error) {
       logger.error("scan failed", { detail: inspect(error) });
-    } finally {
-      scanning = null;
     }
   };
 
@@ -288,11 +288,11 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       if (runtime().restarting()) {
         return reply.code(restarting.status).send(restarting.body);
       }
-      if (scanning !== null) {
+      if (runtime().scans().scanning()) {
         const { status, body } = failure(RouteStatus.Conflict, ApiErrorKind.ScanRunning, Message.ScanRunning);
         return reply.code(status).send(body);
       }
-      scanning = runScan();
+      void runScan();
       return reply.code(RouteStatus.Accepted).send(await scanStatus());
     },
   });

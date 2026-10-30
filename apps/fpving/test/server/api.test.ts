@@ -437,8 +437,27 @@ describe("Scan API", () => {
     });
   });
 
-  it("answers no run and no result before any scan", async () => {
-    expect(await status()).toEqual({ running: false, latestRun: null, lastResult: null });
+  it("answers 409 scan_running while a scan it did not start runs, and reports that scan", async () => {
+    await addProduct();
+    let release = (): void => undefined;
+    api.stores.script.fetching = new Promise((resolve) => {
+      release = resolve;
+    });
+    const scheduled = api.scans.current.scanNow();
+    expect((await status()).running).toBe(true);
+    const response = await api.request("POST", apiRoutes.startScan.url);
+    expect(response.statusCode).toBe(RouteStatus.Conflict);
+    release();
+    await scheduled;
+    expect(await status()).toMatchObject({ running: false, lastResult: { plugins: [{ succeeded: 1 }] } });
+  });
+
+  it("answers no recorded run before any listing was scanned, and the empty boot scan as the last result", async () => {
+    expect(await status()).toMatchObject({
+      running: false,
+      latestRun: null,
+      lastResult: { plugins: [], alerts: 0, transitions: 0 },
+    });
   });
 
   it("logs a scan that could not start because the schedule stopped", async () => {
@@ -451,7 +470,7 @@ describe("Scan API", () => {
 
   it("logs a scan that threw and is ready for the next one", async () => {
     const scanNow = async () => Promise.reject(new Error("disk full"));
-    api.scans.current = { scanNow, stop: async () => Promise.resolve() };
+    api.scans.current = { scanNow, stop: async () => Promise.resolve(), scanning: () => false, lastReport: () => null };
     await api.request("POST", apiRoutes.startScan.url);
     await vi.waitFor(async () => {
       expect((await status()).running).toBe(false);
@@ -477,7 +496,7 @@ describe("API during a settings restart", () => {
   it("starts no scan while restarting", async () => {
     const { current } = api.scans;
     const scanNow = vi.fn(async () => current.scanNow());
-    api.scans.current = { scanNow, stop: async () => current.stop() };
+    api.scans.current = { ...current, scanNow };
     api.restarting.current = true;
     await api.request("POST", apiRoutes.startScan.url);
     expect(scanNow).not.toHaveBeenCalled();

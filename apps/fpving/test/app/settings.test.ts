@@ -43,7 +43,9 @@ const applierHarness = async () => {
       },
     },
   };
-  const live = { host, deps, scans: { scanNow: vi.fn(), stop: async () => Promise.resolve() } };
+  const stop = async (): Promise<void> => Promise.resolve();
+  const scans = { scanNow: vi.fn(), stop, scanning: () => false, lastReport: () => null };
+  const live = { host, deps, scans };
   const applier = createSettingsApplier({ live, applied, startHost, gatewayFor: () => fakeGateway().gateway });
   return { applier, live, startHost, armed, repository };
 };

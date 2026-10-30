@@ -63,7 +63,10 @@ const scanStatusSchema = z.object({
   }).nullable(),
 });
 
-/** Whether a scan the API started is running, the newest recorded run and what the last finished API scan did. */
+/**
+ * Whether a scan is running, scheduled or on demand, the newest recorded run and what the last scan that finished
+ * since the schedule last started did.
+ */
 export type ScanStatus = z.infer<typeof scanStatusSchema>;
 
 const { Ok, Created, Accepted, NoContent, NotFound, Conflict, UnprocessableContent, BadGateway, ServiceUnavailable }
@@ -185,7 +188,7 @@ export const apiRoutes = {
   startScan: {
     method: "POST",
     url: "/api/scan",
-    summary: "Starts a scan of every listing in the background; one at a time.",
+    summary: "Starts a scan of every listing in the background; 409 while any scan runs.",
     schema: {
       response: { [Accepted]: scanStatusSchema, [Conflict]: apiErrorSchema, [ServiceUnavailable]: apiErrorSchema },
     },
@@ -193,7 +196,7 @@ export const apiRoutes = {
   getScan: {
     method: "GET",
     url: "/api/scan",
-    summary: "Whether a scan the API started is running, the newest recorded run and the last API scan's result.",
+    summary: "Whether any scan is running, the newest recorded run and the last finished scan's result.",
     schema: { response: { [Ok]: scanStatusSchema } },
   },
 } as const;

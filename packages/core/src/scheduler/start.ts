@@ -33,6 +33,16 @@ export interface SchedulerHandle {
    * database. It does not reject when that scan threw.
    */
   stop(): Promise<void>;
+  /** Whether a scan is running, scheduled, caught up on boot or on demand. */
+  scanning(): boolean;
+  /** The report of the last scan that finished since the schedule started and when it finished, or null. */
+  lastReport(): FinishedScan | null;
+}
+
+/** A finished scan's report and when it finished. */
+export interface FinishedScan {
+  readonly report: ScanReport;
+  readonly finishedAt: Date;
 }
 
 /**
@@ -51,6 +61,7 @@ export interface SchedulerHandle {
 export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHandle> => {
   const { repository, clock, logger, scheduler } = deps;
   let running: Promise<ScanReport> | null = null;
+  let finished: FinishedScan | null = null;
   let stopped = false;
   const scanOnce = async (): Promise<Result<ScanReport, SchedulerStopped>> => {
     if (stopped) {
@@ -59,7 +70,9 @@ export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHand
     running ??= (async () => {
       try {
         await refreshRatesIfStale(deps);
-        return await scanListings(deps);
+        const report = await scanListings(deps);
+        finished = { report, finishedAt: clock.now() };
+        return report;
       } finally {
         running = null;
       }
@@ -97,5 +110,5 @@ export const startScheduler = async (deps: SchedulerDeps): Promise<SchedulerHand
   if (overdue) {
     void scanInBackground();
   }
-  return { scanNow, stop };
+  return { scanNow, stop, scanning: () => running !== null, lastReport: () => finished };
 };

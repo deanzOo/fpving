@@ -128,4 +128,4 @@ export { nextScanDue, RatesRefresh, refreshRatesIfStale } from "./scheduler/poli
 export type { RefreshRatesDeps } from "./scheduler/policy.js";
 export { SchedulerErrorKind } from "./scheduler/errors.js";
 export { startScheduler } from "./scheduler/start.js";
-export type { SchedulerDeps, SchedulerHandle, SchedulerStopped } from "./scheduler/start.js";
+export type { FinishedScan, SchedulerDeps, SchedulerHandle, SchedulerStopped } from "./scheduler/start.js";
