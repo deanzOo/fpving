@@ -104,6 +104,10 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
     return done;
   };
 
+  const isLive = (tx: Tx, productId: string): boolean =>
+    tx.select({ archivedAt: products.archivedAt }).from(products).where(eq(products.id, productId)).get()
+      ?.archivedAt === null;
+
   const updateLive = (id: string, change: Partial<typeof products.$inferInsert>): Result<void, NotFound> =>
     changedOne(db.update(products).set(change).where(and(eq(products.id, id), isNull(products.archivedAt))).run());
 
@@ -114,10 +118,6 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
       .map(fromCandidateRow);
 
   const urlRefusals = new Map<string, DuplicateUrl>([[Constraint.Unique, duplicateUrl]]);
-  const listingRefusals = new Map<string, NotFound | DuplicateUrl>([
-    [Constraint.Unique, duplicateUrl],
-    [Constraint.ForeignKey, notFound],
-  ]);
 
   const repository: Repository = {
     products: {
@@ -163,8 +163,8 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
     listings: {
       addWithSnapshot: async (listing, firstSnapshot) =>
         atomically<NotFound | DuplicateUrl>(
-          (tx) => insertListing(tx, listing, firstSnapshot),
-          listingRefusals,
+          (tx) => (isLive(tx, listing.productId) ? insertListing(tx, listing, firstSnapshot) : err(notFound)),
+          urlRefusals,
         ),
       findByUrl: async (url) =>
         settle(() => {
@@ -244,13 +244,13 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
       listPendingFor: async (productId) => settle(() => pendingCandidates(eq(matchCandidates.productId, productId))),
       accept: async (id, listing, firstSnapshot) =>
         atomically<NotFound | DuplicateUrl>((tx) => {
-          const [decided] = tx.update(matchCandidates).set({ status: CandidateStatus.Accepted })
-            .where(and(eq(matchCandidates.id, id), eq(matchCandidates.status, CandidateStatus.Pending)))
-            .returning({ productId: matchCandidates.productId })
-            .all();
-          if (decided === undefined) {
+          const pending = and(eq(matchCandidates.id, id), eq(matchCandidates.status, CandidateStatus.Pending));
+          const decided = tx.select({ productId: matchCandidates.productId }).from(matchCandidates)
+            .where(pending).get();
+          if (decided === undefined || !isLive(tx, decided.productId)) {
             return err(notFound);
           }
+          tx.update(matchCandidates).set({ status: CandidateStatus.Accepted }).where(pending).run();
           if (listing.productId !== decided.productId) {
             bug("listing belongs to another product than the candidate");
           }

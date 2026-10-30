@@ -70,7 +70,7 @@ export const inMemoryRepository = (): Repository => {
     if (listings.has(listing.id) || snapshots.has(firstSnapshot.id)) {
       return bug("duplicate id");
     }
-    if (!products.has(listing.productId)) {
+    if (products.get(listing.productId)?.archivedAt !== null) {
       return Promise.resolve(notFound);
     }
     if (urlTracked(listing.url)) {

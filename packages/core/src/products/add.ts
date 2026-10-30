@@ -179,7 +179,8 @@ export const addProduct = async (deps: CoreDeps, url: string): Promise<Result<Ad
  *
  * @remarks
  * Normalizes, resolves the plugin, dedupes and fetches exactly like {@link addProduct}. The product is checked when
- * the listing is stored, after the fetch, so an unknown product yields `product_not_found` and stores nothing.
+ * the listing is stored, after the fetch, so an unknown or archived product yields `product_not_found` and stores
+ * nothing.
  *
  * @param deps - The ports to use.
  * @param productId - The product the listing belongs to.

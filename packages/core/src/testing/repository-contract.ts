@@ -278,6 +278,14 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.listings.listByProduct(p1.id)).toEqual([l1]);
       });
 
+      it("refuses a listing for an archived product with not_found and stores neither", async () => {
+        await repo.products.archive(p1.id, JAN_2);
+        const l3 = listing("l3", p1.id, url("three"));
+        expect(await repo.listings.addWithSnapshot(l3, snapshot("s3", l3.id, JAN_2))).toEqual(notFound);
+        expect(await repo.listings.listByProduct(p1.id)).toEqual([l1]);
+        expect(await repo.snapshots.listSince(l3.id, JAN_1)).toEqual([]);
+      });
+
       it("rejects a snapshot of another listing, or a listing or snapshot id already stored, as a bug", async () => {
         const l3 = listing("l3", p1.id, url("three"));
         await expect(repo.listings.addWithSnapshot(l3, snapshot("s3", l1.id, JAN_2))).rejects.toThrow();
@@ -458,6 +466,18 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
           duplicateUrl,
         );
         expect(await repo.snapshots.listSince(tracked.id, JAN_1)).toEqual([]);
+        expect(await repo.matchCandidates.listPending()).toEqual([found]);
+      });
+
+      it("refuses with not_found to accept a candidate of an archived product, leaving it pending", async () => {
+        const found = candidate("c1", p1.id, url("c1"), HIGH_SIMILARITY);
+        const matched = { ...listing("l3", p1.id, found.url), origin: ListingOrigin.Matched };
+        await repo.matchCandidates.save([found]);
+        await repo.products.archive(p1.id, JAN_2);
+        expect(await repo.matchCandidates.accept(found.id, matched, snapshot("s3", matched.id, JAN_2))).toEqual(
+          notFound,
+        );
+        expect(await repo.listings.findByUrl(found.url)).toBeNull();
         expect(await repo.matchCandidates.listPending()).toEqual([found]);
       });
 

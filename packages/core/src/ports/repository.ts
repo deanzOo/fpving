@@ -62,8 +62,8 @@ export type ListingStatusUpdate = Pick<Listing, "status" | "failureStreak" | "no
 /** Stores listings. Urls are compared exactly, so callers pass them normalized. */
 export interface ListingRepository {
   /**
-   * Adds a listing to an existing product together with its first snapshot, or neither of them. Rejects when the
-   * snapshot is not the listing's.
+   * Adds a listing to an existing product that is not archived together with its first snapshot, or neither of
+   * them: a missing or archived product is `not_found`. Rejects when the snapshot is not the listing's.
    */
   addWithSnapshot(listing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, NotFound | DuplicateUrl>>;
   /** The listing tracking `url`, or null. */
@@ -110,7 +110,8 @@ export interface MatchCandidateRepository {
   listPendingFor(productId: ProductId): Promise<MatchCandidate[]>;
   /**
    * Marks a pending candidate accepted and adds its listing with the listing's first snapshot in one step, or does
-   * none of it. Rejects when the listing is not for the candidate's product or the snapshot not the listing's.
+   * none of it: a candidate that is not pending, or whose product is archived, is `not_found`. Rejects when the
+   * listing is not for the candidate's product or the snapshot not the listing's.
    */
   accept(
     id: MatchCandidateId,

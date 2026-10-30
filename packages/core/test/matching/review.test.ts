@@ -106,6 +106,14 @@ describe("Accepting a match candidate", () => {
     expect(await pendingIds(repository)).toEqual([exact.id, older.id]);
   });
 
+  it("answers product_not_found for a candidate of an archived product, leaving it pending", async () => {
+    const { deps, repository, productId, exact, older } = await withCandidates();
+    await repository.products.archive(productId, NOW);
+    expect(await acceptCandidate(deps, exact.id)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+    expect(await repository.listings.findByUrl(EXACT_URL)).toBeNull();
+    expect(await pendingIds(repository)).toEqual([exact.id, older.id]);
+  });
+
   it("refuses a candidate rejected while its page was being fetched, storing no listing", async () => {
     const { deps, repository, exact } = await withCandidates();
     const stores: StoreGateway = {

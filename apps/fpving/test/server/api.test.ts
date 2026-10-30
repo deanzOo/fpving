@@ -236,6 +236,14 @@ describe("Listings API", () => {
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ProductNotFound);
   });
 
+  it("answers 404 product_not_found when adding a listing to an archived product", async () => {
+    const { product } = await addProduct();
+    await api.request("DELETE", `/api/products/${product.id}`);
+    const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: OTHER_PAGE });
+    expect({ status: response.statusCode, kind: errorOf(response.json()).kind })
+      .toEqual({ status: RouteStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
+  });
+
   it("answers 409 already_tracked for a URL another listing tracks", async () => {
     const { product } = await addProduct();
     const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: PAGE });
@@ -379,6 +387,15 @@ describe("Match candidates API", () => {
     api.stores.answers.set(MATCH, networkError(GatewayRefusal.Unavailable));
     const response = await api.request("POST", `/api/candidates/${id}/accept`);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.PluginUnavailable);
+  });
+
+  it("answers 404 product_not_found when accepting a candidate of an archived product", async () => {
+    const id = await pendingId();
+    const [pending] = await api.repository.matchCandidates.listPending();
+    await api.request("DELETE", `/api/products/${pending?.productId ?? ""}`);
+    const response = await api.request("POST", `/api/candidates/${id}/accept`);
+    expect({ status: response.statusCode, kind: errorOf(response.json()).kind })
+      .toEqual({ status: RouteStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
   it("answers 409 already_tracked when a listing started tracking the candidate's URL", async () => {

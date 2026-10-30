@@ -204,6 +204,13 @@ describe("Adding a listing to a product", () => {
     expect(await repository.listings.findByUrl(OTHER_CANONICAL)).toBeNull();
   });
 
+  it("reports product_not_found and stores nothing when the product is archived", async () => {
+    const { deps, repository } = await withProduct();
+    await repository.products.archive(productId, NOW);
+    expect(await addListing(deps, productId, OTHER)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+    expect(await repository.listings.findByUrl(OTHER_CANONICAL)).toBeNull();
+  });
+
   it("returns the listing that tracked the URL first when another add wins the race during the fetch", async () => {
     let armed = false;
     const racing = setup(ok(fetched), async () => {

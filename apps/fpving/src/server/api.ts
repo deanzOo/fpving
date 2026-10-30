@@ -253,10 +253,11 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       }
       const accepted = await acceptCandidate(deps(), candidateId);
       if (!accepted.ok) {
-        const { status, body } = accepted.error.kind === MatchErrorKind.NotPending
+        const { error } = accepted;
+        const refusal = error.kind === MatchErrorKind.NotPending
           ? notPending
-          : addFailure(accepted.error);
-        return reply.code(status).send(body);
+          : error.kind === AddErrorKind.ProductNotFound ? productNotFound : addFailure(error);
+        return reply.code(refusal.status).send(refusal.body);
       }
       return reply.code(RouteStatus.Created).send(accepted.value);
     },

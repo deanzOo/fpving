@@ -23,10 +23,10 @@ export interface NotPending {
 }
 
 /**
- * Why {@link acceptCandidate} stored nothing: the candidate is not pending, the store could not fetch it, or a
- * listing already tracks its url.
+ * Why {@link acceptCandidate} stored nothing: the candidate is not pending, its product is archived, the store could
+ * not fetch it, or a listing already tracks its url.
  */
-export type AcceptCandidateError = NotPending | FetchFailed | AlreadyTracked;
+export type AcceptCandidateError = NotPending | ProductNotFound | FetchFailed | AlreadyTracked;
 
 const notPending = err({ kind: MatchErrorKind.NotPending });
 
@@ -44,7 +44,8 @@ const pendingCandidate = async (
  *
  * @remarks
  * The listing and snapshot are built exactly like {@link addListing} builds them. A candidate that is not pending
- * is never fetched, and one decided during the fetch yields `not_pending` and stores nothing. When the fetch fails,
+ * is never fetched, and one decided during the fetch yields `not_pending` and stores nothing. A candidate whose
+ * product is archived, before or during the fetch, yields `product_not_found` and stays pending. When the fetch fails,
  * or a listing started tracking the url meanwhile, the candidate stays pending.
  *
  * @param deps - The ports to use.
@@ -70,7 +71,12 @@ export const acceptCandidate = async (
   if (stored.ok) {
     return ok(added);
   }
-  return stored.error.kind === RepositoryErrorKind.NotFound ? notPending : alreadyTracked(deps.repository, url);
+  if (stored.error.kind === RepositoryErrorKind.DuplicateUrl) {
+    return alreadyTracked(deps.repository, url);
+  }
+  return (await liveProduct(deps.repository, productId)) === null
+    ? err({ kind: AddErrorKind.ProductNotFound })
+    : notPending;
 };
 
 /**
