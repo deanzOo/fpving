@@ -289,7 +289,7 @@ export const startApp = async (
     opened({
       name: ShutdownStepName.Scans,
       run: async () => {
-        await settingsApplier.settled();
+        await settingsApplier.close();
         await parts.scans.stop();
       },
     });

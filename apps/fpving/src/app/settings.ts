@@ -24,11 +24,16 @@ export interface SettingsApplierOptions {
   readonly gatewayFor: (host: PluginHost) => StoreGateway;
 }
 
-/** A settings applier: `apply` saves and restarts, `settled` resolves once every change so far has been applied. */
+/**
+ * A settings applier: `apply` saves and restarts; `close` refuses later changes and resolves once every change so
+ * far has been applied.
+ */
 export interface SettingsApplier {
   apply(settings: Settings): Promise<void>;
-  settled(): Promise<void>;
+  close(): Promise<void>;
 }
+
+const CLOSED = "the app is shutting down; settings are no longer applied";
 
 const settledEither = (): void => undefined;
 
@@ -51,6 +56,7 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
   const { live, startHost, gatewayFor } = options;
   let applied = options.applied;
   let queue = Promise.resolve();
+  let closed = false;
   const reconfigure = async (next: Settings): Promise<void> => {
     const { repository } = live.deps;
     const restartPlugins = pluginsChanged(applied, next);
@@ -77,11 +83,17 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
   };
   return {
     apply: async (next) => {
+      if (closed) {
+        return Promise.reject(new Error(CLOSED));
+      }
       const run = queue.then(async () => reconfigure(next));
       // The caller gets the failure and the server logs it; the queue only waits for it.
       queue = run.then(settledEither, settledEither);
       return run;
     },
-    settled: async () => queue,
+    close: async () => {
+      closed = true;
+      return queue;
+    },
   };
 };
