@@ -69,14 +69,14 @@ export const withinDeadline = async (work: Promise<boolean>, deadlineMs: number,
   }
 };
 
-interface ShutdownSource {
+/** Where shutdown requests come from: `process`, or an emitter in tests. */
+export interface ShutdownSource {
   on(event: (typeof SHUTDOWN_SIGNALS)[number], listener: () => void): unknown;
   on(event: "message", listener: (message: unknown) => void): unknown;
 }
 
 /** What {@link handleShutdown} needs. */
 export interface ShutdownHandling {
-  /** Where requests come from: `process`, or an emitter in tests. */
   readonly source: ShutdownSource;
   readonly shutdown: () => Promise<boolean>;
   readonly logger: Logger;

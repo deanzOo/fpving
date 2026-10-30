@@ -1,12 +1,9 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { createServer as createNetServer } from "node:net";
-import type { AddressInfo } from "node:net";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ok, productIdSchema } from "@fpving/core";
-import type { CurrencyRates, FxTable, Notifier, Scheduler } from "@fpving/core";
+import { productIdSchema } from "@fpving/core";
+import type { Scheduler } from "@fpving/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 import { migrate } from "../../src/adapters/sqlite/migrate.ts";
 import { openSqliteRepository } from "../../src/adapters/sqlite/repository.ts";
 import type { ClosableBrowserDriver } from "../../src/adapters/transport/playwright-browser-driver.ts";
@@ -17,10 +14,13 @@ import { PLUGINS_FILE } from "../../src/plugins/config.ts";
 import type { SpawnWorker } from "../../src/plugins/runtime/connection.ts";
 import { HEALTH_PATH } from "../../src/server/health.ts";
 import { fakeWorker } from "../plugins/runtime/fake-worker.ts";
-import { fixturePlugin, spawnSourceWorker } from "../support/plugin-workers.ts";
+import { fakePorts, freePort, FX, occupy } from "../support/app-fixtures.ts";
+import { fixturePlugin } from "../support/plugin-workers.ts";
 
 const FAKE_KEY = "sk-ant-test-not-a-real-secret";
 const OK = 200;
+const NOT_FOUND = 404;
+const UNAVAILABLE = 503;
 const PLUGIN_LOAD_MS = 20_000;
 const OWNER_ONLY = 0o700;
 const PERMISSIONS = 0o777;
@@ -28,7 +28,6 @@ const OPEN_DIR = 0o755;
 const GROUP_READABLE = 0o750;
 const isWindows = process.platform === "win32";
 const today = (): string => new Date().toISOString().slice(0, "yyyy-mm-dd".length);
-const FX: FxTable = { base: "EUR", fetchedOn: "2026-01-01", ratesPerBase: { USD: 1.1 } };
 
 let root = "";
 let dataDir = "";
@@ -42,16 +41,6 @@ afterEach(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-const freePort = async (): Promise<number> =>
-  new Promise((resolve) => {
-    const probe = createNetServer().listen(0, "127.0.0.1", () => {
-      const { port } = z.object({ port: z.number() }).parse(probe.address() satisfies AddressInfo | string | null);
-      probe.close(() => {
-        resolve(port);
-      });
-    });
-  });
-
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), "fpving-app-"));
   dataDir = join(root, "data");
@@ -61,32 +50,7 @@ beforeEach(async () => {
 const env = (): Record<string, string> => ({ PORT: String(port), DATA_DIR: dataDir, LOG_LEVEL: "debug" });
 const healthUrl = (): string => `http://127.0.0.1:${String(port)}${HEALTH_PATH}`;
 
-const fakes = () => {
-  const order: string[] = [];
-  const armed: number[] = [];
-  const scheduler: Scheduler = {
-    every: (intervalMs) => {
-      armed.push(intervalMs);
-      return () => {
-        order.push("scheduler");
-      };
-    },
-  };
-  const browser: ClosableBrowserDriver = {
-    fetchPage: async () => Promise.reject(new Error("no browser in tests")),
-    close: async () => Promise.resolve(void order.push("browser")),
-  };
-  const fetchLatest = vi.fn<CurrencyRates["fetchLatest"]>(async () => Promise.resolve(ok(FX)));
-  const rates: CurrencyRates = { fetchLatest };
-  const notifier: Notifier = { notify: vi.fn(async () => Promise.resolve(ok(undefined))) };
-  const spawned: string[] = [];
-  const spawn: SpawnWorker = (data) => {
-    spawned.push(JSON.stringify(data.entry));
-    return spawnSourceWorker(data);
-  };
-  const ports: Partial<AppPorts> = { scheduler, browser, rates, notifier, spawn };
-  return { order, ports, fetchLatest, armed, spawned };
-};
+const fakes = fakePorts;
 
 const started = async (source: Record<string, string>, overrides: Partial<AppPorts>): Promise<App> => {
   const result = await startApp(source, overrides);
@@ -160,12 +124,18 @@ describe("App startup", () => {
     expect(statSync(dataDir).mode & PERMISSIONS).toBe(OWNER_ONLY);
   });
 
-  it.skipIf(isWindows)("leaves an existing DATA_DIR's mode alone, warning when others can open it", async () => {
+  it("warns when an existing DATA_DIR is open to other users on a POSIX system, on every OS", async () => {
+    mkdirSync(dataDir, { mode: OPEN_DIR });
+    chmodSync(dataDir, OPEN_DIR);
+    await started(env(), { ...fakes().ports, platform: "linux" });
+    expect(logText()).toContain("DATA_DIR is open to other users");
+  });
+
+  it.skipIf(isWindows)("leaves an existing DATA_DIR's mode alone", async () => {
     mkdirSync(dataDir, { mode: OPEN_DIR });
     chmodSync(dataDir, OPEN_DIR);
     await started(env(), fakes().ports);
     expect(statSync(dataDir).mode & PERMISSIONS).toBe(OPEN_DIR);
-    expect(logText()).toContain("DATA_DIR is open to other users");
   });
 
   it.skipIf(isWindows)("does not warn about an existing owner-only DATA_DIR", async () => {
@@ -192,17 +162,21 @@ describe("App startup", () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
     let whileLoading: unknown = null;
+    let otherRoute = 0;
     const spawn: SpawnWorker = (data) => {
       const worker = fakeWorker(data);
-      void fetch(healthUrl()).then(async (response) => response.json()).then((body: unknown) => {
-        whileLoading = body;
+      void (async () => {
+        whileLoading = await (await fetch(healthUrl())).json();
+        otherRoute = (await fetch(`http://127.0.0.1:${String(port)}/api/anything`)).status;
         worker.ready();
-      });
+      })();
       return worker.handle;
     };
     const running = await started(env(), { ...fakes().ports, spawn });
     expect(running.address).toBe(`http://127.0.0.1:${String(port)}`);
     expect(whileLoading).toMatchObject({ plugins: { loaded: 0, disabled: 0 } });
+    expect(otherRoute).toBe(UNAVAILABLE);
+    expect((await fetch(`http://127.0.0.1:${String(port)}/api/anything`)).status).toBe(NOT_FOUND);
     expect(await (await fetch(healthUrl())).json()).toMatchObject({ plugins: { loaded: 1, disabled: 0 } });
   });
 });
@@ -226,29 +200,24 @@ describe("App startup failures", () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, DB_FILE), "not a database, just text that is long enough to have a header page");
     const result = await startApp(env(), fakes().ports);
-    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.MigrateFailed } });
-    expect(logText()).toContain("database migration failed");
+    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.StartupFailed } });
+    expect(logText()).toContain("startup failed");
   });
 });
 
 describe("App startup when the port is taken", () => {
-  it("fails before any plugin starts or any scan is armed, and frees what it opened", async () => {
-    const blocker = createNetServer();
-    await new Promise<void>((resolve) => blocker.listen(port, "127.0.0.1", resolve));
+  it("fails before it touches the database, starts a plugin or arms a scan", async () => {
+    const release = await occupy(port);
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
     const { ports, armed, spawned, fetchLatest } = fakes();
     const result = await startApp(env(), ports);
-    await new Promise<void>((resolve) => blocker.close(() => {
-      resolve();
-    }));
+    await release();
     expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.StartupFailed } });
     expect(JSON.stringify(result)).toContain("EADDRINUSE");
     expect({ armed, spawned, fetched: fetchLatest.mock.calls.length }).toEqual({ armed: [], spawned: [], fetched: 0 });
+    expect(existsSync(join(dataDir, DB_FILE))).toBe(false);
     expect(logText()).toContain("startup failed");
-    expect(() => {
-      openSqliteRepository(join(dataDir, DB_FILE)).close();
-    }).not.toThrow();
   });
 
   it("closes the server and the database when a later step throws, with a one-line message", async () => {
@@ -260,11 +229,32 @@ describe("App startup when the port is taken", () => {
     const result = await startApp(env(), { ...fakes().ports, spawn });
     expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.StartupFailed } });
     expect(result.ok ? "" : result.error.message).toBe("Error: cannot spawn");
-    const reuse = createNetServer();
-    await new Promise<void>((resolve) => reuse.listen(port, "127.0.0.1", resolve));
-    await new Promise<void>((resolve) => reuse.close(() => {
-      resolve();
-    }));
+    await (await occupy(port))();
+  });
+});
+
+describe("App startup cancelled by a shutdown request", () => {
+  it("stops after the step that was running, closes what it opened and arms no scan", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const controller = new AbortController();
+    const workers: ReturnType<typeof fakeWorker>[] = [];
+    const spawn: SpawnWorker = (data) => {
+      const worker = fakeWorker(data);
+      workers.push(worker);
+      controller.abort();
+      queueMicrotask(() => {
+        worker.ready();
+      });
+      return worker.handle;
+    };
+    const { ports, armed } = fakes();
+    const result = await startApp(env(), { ...ports, spawn }, controller.signal);
+    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.Cancelled } });
+    expect(armed).toEqual([]);
+    expect(workers.map((worker) => worker.terminations())).toEqual([1]);
+    expect(logText()).toContain("startup cancelled");
+    await (await occupy(port))();
   });
 });
 

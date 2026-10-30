@@ -1,7 +1,7 @@
 import { fork } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -123,6 +123,7 @@ describe("App process", () => {
     blocker.close();
     expect(Date.now() - startedAt).toBeLessThan(SHUTDOWN_DEADLINE_MS);
     expect(running.stderr()).toMatch(/^fpving did not start: .*EADDRINUSE.*\n$/u);
+    expect(existsSync(join(dataDir, DB_FILE))).toBe(false);
   }, BOOT_TIMEOUT_MS);
 
   it("exits non-zero with a clear message on a bad environment, never printing the key", async () => {

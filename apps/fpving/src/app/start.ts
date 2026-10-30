@@ -41,6 +41,7 @@ import { HEALTH_PATH, registerHealthRoute } from "../server/health.js";
 import { createServer, LOOPBACK_HOST } from "../server/server.js";
 import type { AppServer } from "../server/server.js";
 import { sequenceShutdown, SHUTDOWN_DEADLINE_MS, withinDeadline } from "./lifecycle.js";
+import type { ShutdownStep } from "./lifecycle.js";
 
 /** The database file in `DATA_DIR`. */
 export const DB_FILE = "fpving.db";
@@ -53,23 +54,23 @@ const BROWSER_PROFILE_DIR = "browser-profile";
 const OWNER_ONLY_DIR = 0o700;
 const GROUP_OR_WORLD = 0o077;
 
-/** Why the app did not start. */
+/** Why the app did not start. `cancelled`: a shutdown was requested while it was starting. */
 export const StartupErrorKind = {
   InvalidEnv: "invalid_env",
   DataDirFailed: "data_dir_failed",
-  MigrateFailed: "migrate_failed",
   StartupFailed: "startup_failed",
+  Cancelled: "cancelled",
 } as const;
 
-/** A startup failure; `message` is for the terminal and never contains the API key. */
+/** A startup failure; `message` is one line for the terminal and never contains the API key. */
 export interface StartupError {
   readonly kind: (typeof StartupErrorKind)[keyof typeof StartupErrorKind];
   readonly message: string;
 }
 
 /**
- * The ports the app wires from real adapters by default. Tests pass any of them as overrides; every factory in the
- * app shell takes its replaceable ports this way.
+ * The ports the app wires from real adapters by default, and the OS it checks file modes for. Tests pass any of
+ * them as overrides; every factory in the app shell takes its replaceable parts this way.
  */
 export interface AppPorts {
   readonly clock: Clock;
@@ -81,6 +82,7 @@ export interface AppPorts {
   readonly browser: ClosableBrowserDriver;
   readonly llm: LlmJudge;
   readonly spawn: SpawnWorker;
+  readonly platform: NodeJS.Platform;
 }
 
 /** The running app. */
@@ -101,6 +103,18 @@ export interface App {
   readonly shutdown: () => Promise<boolean>;
 }
 
+const ShutdownStepName = {
+  Scans: "scan schedule",
+  Server: "server",
+  Plugins: "plugin host",
+  Browser: "browser",
+  Database: "database",
+  Log: "log",
+} as const;
+
+const SHUTDOWN_ORDER: readonly string[] = Object.values(ShutdownStepName);
+const CANCELLED = "startup was cancelled by a shutdown request";
+
 const failed = (kind: StartupError["kind"], message: string): Result<never, StartupError> => err({ kind, message });
 
 /**
@@ -113,27 +127,19 @@ const failed = (kind: StartupError["kind"], message: string): Result<never, Star
 export const isOpenToOthers = (mode: number, platform: NodeJS.Platform): boolean =>
   platform !== "win32" && (mode & GROUP_OR_WORLD) !== 0;
 
-const prepareDataDir = async (dataDir: string): Promise<Result<{ readonly openToOthers: boolean }, StartupError>> => {
+const prepareDataDir = async (
+  dataDir: string,
+  platform: NodeJS.Platform,
+): Promise<Result<{ readonly openToOthers: boolean }, StartupError>> => {
   try {
     const created = await mkdir(dataDir, { recursive: true, mode: OWNER_ONLY_DIR });
     if (created !== undefined) {
       await chmod(dataDir, OWNER_ONLY_DIR);
       return ok({ openToOthers: false });
     }
-    return ok({ openToOthers: isOpenToOthers((await stat(dataDir)).mode, process.platform) });
+    return ok({ openToOthers: isOpenToOthers((await stat(dataDir)).mode, platform) });
   } catch (error) {
     return failed(StartupErrorKind.DataDirFailed, `Cannot prepare DATA_DIR: ${String(error)}`);
-  }
-};
-
-const migrateDatabase = (path: string, logger: ClosableLogger): Result<void, StartupError> => {
-  try {
-    migrate(path);
-    return ok(undefined);
-  } catch (error) {
-    logger.error("database migration failed", { detail: inspect(error) });
-    logger.close();
-    return failed(StartupErrorKind.MigrateFailed, String(error));
   }
 };
 
@@ -159,20 +165,23 @@ const judgeFor = (env: Env, logger: ClosableLogger): LlmJudge => {
 
 /**
  * Starts the app: parses the environment, creates `DATA_DIR` owner-only (an existing one keeps its mode, with a
- * warning when others can open it), opens the log, migrates the database before opening it, and binds the server to
- * `127.0.0.1:PORT`. Only once the port is bound does it start the plugin host with the saved ship-to country and
- * display currency, wire every adapter into core and start the scan schedule, so a second instance on a taken port
- * never loads plugins or scans. Any failure after the database opened closes what was opened, within the shutdown
- * deadline, and returns `startup_failed`. The plugin host keeps the settings it started with, so a settings change
- * needs a restart.
+ * warning when others can open it) and opens the log. Then it binds the server to `127.0.0.1:PORT`, which is the
+ * single-instance lock: a second instance fails there, before it touches the database, loads a plugin or scans.
+ * While starting, only the health route answers; every other route answers 503. Then it migrates and opens the
+ * database, starts the plugin host with the saved ship-to country and display currency, wires every adapter into
+ * core and starts the scan schedule. Any failure after the log opened, and a shutdown requested through `signal`
+ * while starting, closes what was opened, within the shutdown deadline. The plugin host keeps the settings it started
+ * with, so a settings change needs a restart.
  *
  * @param source - The `process.env`-shaped environment.
  * @param overrides - Ports to use instead of the real adapters, see {@link AppPorts}.
+ * @param signal - Aborted to cancel the startup; it is checked after each slow step.
  * @returns The listening app, or why it did not start.
  */
 export const startApp = async (
   source: Readonly<Record<string, string | undefined>>,
   overrides: Partial<AppPorts> = {},
+  signal: AbortSignal = new AbortController().signal,
 ): Promise<Result<App, StartupError>> => {
   const parsed = parseEnv(source);
   if (!parsed.ok) {
@@ -180,7 +189,8 @@ export const startApp = async (
   }
   const env = parsed.value;
   const dataDir = env.DATA_DIR;
-  const prepared = await prepareDataDir(dataDir);
+  const platform = overrides.platform ?? process.platform;
+  const prepared = await prepareDataDir(dataDir, platform);
   if (!prepared.ok) {
     return prepared;
   }
@@ -188,42 +198,49 @@ export const startApp = async (
   if (prepared.value.openToOthers) {
     logger.warn("DATA_DIR is open to other users; consider chmod 700", { dataDir });
   }
-  const dbPath = join(dataDir, DB_FILE);
-  const migrated = migrateDatabase(dbPath, logger);
-  if (!migrated.ok) {
-    return migrated;
-  }
-  const { repository, close: closeDatabase } = openSqliteRepository(dbPath);
-  const version = readAppVersion();
-  const limiter = createDomainLimiter(systemTiming);
-  const userAgent = createUserAgent(version);
-  const http = overrides.http ?? createFetchHttpClient({ fetch: globalThis.fetch, limiter, userAgent });
-  const browser = overrides.browser ?? createPlaywrightBrowserDriver({
-    launch: launchChromium,
-    limiter,
-    profileDir: join(dataDir, BROWSER_PROFILE_DIR),
-  });
+  const closeLog = (): void => {
+    logger.close();
+  };
+  const steps: ShutdownStep[] = [{ name: ShutdownStepName.Log, run: closeLog }];
+  const opened = (step: ShutdownStep): void => {
+    steps.push(step);
+    steps.sort((a, b) => SHUTDOWN_ORDER.indexOf(a.name) - SHUTDOWN_ORDER.indexOf(b.name));
+  };
+  const shutdown = sequenceShutdown(steps, logger);
+  const checkpoint = (): void => {
+    if (signal.aborted) {
+      throw new Error(CANCELLED);
+    }
+  };
   let ready = false;
-  const server = createServer({ port: env.PORT, logger, isReady: () => ready, openWhileStarting: [HEALTH_PATH] });
-  let plugins: PluginHost | null = null;
-  let scans: SchedulerHandle | null = null;
   let pluginStates = (): readonly PluginState[] => [];
-  const shutdown = sequenceShutdown(
-    [
-      { name: "scan schedule", run: async () => scans?.stop() },
-      { name: "server", run: async () => server.close() },
-      { name: "plugin host", run: async () => plugins?.shutdown() },
-      { name: "browser", run: async () => browser.close() },
-      { name: "database", run: closeDatabase },
-      { name: "log", run: () => { logger.close(); } },
-    ],
-    logger,
-  );
+  let rejectedEntries = 0;
   try {
+    const version = readAppVersion();
+    const limiter = createDomainLimiter(systemTiming);
+    const http = overrides.http ?? createFetchHttpClient({
+      fetch: globalThis.fetch,
+      limiter,
+      userAgent: createUserAgent(version),
+    });
+    const browser = overrides.browser ?? createPlaywrightBrowserDriver({
+      launch: launchChromium,
+      limiter,
+      profileDir: join(dataDir, BROWSER_PROFILE_DIR),
+    });
+    opened({ name: ShutdownStepName.Browser, run: async () => browser.close() });
+    const server = createServer({ port: env.PORT, logger, isReady: () => ready, openWhileStarting: [HEALTH_PATH] });
+    registerHealthRoute(server, { version, plugins: () => pluginStates(), rejectedEntries: () => rejectedEntries });
+    opened({ name: ShutdownStepName.Server, run: async () => server.close() });
+    const address = await server.listen({ host: LOOPBACK_HOST, port: env.PORT });
+    checkpoint();
+    const dbPath = join(dataDir, DB_FILE);
+    migrate(dbPath);
+    const { repository, close: closeDatabase } = openSqliteRepository(dbPath);
+    opened({ name: ShutdownStepName.Database, run: closeDatabase });
     const settings = await repository.settings.get();
     const { entries, rejected } = await readPlugins(dataDir, logger);
-    registerHealthRoute(server, { version, plugins: () => pluginStates(), rejectedEntries: () => rejected.length });
-    const address = await server.listen({ host: LOOPBACK_HOST, port: env.PORT });
+    rejectedEntries = rejected.length;
     const host = await startPluginHost({
       entries,
       services: { http, browser, logger },
@@ -231,28 +248,32 @@ export const startApp = async (
       currencyPreference: settings.displayCurrency,
       spawn: overrides.spawn ?? spawnWorker(WORKER_ENTRY),
     });
-    plugins = host;
+    opened({ name: ShutdownStepName.Plugins, run: async () => host.shutdown() });
     pluginStates = () => host.plugins();
+    checkpoint();
     const clock = overrides.clock ?? systemClock;
     const deps = {
       repository,
       stores: createPluginStoreGateway({ host, debugSink: createFileDebugSink({ dataDir, clock }), logger }),
       ids: overrides.ids ?? uuidIdGenerator,
       clock,
-      notifier: overrides.notifier ?? createOsNotifier(notifyBackendFor(process.platform)),
+      notifier: overrides.notifier ?? createOsNotifier(notifyBackendFor(platform)),
       logger,
       llm: overrides.llm ?? judgeFor(env, logger),
       rates: overrides.rates ?? createHttpFxRates(globalThis.fetch),
       scheduler: overrides.scheduler ?? createTimerScheduler(),
     };
-    const running = await startScheduler(deps);
-    scans = running;
+    const scans = await startScheduler(deps);
+    opened({ name: ShutdownStepName.Scans, run: async () => scans.stop() });
     ready = true;
     logger.info("fpving started", { version, address, plugins: entries.length });
-    return ok({ env, server, deps, scans: running, plugins: host, logger, address, shutdown });
+    return ok({ env, server, deps, scans, plugins: host, logger, address, shutdown });
   } catch (error) {
-    logger.error("startup failed", { detail: inspect(error) });
+    const cancelled = signal.aborted;
+    logger.error(cancelled ? "startup cancelled" : "startup failed", { detail: inspect(error) });
     await withinDeadline(shutdown(), SHUTDOWN_DEADLINE_MS, logger);
-    return failed(StartupErrorKind.StartupFailed, String(error));
+    return cancelled
+      ? failed(StartupErrorKind.Cancelled, CANCELLED)
+      : failed(StartupErrorKind.StartupFailed, String(error));
   }
 };
