@@ -285,7 +285,7 @@ export const startApp = async (
       scheduler: overrides.scheduler ?? createTimerScheduler(),
     };
     const parts: LiveParts = { host, deps, scans: await startScheduler(deps) };
-    const settingsApplier = createSettingsApplier({ live: parts, startHost, gatewayFor });
+    const settingsApplier = createSettingsApplier({ live: parts, applied: settings, startHost, gatewayFor });
     opened({
       name: ShutdownStepName.Scans,
       run: async () => {

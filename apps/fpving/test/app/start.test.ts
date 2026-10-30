@@ -364,25 +364,30 @@ describe("App settings changes", () => {
     expect(scan.statusCode).toBe(ACCEPTED);
   });
 
-  it("answers 500 when the plugin host cannot restart, and still applies the next change", async () => {
+  it("keeps the old settings and plugins when the host cannot restart, so retrying the same change works", async () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
     const ready = readyWorkers();
+    let refuseUs = true;
     const spawn: SpawnWorker = (data) => {
-      if (data.shipTo === "US") {
+      if (data.shipTo === "US" && refuseUs) {
+        refuseUs = false;
         throw new Error("cannot spawn");
       }
       return ready.spawn(data);
     };
     const running = await started(env(), { ...fakes().ports, spawn });
-    const put = async (shipToCountry: Settings["shipToCountry"]) => {
-      const payload = { ...(await running.deps.repository.settings.get()), shipToCountry };
-      return running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
-    };
-    expect((await put("US")).statusCode).toBe(INTERNAL_ERROR);
-    expect(logText()).toContain("settings change failed");
-    expect((await put("IL")).statusCode).toBe(OK);
-    expect(ready.workers.map((worker) => worker.data.shipTo)).toEqual(["IL", "IL"]);
+    const payload = { ...(await running.deps.repository.settings.get()), shipToCountry: "US" };
+    const put = async () =>
+      running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    expect((await put()).statusCode).toBe(INTERNAL_ERROR);
+    expect(await running.deps.repository.settings.get()).toMatchObject({ shipToCountry: "IL" });
+    expect(running.plugins.plugins()[0]?.status.kind).toBe(PluginStatusKind.Loaded);
+    expect(ready.workers.map((worker) => worker.terminations())).toEqual([0]);
+    expect((await put()).statusCode).toBe(OK);
+    expect(await running.deps.repository.settings.get()).toMatchObject({ shipToCountry: "US" });
+    expect(ready.workers.map((worker) => ({ shipTo: worker.data.shipTo, terminated: worker.terminations() > 0 })))
+      .toEqual([{ shipTo: "IL", terminated: true }, { shipTo: "US", terminated: false }]);
   });
 
   it("restarts nothing when only the drop threshold changes", async () => {

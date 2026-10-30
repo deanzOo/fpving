@@ -17,6 +17,8 @@ export interface LiveParts {
 export interface SettingsApplierOptions {
   /** The running parts, replaced in place. */
   readonly live: LiveParts;
+  /** The settings the running parts were started with. */
+  readonly applied: Settings;
   /** Starts a new plugin host for the settings. */
   readonly startHost: (settings: Settings) => Promise<PluginHost>;
   /** The store gateway over a host. */
@@ -33,32 +35,40 @@ const pluginsChanged = (before: Settings, after: Settings): boolean =>
   before.shipToCountry !== after.shipToCountry || before.displayCurrency !== after.displayCurrency;
 
 /**
- * Applies settings changes one at a time. Each saves the settings; a new ship-to country or display currency, which
- * plugin workers receive when they start, restarts the plugin host and the gateway over it, and that or a new scan
- * interval, which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which waits
- * for a running scan, so no scan loses its plugins halfway; it is started again even when the host failed to restart.
- * A failed change rejects for its caller and is logged; the next change still runs.
+ * Applies settings changes one at a time, each compared with the settings the running parts were started with. A new
+ * ship-to country or display currency, which plugin workers receive when they start, starts a new plugin host; once
+ * it is up the gateway moves over to it, the settings are saved, then the old host is shut down. A host that fails to
+ * start leaves the old one running and saves nothing, so the same change can be retried. That or a new scan interval,
+ * which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which waits for a
+ * running scan, so no scan loses its plugins halfway; it is started again whether or not the change succeeded. A
+ * change that needs no restart is only saved. A failed change rejects for its caller; the next change still runs.
  *
  * @param options - The running parts and how to start a host and a gateway.
  * @returns The applier.
  */
 export const createSettingsApplier = (options: SettingsApplierOptions): SettingsApplier => {
   const { live, startHost, gatewayFor } = options;
+  let applied = options.applied;
   let queue = Promise.resolve();
   const reconfigure = async (next: Settings): Promise<void> => {
     const { repository } = live.deps;
-    const before = await repository.settings.get();
-    await repository.settings.save(next);
-    const restartPlugins = pluginsChanged(before, next);
-    if (!restartPlugins && before.scanIntervalHours === next.scanIntervalHours) {
+    const restartPlugins = pluginsChanged(applied, next);
+    if (!restartPlugins && applied.scanIntervalHours === next.scanIntervalHours) {
+      await repository.settings.save(next);
+      applied = next;
       return;
     }
     await live.scans.stop();
     try {
+      const old = live.host;
       if (restartPlugins) {
-        await live.host.shutdown();
         live.host = await startHost(next);
         live.deps = { ...live.deps, stores: gatewayFor(live.host) };
+      }
+      await repository.settings.save(next);
+      applied = next;
+      if (old !== live.host) {
+        await old.shutdown();
       }
     } finally {
       live.scans = await startScheduler(live.deps);
