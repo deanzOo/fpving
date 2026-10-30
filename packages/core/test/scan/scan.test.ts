@@ -595,6 +595,38 @@ describe("Scanning listings", () => {
       expect((await repository.products.get(P1))?.cheapestListingId).toBe(l1.id);
     });
 
+    it("leaves a listing removed while the scan runs out of that scan's cheapest price and alerts", async () => {
+      let removeDuringFetch = async (): Promise<void> => Promise.resolve();
+      const { deps, repository } = await setup({
+        products: [product("p1", { cheapestListingId: l1.id })],
+        listings: [l1, l2],
+        bases: [snapshot(l2, PRICE, { inStock: false })],
+        answers: [[l2, fetched(LOWEST)]],
+        onFetch: async (url) => (url === l2.url ? removeDuringFetch() : Promise.resolve()),
+      });
+      removeDuringFetch = async () => {
+        await repository.listings.remove(P1, l2.id);
+      };
+      const report = await scanListings(deps);
+      expect(report.alerts).toEqual([]);
+      expect((await repository.products.get(P1))?.cheapestListingId).toBe(l1.id);
+    });
+
+    it("raises no alerts for a product archived while the scan runs", async () => {
+      let archiveDuringFetch = async (): Promise<void> => Promise.resolve();
+      const { deps, repository } = await setup({
+        bases: [snapshot(l1, PRICE, { inStock: false })],
+        answers: [[l1, fetched(LOWER)]],
+        onFetch: async () => archiveDuringFetch(),
+      });
+      archiveDuringFetch = async () => {
+        await repository.products.archive(P1, NOW);
+      };
+      const report = await scanListings(deps);
+      expect(report.alerts).toEqual([]);
+      expect(await repository.alerts.list({ unreadOnly: false })).toEqual([]);
+    });
+
     it("rejects as a bug when the product's cheapest listing cannot be stored", async () => {
       const wrap = (repository: Repository): Repository => ({
         ...repository,
