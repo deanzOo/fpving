@@ -15,6 +15,11 @@ const FRONTMATTER = [
   "Every route answers JSON on `http://127.0.0.1:<PORT>` and sits behind the localhost `Host` and `Origin` guards and",
   "the readiness gate (503 while starting). Every error answers `{ \"error\": { \"kind\", \"message\" } }`.",
   "",
+  "A product is created only from a pasted store URL; there is no create by name or search query. Deleting a",
+  "product archives it, keeping its history, and it then answers 404 on every product route. Removing a listing",
+  "keeps its history too, but it is never scanned again and counts for no price or alert. While a settings change",
+  "restarts the plugins or the scan schedule, the routes that need them answer 503 `restarting`.",
+  "",
 ].join("\n");
 
 const JSON_INDENT = 2;
