@@ -1,6 +1,7 @@
 import { err, ok } from "@fpving/plugin-sdk";
 import type { Money, Result } from "@fpving/plugin-sdk";
 import type { ListingWithLatest } from "../alerts/draft.js";
+import { ListingStatus } from "../entities.js";
 import type { Listing, PriceSnapshot, Product } from "../entities.js";
 import type { ListingId, ProductId } from "../ids.js";
 
@@ -73,7 +74,7 @@ export const watchlist = async ({ repository }: Pick<CoreDeps, "repository">): P
 };
 
 /**
- * A product with its listings, oldest first, and each listing's snapshots, oldest first.
+ * A product with its listings that are not removed, oldest first, and each listing's snapshots, oldest first.
  *
  * @param deps - The repository.
  * @param productId - The product.
@@ -87,7 +88,10 @@ export const productDetail = async (
   if (product === null) {
     return err({ kind: AddErrorKind.ProductNotFound });
   }
-  const listings = await Promise.all((await repository.listings.listByProduct(productId)).map(async (listing) => ({
+  const kept = (await repository.listings.listByProduct(productId)).filter(
+    ({ status }) => status !== ListingStatus.Removed,
+  );
+  const listings = await Promise.all(kept.map(async (listing) => ({
     listing,
     history: await repository.snapshots.listSince(listing.id, EPOCH),
   })));

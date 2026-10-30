@@ -5,7 +5,10 @@ import {
   DEFAULT_SETTINGS,
   err,
   landedCost,
+  listingIdSchema,
   ListingStatus,
+  removeListing,
+  RepositoryErrorKind,
   productDetail,
   productIdSchema,
   settingsSchema,
@@ -115,6 +118,15 @@ describe("A product's detail", () => {
     expect(detail.ok && detail.value.product).toEqual(row);
   });
 
+  it("leaves removed listings out", async () => {
+    const repository = inMemoryRepository();
+    const row = product("p1", NOW);
+    await watched(repository, row, [[listing("l1"), snapshot("s1", "l1")], [listing("l2"), snapshot("s2", "l2")]]);
+    await repository.listings.remove(row.id, listingIdSchema.parse("l1"));
+    const detail = await productDetail({ repository }, row.id);
+    expect(detail.ok && detail.value.listings.map(({ listing: l }) => l.id)).toEqual(["l2"]);
+  });
+
   it("answers product_not_found for a product that is missing or archived", async () => {
     const repository = inMemoryRepository();
     const row = product("p1", NOW);
@@ -123,5 +135,40 @@ describe("A product's detail", () => {
     const notFound = err({ kind: AddErrorKind.ProductNotFound });
     expect(await productDetail({ repository }, row.id)).toEqual(notFound);
     expect(await productDetail({ repository }, productIdSchema.parse("missing"))).toEqual(notFound);
+  });
+});
+
+describe("Removing a listing", () => {
+  const twoListings = async () => {
+    const repository = inMemoryRepository();
+    const row = product("p1", NOW);
+    await watched(repository, row, [[listing("l1"), snapshot("s1", "l1")], [listing("l2"), snapshot("s2", "l2")]]);
+    return { repository, row };
+  };
+  const l1 = listingIdSchema.parse("l1");
+
+  it("marks the product's listing removed, keeping the others", async () => {
+    const { repository, row } = await twoListings();
+    expect((await removeListing({ repository }, row.id, l1)).ok).toBe(true);
+    const statuses = (await repository.listings.listByProduct(row.id)).map(({ id, status }) => [id, status]);
+    expect(statuses).toEqual([["l1", ListingStatus.Removed], ["l2", ListingStatus.Active]]);
+  });
+
+  it("answers product_not_found for a product that is missing or archived, removing nothing", async () => {
+    const { repository, row } = await twoListings();
+    await repository.products.archive(row.id, NOW);
+    const notFound = err({ kind: AddErrorKind.ProductNotFound });
+    expect(await removeListing({ repository }, row.id, l1)).toEqual(notFound);
+    expect(await removeListing({ repository }, productIdSchema.parse("missing"), l1)).toEqual(notFound);
+    expect((await repository.listings.listByProduct(row.id)).map(({ status }) => status))
+      .toEqual([ListingStatus.Active, ListingStatus.Active]);
+  });
+
+  it("answers not_found for a listing that is not the product's or already removed", async () => {
+    const { repository, row } = await twoListings();
+    await removeListing({ repository }, row.id, l1);
+    const missing = err({ kind: RepositoryErrorKind.NotFound });
+    expect(await removeListing({ repository }, row.id, l1)).toEqual(missing);
+    expect(await removeListing({ repository }, row.id, listingIdSchema.parse("other"))).toEqual(missing);
   });
 });

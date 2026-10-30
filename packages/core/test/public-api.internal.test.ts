@@ -56,6 +56,7 @@ describe("Core public API", () => {
       "refreshRatesIfStale",
       "rejectCandidate",
       "rejudgeUnjudged",
+      "removeListing",
       "scanListings",
       "scanRunIdSchema",
       "scanRunSchema",
