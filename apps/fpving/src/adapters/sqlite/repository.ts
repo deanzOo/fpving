@@ -104,6 +104,9 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
     return done;
   };
 
+  const updateLive = (id: string, change: Partial<typeof products.$inferInsert>): Result<void, NotFound> =>
+    changedOne(db.update(products).set(change).where(and(eq(products.id, id), isNull(products.archivedAt))).run());
+
   const pendingCandidates = (filter?: SQL) =>
     db.select().from(matchCandidates).where(and(eq(matchCandidates.status, CandidateStatus.Pending), filter))
       .orderBy(desc(matchCandidates.similarity), asc(matchCandidates.id))
@@ -134,6 +137,14 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
           const row = db.select().from(products).where(eq(products.id, id)).get();
           return row === undefined ? null : productSchema.parse(row);
         }),
+      list: async () =>
+        settle(() =>
+          db.select().from(products).where(isNull(products.archivedAt))
+            .orderBy(desc(products.createdAt), desc(products.id))
+            .all()
+            .map((row) => productSchema.parse(row))),
+      rename: async (id, name) => settle(() => updateLive(id, { name })),
+      archive: async (id, archivedAt) => settle(() => updateLive(id, { archivedAt })),
       setCheapest: async (id, cheapestListingId) =>
         atomically((tx) => {
           const updated = changedOne(

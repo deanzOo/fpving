@@ -46,6 +46,15 @@ export const inMemoryRepository = (): Repository => {
   const suggested = (row: Pick<MatchCandidate, "productId" | "url">, pool: Iterable<MatchCandidate>): boolean =>
     [...pool].some((other) => other.productId === row.productId && other.url === row.url);
 
+  const updateLive = (id: string, change: Partial<Product>): Result<void, NotFound> => {
+    const row = products.get(id);
+    if (row?.archivedAt !== null) {
+      return notFound;
+    }
+    products.set(id, { ...row, ...change });
+    return done;
+  };
+
   const pending = (): MatchCandidate[] =>
     copy(
       [...candidates.values()]
@@ -92,6 +101,10 @@ export const inMemoryRepository = (): Repository => {
         return Promise.resolve(done);
       },
       get: async (id) => Promise.resolve(copy(products.get(id) ?? null)),
+      list: async () =>
+        Promise.resolve(copy(newestFirst(products.values(), (row) => row.createdAt).filter((row) => !row.archivedAt))),
+      rename: async (id, name) => Promise.resolve(updateLive(id, { name })),
+      archive: async (id, at) => Promise.resolve(updateLive(id, { archivedAt: copy(at) })),
       setCheapest: async (id, cheapestListingId) => {
         const row = products.get(id);
         if (row === undefined) {

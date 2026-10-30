@@ -207,6 +207,37 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.products.setCheapest(missingProduct, null)).toEqual(notFound);
       });
 
+      it("lists the products that are not archived newest first, the greater id first on a tie", async () => {
+        const newer = { ...product("p3"), createdAt: JAN_2 };
+        const tied = { ...product("p4"), createdAt: JAN_2 };
+        const archived = product("p5");
+        for (const row of [p1, newer, tied, archived]) {
+          const first = listing(`l-${row.id}`, row.id, url(row.id));
+          await repo.products.add(row, first, snapshot(`s-${row.id}`, first.id, JAN_1));
+        }
+        expect(await repo.products.archive(archived.id, JAN_3)).toEqual(ok);
+        expect(await repo.products.list()).toEqual([tied, newer, p1]);
+      });
+
+      it("archives a product at an instant, still reading it, and refuses a missing or archived one", async () => {
+        await repo.products.add(p1, l1, s1);
+        expect(await repo.products.archive(p1.id, JAN_2)).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual({ ...p1, archivedAt: JAN_2 });
+        expect(await repo.products.archive(p1.id, JAN_3)).toEqual(notFound);
+        expect(await repo.products.archive(missingProduct, JAN_3)).toEqual(notFound);
+        expect(await repo.products.get(p1.id)).toEqual({ ...p1, archivedAt: JAN_2 });
+      });
+
+      it("renames a product, and refuses a missing or archived one", async () => {
+        await seed();
+        expect(await repo.products.rename(p1.id, "Renamed")).toEqual(ok);
+        expect(await repo.products.get(p1.id)).toEqual({ ...p1, name: "Renamed" });
+        await repo.products.archive(p2.id, JAN_2);
+        expect(await repo.products.rename(p2.id, "Renamed")).toEqual(notFound);
+        expect(await repo.products.rename(missingProduct, "Renamed")).toEqual(notFound);
+        expect(await repo.products.get(p2.id)).toEqual({ ...p2, archivedAt: JAN_2 });
+      });
+
       it("rejects a product id that is already stored as a bug", async () => {
         await repo.products.add(p1, l1, s1);
         const l3 = listing("l3", p1.id, url("three"));

@@ -38,8 +38,17 @@ export interface ProductRepository {
    * names a cheapest listing: a new product's `cheapestListingId` must be null.
    */
   add(product: Product, firstListing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, DuplicateUrl>>;
-  /** The product with id `id`, or null. */
+  /** The product with id `id`, archived or not, or null. */
   get(id: ProductId): Promise<Product | null>;
+  /**
+   * The products that are not archived, newest first. Of products created at the same instant, the one with the
+   * greater id by code point comes first.
+   */
+  list(): Promise<Product[]>;
+  /** Replaces the name of a product that is not archived. */
+  rename(id: ProductId, name: string): Promise<Result<void, NotFound>>;
+  /** Archives a product that is not archived yet at `at`; it then counts as gone everywhere but {@link get}. */
+  archive(id: ProductId, at: Date): Promise<Result<void, NotFound>>;
   /**
    * Replaces a product's cheapest listing, or clears it with null. Rejects when the listing does not exist or is
    * another product's.
