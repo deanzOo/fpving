@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, ok, settingsSchema } from "@fpving/core";
+import { DEFAULT_SETTINGS, ok, pluginIdSchema, settingsSchema } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
@@ -16,6 +16,14 @@ import { recordingLogger } from "../support/recording-logger.ts";
 const US: Settings = { ...settingsSchema.parse(DEFAULT_SETTINGS), shipToCountry: "US" };
 
 afterEach(cleanUpTemp);
+
+const held = () => {
+  let release = (): void => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { gate, release };
+};
 
 const applierHarness = async () => {
   const sqlite = await openTempSqliteRepository();
@@ -115,6 +123,39 @@ describe("Settings applier", () => {
     await applier.apply(US);
     expect({ live: live.host === hosts.at(-1), shutdowns: shutdowns() }).toEqual({ live: true, shutdowns: [1, 1, 0] });
     expect(await repository.settings.get()).toMatchObject({ shipToCountry: "US" });
+  });
+
+  it("keeps the old schedule and settings when saving a new scan interval fails", async () => {
+    const { applier, armed, shutdowns, saving, repository } = await applierHarness();
+    saving.mockRejectedValueOnce(new Error("disk full"));
+    await expect(applier.apply({ ...US, shipToCountry: "IL", scanIntervalHours: 1 })).rejects.toThrow("disk full");
+    expect({ armed, shutdowns: shutdowns() }).toEqual({ armed: [armed[0]], shutdowns: [0] });
+    expect(await repository.settings.get()).toEqual(settingsSchema.parse(DEFAULT_SETTINGS));
+  });
+
+  it("lets a call through the old gateway finish before it shuts the old host down", async () => {
+    const { applier, live, hosts, events, old, repository } = await applierHarness();
+    const { gate, release } = held();
+    old.script.fetching = gate;
+    old.gateway.search = async () => gate.then(() => ok([]));
+    const shop = pluginIdSchema.parse("shop");
+    const call = live.deps.stores.fetchListing(shop, "https://shop.example/p").then((result) => {
+      events.push("call finished");
+      return result;
+    });
+    const searching = live.deps.stores.search(shop, { text: "frame" }).then(() => {
+      events.push("search finished");
+    });
+    const applying = applier.apply(US);
+    await vi.waitFor(async () => {
+      expect({ moved: live.host === hosts[1], saved: (await repository.settings.get()).shipToCountry })
+        .toEqual({ moved: true, saved: "US" });
+    });
+    release();
+    await applying;
+    await searching;
+    expect((await call).ok).toBe(true);
+    expect(events).toEqual(["call finished", "search finished", "host 0 shut down"]);
   });
 
   it("applies the change and logs a warning when the old host fails to shut down", async () => {

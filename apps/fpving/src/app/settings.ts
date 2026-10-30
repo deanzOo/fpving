@@ -2,6 +2,7 @@ import { inspect } from "node:util";
 import { startScheduler } from "@fpving/core";
 import type { MatchDeps, SchedulerDeps, SchedulerHandle, Settings, StoreGateway } from "@fpving/core";
 import type { PluginHost } from "../plugins/runtime/host.js";
+import { withinDeadline } from "./lifecycle.js";
 
 /** Every port core's use cases take. */
 export type AppDeps = MatchDeps & SchedulerDeps;
@@ -15,7 +16,7 @@ export interface LiveParts {
 
 /** What {@link createSettingsApplier} needs. */
 export interface SettingsApplierOptions {
-  /** The running parts, replaced in place. */
+  /** The running parts, replaced in place; the store gateway is wrapped at once so its running calls can be awaited. */
   readonly live: LiveParts;
   /** The settings the running parts were started with. */
   readonly applied: Settings;
@@ -39,7 +40,29 @@ export interface SettingsApplier {
 const CLOSED = "the app is shutting down; settings are no longer applied";
 const OLD_HOST_STUCK = "the old plugin host did not shut down";
 
+const DRAIN_DEADLINE_MS = 5000;
+
 const settledEither = (): void => undefined;
+
+type DrainableGateway = StoreGateway & { drained(): Promise<boolean> };
+
+const drainable = (gateway: StoreGateway): DrainableGateway => {
+  const open = new Set<Promise<unknown>>();
+  const track = async <T>(call: Promise<T>): Promise<T> => {
+    open.add(call);
+    try {
+      return await call;
+    } finally {
+      open.delete(call);
+    }
+  };
+  return {
+    ...gateway,
+    fetchListing: async (pluginId, url) => track(gateway.fetchListing(pluginId, url)),
+    search: async (pluginId, query) => track(gateway.search(pluginId, query)),
+    drained: async () => Promise.allSettled(open).then(() => true),
+  };
+};
 
 const pluginsChanged = (before: Settings, after: Settings): boolean =>
   before.shipToCountry !== after.shipToCountry || before.displayCurrency !== after.displayCurrency;
@@ -47,19 +70,22 @@ const pluginsChanged = (before: Settings, after: Settings): boolean =>
 /**
  * Applies settings changes one at a time, each compared with the settings the running parts were started with. A new
  * ship-to country or display currency, which plugin workers receive when they start, starts a new plugin host; once
- * it is up the settings are saved, the gateway moves over to it, then the old host is shut down. A host that fails to
- * start, or settings that fail to save, which also shuts the new host down, leave the old host running and the old
- * settings saved, so the same change can be retried. An old host that fails to shut down is logged as a warning; the
- * change still succeeds. That or a new scan interval,
- * which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which waits for a
- * running scan, so no scan loses its plugins halfway; it is started again whether or not the change succeeded. A
- * change that needs no restart is only saved. A failed change rejects for its caller; the next change still runs.
+ * it is up the settings are saved, the gateway moves over to it, the calls still running through the old gateway get
+ * up to five seconds to finish, then the old host is shut down. A host that fails to start, or settings that fail to
+ * save, which also shuts the new host down, leave the old host running and the old settings saved, so the same change
+ * can be retried. An old host that fails to shut down is logged as a warning; the change still succeeds. That or a new
+ * scan interval, which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which
+ * waits for a running scan, so no scan loses its plugins halfway; it is started again whether or not the change
+ * succeeded. A change that needs no restart is only saved. A failed change rejects for its caller; the next change
+ * still runs.
  *
  * @param options - The running parts and how to start a host and a gateway.
  * @returns The applier.
  */
 export const createSettingsApplier = (options: SettingsApplierOptions): SettingsApplier => {
   const { live, startHost, gatewayFor } = options;
+  let gateway = drainable(live.deps.stores);
+  live.deps = { ...live.deps, stores: gateway };
   let applied = options.applied;
   let queue = Promise.resolve();
   let closed = false;
@@ -80,8 +106,11 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
       }
       applied = next;
       if (host !== old) {
+        const draining = gateway;
+        gateway = drainable(gatewayFor(host));
         live.host = host;
-        live.deps = { ...live.deps, stores: gatewayFor(host) };
+        live.deps = { ...live.deps, stores: gateway };
+        await withinDeadline(draining.drained(), DRAIN_DEADLINE_MS, live.deps.logger);
         await old.shutdown().catch((error: unknown) => {
           live.deps.logger.warn(OLD_HOST_STUCK, { detail: inspect(error) });
         });
