@@ -17,9 +17,11 @@ const FRONTMATTER = [
   "",
   "A product is created only from a pasted store URL; there is no create by name or search query. Deleting a",
   "product archives it, keeping its history, and it then answers 404 on every product route, adding a listing to it",
-  "and accepting one of its candidates included. Removing a listing",
-  "keeps its history too, but it is never scanned again and counts for no price or alert. While a settings change",
-  "restarts the plugins or the scan schedule, the routes that need them answer 503 `restarting`.",
+  "and accepting one of its candidates included. Removing a listing keeps its history too, but it is never scanned",
+  "again and counts for no price or alert. Adding a deleted product's URL again restores that product, and adding a",
+  "removed listing's URL to its own product makes the listing active again; both answer 201 with a new snapshot. A",
+  "URL any other listing tracks answers 409 `already_tracked`, naming the product that tracks it. While a settings",
+  "change restarts the plugins or the scan schedule, the routes that need them answer 503 `restarting`.",
   "",
 ].join("\n");
 

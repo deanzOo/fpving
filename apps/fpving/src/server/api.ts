@@ -70,8 +70,10 @@ const addFailure = (error: AddProductError) => {
       return failure(RouteStatus.UnprocessableContent, error.kind, Message.InvalidUrl);
     case AddErrorKind.NoPluginForDomain:
       return failure(RouteStatus.UnprocessableContent, error.kind, `no plugin handles ${error.host}`);
-    case AddErrorKind.AlreadyTracked:
-      return failure(RouteStatus.Conflict, error.kind, `already tracked by product ${error.listing.productId}`);
+    case AddErrorKind.AlreadyTracked: {
+      const { id, name } = error.product;
+      return failure(RouteStatus.Conflict, error.kind, `already tracked by product ${id} "${name}"`);
+    }
     case AddErrorKind.FetchFailed: {
       const { kind, detail } = error.error;
       return kind === StoreErrorKind.Network && detail === GatewayRefusal.Unavailable

@@ -120,7 +120,7 @@ describe("Products API", () => {
     expect(response.statusCode).toBe(RouteStatus.Conflict);
     const error = errorOf(response.json());
     expect(error.kind).toBe(ApiErrorKind.AlreadyTracked);
-    expect(error.message).toContain(first.product.id);
+    expect(error.message).toBe(`already tracked by product ${first.product.id} "${LISTING.title}"`);
   });
 
   it("answers a product with its listings and each listing's price history, oldest first", async () => {
@@ -175,6 +175,16 @@ describe("Watchlist API", () => {
     const { product } = await addProduct();
     const response = await api.request("PATCH", `/api/products/${product.id}`, { name: "" });
     expect(response.statusCode).toBe(RouteStatus.BadRequest);
+  });
+
+  it("restores a deleted product when its URL is added again, answering 201 with it back in the list", async () => {
+    const { product, listing } = await addProduct();
+    await api.request("DELETE", `/api/products/${product.id}`);
+    const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
+    expect(response.statusCode).toBe(RouteStatus.Created);
+    expect(response.json())
+      .toMatchObject({ product: { id: product.id, archivedAt: null }, listing: { id: listing.id } });
+    expect((await watchlist()).map((entry) => entry.product.id)).toEqual([product.id]);
   });
 
   it("deletes a product by archiving it: gone from the list, its detail and its candidates", async () => {
@@ -244,10 +254,21 @@ describe("Listings API", () => {
       .toEqual({ status: RouteStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
-  it("answers 409 already_tracked for a URL another listing tracks", async () => {
+  it("answers 409 already_tracked naming the product for a URL another listing tracks", async () => {
     const { product } = await addProduct();
-    const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: PAGE });
+    const other = await addProduct(OTHER_PAGE);
+    const response = await api.request("POST", `/api/products/${other.product.id}/listings`, { url: PAGE });
     expect(response.statusCode).toBe(RouteStatus.Conflict);
+    expect(errorOf(response.json()).message).toContain(product.id);
+  });
+
+  it("makes a removed listing active again when its URL is added to its product, answering 201", async () => {
+    const { product, listing } = await addProduct();
+    await api.request("DELETE", `/api/products/${product.id}/listings/${listing.id}`);
+    const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: PAGE });
+    expect(response.statusCode).toBe(RouteStatus.Created);
+    const detail = detailWire.parse((await api.request("GET", `/api/products/${product.id}`)).json());
+    expect(detail.listings.map((row) => row.listing.id)).toEqual([listing.id]);
   });
 });
 
