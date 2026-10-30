@@ -49,6 +49,7 @@ describe("Core public API", () => {
       "pluginIdSchema",
       "presetFor",
       "priceSnapshotSchema",
+      "productDetail",
       "productIdSchema",
       "productIdentitySchema",
       "productSchema",
@@ -62,6 +63,7 @@ describe("Core public API", () => {
       "snapshotIdSchema",
       "startScheduler",
       "verdictSchema",
+      "watchlist",
     ]);
   });
 });
