@@ -298,8 +298,7 @@ describe("App startup cancelled by a shutdown request", () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
     const controller = new AbortController();
-    let checks = 0;
-    Object.defineProperty(controller.signal, "aborted", { get: () => (checks += 1) > 1 });
+    Object.defineProperty(controller.signal, "aborted", { get: () => existsSync(join(dataDir, DB_FILE)) });
     const { ports, spawned } = fakes();
     const result = await startApp(env(), ports, controller.signal);
     expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.Cancelled, clean: true } });
