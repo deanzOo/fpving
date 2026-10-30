@@ -29,3 +29,5 @@ Every error reply, from the guards, the readiness gate, Fastify's own 4xx, an un
 - Good: the UI switches on `kind`; a new refusal is a compile error until it is in the table and in `ApiErrorKind`.
 - Good: the reference page is regenerated on every docs build.
 - Bad: the generated page is long, because each route's schemas are inlined rather than shared.
+
+Amended by [ADR 0025](../0025-archive-products-and-remove-listings/), which adds error kinds; the page now shows the envelope once.
