@@ -50,6 +50,7 @@ const notFound: NotFound = { kind: RepositoryErrorKind.NotFound };
 const duplicateUrl: DuplicateUrl = { kind: RepositoryErrorKind.DuplicateUrl };
 const done = ok(undefined);
 const LATEST_RANK = 1;
+const BUSY_TIMEOUT_MS = 5000;
 const SCANNED_STATUSES = [ListingStatus.Active, ListingStatus.Stale];
 
 const settle = async <T>(work: () => T): Promise<T> =>
@@ -64,13 +65,15 @@ const bug = (message: string): never => {
 };
 
 /**
- * Opens the SQLite database at `path`, which must already be migrated, with foreign keys enforced.
+ * Opens the SQLite database at `path`, which must already be migrated, with foreign keys enforced, in write-ahead log
+ * mode, and waiting up to five seconds for a lock held by another connection.
  *
  * @param path - The database file.
  * @returns The repository and a function that closes the database.
  */
 export const openSqliteRepository = (path: string): { repository: Repository; close: () => void } => {
-  const client = new Database(path);
+  const client = new Database(path, { timeout: BUSY_TIMEOUT_MS });
+  client.pragma("journal_mode = WAL");
   client.pragma("foreign_keys = ON");
   const db = drizzle({ client });
   type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];

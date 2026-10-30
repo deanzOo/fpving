@@ -266,6 +266,10 @@ describe("SQLite repository storage", () => {
     expect(() => raw.prepare("delete from products").run()).toThrow("FOREIGN KEY constraint failed");
   });
 
+  it("opens the database in write-ahead log mode, so readers do not block the writer", () => {
+    expect(raw.pragma("journal_mode", { simple: true })).toBe("wal");
+  });
+
   it("refuses rows that break the entity rules through check constraints", () => {
     const failed = (name: string): string => `CHECK constraint failed: ${name}`;
     const run = (statement: string, ...params: unknown[]) => () => raw.prepare(statement).run(...params);
