@@ -116,4 +116,14 @@ describe("Settings applier", () => {
     expect({ live: live.host === hosts.at(-1), shutdowns: shutdowns() }).toEqual({ live: true, shutdowns: [1, 1, 0] });
     expect(await repository.settings.get()).toMatchObject({ shipToCountry: "US" });
   });
+
+  it("applies the change and logs a warning when the old host fails to shut down", async () => {
+    const { applier, live, hosts, spies, logger } = await applierHarness();
+    spies[0]?.mockRejectedValueOnce(new Error("worker stuck"));
+    await expect(applier.apply(US)).resolves.toBeUndefined();
+    expect(live.host).toBe(hosts.at(-1));
+    expect(logger.events.filter((event) => event.level === "warn").map((event) => event.message)).toEqual([
+      "the old plugin host did not shut down",
+    ]);
+  });
 });

@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import { startScheduler } from "@fpving/core";
 import type { MatchDeps, SchedulerDeps, SchedulerHandle, Settings, StoreGateway } from "@fpving/core";
 import type { PluginHost } from "../plugins/runtime/host.js";
@@ -36,6 +37,7 @@ export interface SettingsApplier {
 }
 
 const CLOSED = "the app is shutting down; settings are no longer applied";
+const OLD_HOST_STUCK = "the old plugin host did not shut down";
 
 const settledEither = (): void => undefined;
 
@@ -47,7 +49,8 @@ const pluginsChanged = (before: Settings, after: Settings): boolean =>
  * ship-to country or display currency, which plugin workers receive when they start, starts a new plugin host; once
  * it is up the settings are saved, the gateway moves over to it, then the old host is shut down. A host that fails to
  * start, or settings that fail to save, which also shuts the new host down, leave the old host running and the old
- * settings saved, so the same change can be retried. That or a new scan interval,
+ * settings saved, so the same change can be retried. An old host that fails to shut down is logged as a warning; the
+ * change still succeeds. That or a new scan interval,
  * which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which waits for a
  * running scan, so no scan loses its plugins halfway; it is started again whether or not the change succeeded. A
  * change that needs no restart is only saved. A failed change rejects for its caller; the next change still runs.
@@ -79,7 +82,9 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
       if (host !== old) {
         live.host = host;
         live.deps = { ...live.deps, stores: gatewayFor(host) };
-        await old.shutdown();
+        await old.shutdown().catch((error: unknown) => {
+          live.deps.logger.warn(OLD_HOST_STUCK, { detail: inspect(error) });
+        });
       }
     } finally {
       live.scans = await startScheduler(live.deps);
