@@ -1,10 +1,10 @@
 ---
 title: Getting started
-description: The planned first-run flow, and what exists today.
+description: The planned first-run flow, how to run the server today, and what exists.
 ---
 
 :::caution[Not built yet]
-The app is not released. Everything below under "Planned flow" describes the intended experience. Only the contributor setup works today.
+The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts and answers a health check; the UI and the domain routes are not built yet.
 :::
 
 ## Planned flow
@@ -30,9 +30,21 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - Adding a product or a listing from a pasted URL, with URL normalization, behind the `StoreGateway` port, which the plugin host implements.
 - Assisted matching: searching the other stores, ranking and LLM-judging candidates, and accepting or rejecting them.
 - Scanning: re-fetching every tracked listing, recording prices, marking listings stale or gone, backing off blocked stores, and raising and notifying alerts.
-- The scan schedule policy: a scan every interval, one catch-up scan on boot, stale exchange rates refreshed first, and no overlapping scans. The timer that drives it is not built yet.
+- The scan schedule: a scan every interval, one catch-up scan on boot, stale exchange rates refreshed first, and no overlapping scans, on unref'd Node timers.
 - The plugin list in `DATA_DIR/plugins.json`, the check of each plugin's `sdkVersion` against the SDK, and the map from declared domains to plugins. The plugin host loads each listed plugin in its own worker thread, with call deadlines, one restart and a status for each plugin; the store gateway routes core's fetches and searches to it, and the pages a plugin cannot parse are saved under `DATA_DIR/debug/`.
 - Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
 - `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
 
-None of it is wired into a running app yet. To work on it, follow the setup in [Contributing](../contributing/).
+- The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health`, refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
+
+To work on it, follow the setup in [Contributing](../contributing/).
+
+## Running the server
+
+After the contributor setup and `pnpm worktree:init`:
+
+```sh
+pnpm --filter @fpving/app start
+```
+
+It builds, loads the worktree's `.env` (a variable already set in the shell wins), creates `DATA_DIR`, migrates the database and listens on `http://127.0.0.1:<PORT>`. Check it with `curl http://127.0.0.1:<PORT>/api/health`. Logs go to `DATA_DIR/logs/fpving.log`. Stop it with Ctrl+C; a startup failure prints one line and exits 1. Leaving it running starts the scan schedule, which fetches exchange rates from the Frankfurter API on the first boot. See [Configuration](../configuration/).

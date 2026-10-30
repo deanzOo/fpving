@@ -1,10 +1,10 @@
 ---
 title: Configuration
-description: Planned settings, and the plugin list.
+description: Planned settings, the plugin list, the data directory, the server and logging.
 ---
 
 :::caution[Planned]
-No settings screen or settings file exists yet; this page records their intended shape. The plugin list format below is implemented.
+No settings screen exists yet; the settings section records its intended shape. The plugin list, data directory, server, secrets and logging sections describe what is implemented.
 :::
 
 ## Settings
@@ -45,12 +45,20 @@ The plugin list is `plugins.json` in `DATA_DIR`. It is a JSON array with one ent
 
 A `path` entry loads the folder's `package.json` `main` (or `index.js`). A `package` entry is imported by name from the app's directory (`apps/fpving` in a checkout), with Node's ESM resolution walking up through its `node_modules`, so the package must be installed where the app can resolve it, for example with `pnpm --filter @fpving/app add <package>`. This root is the app's own, not `DATA_DIR/node_modules`, because Node can run its ESM resolution, which honours `exports` and the `import` condition, only from a module's own location. To use a plugin that is installed elsewhere, list its folder with `path`.
 
-The host loads each entry in its own worker thread (`apps/fpving/src/plugins/runtime`); wiring it into the app is not built yet. See [Writing a plugin](../writing-a-plugin/) and [ADR 0020](../adr/0020-plugin-list-in-data-dir-plugins-json/).
+The host loads each entry in its own worker thread (`apps/fpving/src/plugins/runtime`) when the app starts, with the saved ship-to country and display currency; changing either restarts the plugins. Edit `plugins.json` and restart the app to load a new list. See [Writing a plugin](../writing-a-plugin/) and [ADR 0020](../adr/0020-plugin-list-in-data-dir-plugins-json/).
+
+## Data directory
+
+`DATA_DIR` is created on start with mode `0o700`, and an existing one is tightened to it. It holds the SQLite database `fpving.db` (WAL mode, so `fpving.db-wal` and `fpving.db-shm` appear while the app runs), `plugins.json`, `logs/`, `debug/` and the browser profile in `browser-profile/`. Before a migration changes an existing database it is copied to `fpving.db.<UTC time>.bak`; after a successful migration only the five newest backups are kept.
+
+## Server
+
+The server listens on `127.0.0.1:PORT` only. It answers only requests whose `Host` header is `127.0.0.1:PORT` or `localhost:PORT` (others get 421), refuses state-changing requests sent from another origin (403), sends no CORS headers and accepts bodies up to 64 KiB. See [ADR 0023](../adr/0023-fastify-server-with-a-localhost-guard/).
 
 ## Secrets
 
-The Anthropic API key used for matching is bring-your-own and optional. `pnpm eval:matcher` reads `ANTHROPIC_API_KEY` from the environment or from a `.env` in the working directory, and runs the matcher eval against the real model, which costs API credits; with the key unset or blank it skips. A variable already set in the shell takes precedence over `.env`, because Node's `--env-file` does not override it. `parseEnv` trims the key, rejects one that is blank after trimming, and its error text never contains it. The Anthropic adapter never logs it and always sends it to `https://api.anthropic.com`, so an `ANTHROPIC_BASE_URL` set in the shell cannot redirect it. The app does not load `.env` or wire the adapter in yet; both arrive with the app wiring.
+The Anthropic API key used for matching is bring-your-own and optional. `pnpm eval:matcher` reads `ANTHROPIC_API_KEY` from the environment or from a `.env` in the working directory, and runs the matcher eval against the real model, which costs API credits; with the key unset or blank it skips. A variable already set in the shell takes precedence over `.env`, because Node's `--env-file` does not override it. `parseEnv` trims the key, rejects one that is blank after trimming, and its error text never contains it. The Anthropic adapter never logs it and always sends it to `https://api.anthropic.com`, so an `ANTHROPIC_BASE_URL` set in the shell cannot redirect it. `pnpm --filter @fpving/app start` loads `.env` from the repository root the same way. With a key the app judges match candidates with the Anthropic adapter; without one it saves them `unjudged` and logs that once at startup.
 
 ## Logging
 
-`LOG_LEVEL` (`fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`, default `info`) sets the minimum level the pino logger writes. The logger takes its file path as an argument; the app will pass `DATA_DIR/logs/fpving.log` when it is wired in. Any logged field whose name contains `key`, `token`, `secret`, `password`, `authorization` or `cookie` is written as `[redacted]`. Exchange rates need no key: they come from the Frankfurter API. Notifications use the built-in `osascript` on macOS, Windows toasts through `node-notifier` on Windows, and `notify-send` (libnotify), which must be on the path, on Linux.
+`LOG_LEVEL` (`fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`, default `info`) sets the minimum level the pino logger writes. The app logs to `DATA_DIR/logs/fpving.log`. A line that would take the file past 10 MiB first moves it to `fpving.log.1`, shifting older ones up to `fpving.log.5`, and the oldest is dropped; the folder and files are owner-only. Any logged field whose name contains `key`, `token`, `secret`, `password`, `authorization` or `cookie` is written as `[redacted]`. Exchange rates need no key: they come from the Frankfurter API. Notifications use the built-in `osascript` on macOS, Windows toasts through `node-notifier` on Windows, and `notify-send` (libnotify), which must be on the path, on Linux.
