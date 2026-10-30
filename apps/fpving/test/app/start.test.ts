@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer as createNetServer } from "node:net";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -11,31 +11,29 @@ import { migrate } from "../../src/adapters/sqlite/migrate.ts";
 import { openSqliteRepository } from "../../src/adapters/sqlite/repository.ts";
 import type { ClosableBrowserDriver } from "../../src/adapters/transport/playwright-browser-driver.ts";
 import { readAppVersion } from "../../src/adapters/transport/user-agent.ts";
-import { DB_FILE, LOG_FILE, startApp, StartupErrorKind } from "../../src/app/start.ts";
+import { DB_FILE, isOpenToOthers, LOG_FILE, startApp, StartupErrorKind } from "../../src/app/start.ts";
 import type { App, AppPorts } from "../../src/app/start.ts";
 import { PLUGINS_FILE } from "../../src/plugins/config.ts";
+import type { SpawnWorker } from "../../src/plugins/runtime/connection.ts";
 import { HEALTH_PATH } from "../../src/server/health.ts";
+import { fakeWorker } from "../plugins/runtime/fake-worker.ts";
 import { fixturePlugin, spawnSourceWorker } from "../support/plugin-workers.ts";
 
 const FAKE_KEY = "sk-ant-test-not-a-real-secret";
 const OK = 200;
-const PORT = 4321;
 const PLUGIN_LOAD_MS = 20_000;
 const OWNER_ONLY = 0o700;
 const PERMISSIONS = 0o777;
 const OPEN_DIR = 0o755;
+const GROUP_READABLE = 0o750;
 const isWindows = process.platform === "win32";
 const today = (): string => new Date().toISOString().slice(0, "yyyy-mm-dd".length);
 const FX: FxTable = { base: "EUR", fetchedOn: "2026-01-01", ratesPerBase: { USD: 1.1 } };
 
 let root = "";
 let dataDir = "";
+let port = 0;
 let app: App | undefined;
-
-beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "fpving-app-"));
-  dataDir = join(root, "data");
-});
 
 afterEach(async () => {
   await app?.shutdown();
@@ -54,13 +52,24 @@ const freePort = async (): Promise<number> =>
     });
   });
 
-const env = (port = PORT): Record<string, string> => ({ PORT: String(port), DATA_DIR: dataDir, LOG_LEVEL: "debug" });
+beforeEach(async () => {
+  root = mkdtempSync(join(tmpdir(), "fpving-app-"));
+  dataDir = join(root, "data");
+  port = await freePort();
+});
+
+const env = (): Record<string, string> => ({ PORT: String(port), DATA_DIR: dataDir, LOG_LEVEL: "debug" });
+const healthUrl = (): string => `http://127.0.0.1:${String(port)}${HEALTH_PATH}`;
 
 const fakes = () => {
   const order: string[] = [];
+  const armed: number[] = [];
   const scheduler: Scheduler = {
-    every: () => () => {
-      order.push("scheduler");
+    every: (intervalMs) => {
+      armed.push(intervalMs);
+      return () => {
+        order.push("scheduler");
+      };
     },
   };
   const browser: ClosableBrowserDriver = {
@@ -70,8 +79,13 @@ const fakes = () => {
   const fetchLatest = vi.fn<CurrencyRates["fetchLatest"]>(async () => Promise.resolve(ok(FX)));
   const rates: CurrencyRates = { fetchLatest };
   const notifier: Notifier = { notify: vi.fn(async () => Promise.resolve(ok(undefined))) };
-  const ports: Partial<AppPorts> = { scheduler, browser, rates, notifier, spawn: spawnSourceWorker };
-  return { order, ports, fetchLatest };
+  const spawned: string[] = [];
+  const spawn: SpawnWorker = (data) => {
+    spawned.push(JSON.stringify(data.entry));
+    return spawnSourceWorker(data);
+  };
+  const ports: Partial<AppPorts> = { scheduler, browser, rates, notifier, spawn };
+  return { order, ports, fetchLatest, armed, spawned };
 };
 
 const started = async (source: Record<string, string>, overrides: Partial<AppPorts>): Promise<App> => {
@@ -84,7 +98,7 @@ const started = async (source: Record<string, string>, overrides: Partial<AppPor
 };
 
 const health = async (running: App) =>
-  running.server.inject({ method: "GET", url: HEALTH_PATH, headers: { host: `127.0.0.1:${String(PORT)}` } });
+  running.server.inject({ method: "GET", url: HEALTH_PATH, headers: { host: `127.0.0.1:${String(port)}` } });
 
 const logText = (): string => readFileSync(join(dataDir, LOG_FILE), "utf8");
 
@@ -141,10 +155,23 @@ describe("App startup", () => {
     expect(logText()).not.toContain(FAKE_KEY);
   });
 
-  it.skipIf(isWindows)("creates DATA_DIR owner-only, and tightens an existing one", async () => {
-    mkdirSync(dataDir, { mode: OPEN_DIR });
+  it.skipIf(isWindows)("creates DATA_DIR owner-only", async () => {
     await started(env(), fakes().ports);
     expect(statSync(dataDir).mode & PERMISSIONS).toBe(OWNER_ONLY);
+  });
+
+  it.skipIf(isWindows)("leaves an existing DATA_DIR's mode alone, warning when others can open it", async () => {
+    mkdirSync(dataDir, { mode: OPEN_DIR });
+    chmodSync(dataDir, OPEN_DIR);
+    await started(env(), fakes().ports);
+    expect(statSync(dataDir).mode & PERMISSIONS).toBe(OPEN_DIR);
+    expect(logText()).toContain("DATA_DIR is open to other users");
+  });
+
+  it.skipIf(isWindows)("does not warn about an existing owner-only DATA_DIR", async () => {
+    mkdirSync(dataDir, { mode: OWNER_ONLY });
+    await started(env(), fakes().ports);
+    expect(logText()).not.toContain("DATA_DIR is open to other users");
   });
 
   it("runs on real adapters alone, reaching no network when the stored rates are fresh", async () => {
@@ -161,12 +188,22 @@ describe("App startup", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("listens on 127.0.0.1 at PORT", async () => {
-    const port = await freePort();
-    const running = await started(env(port), fakes().ports);
-    expect(await running.listen()).toBe(`http://127.0.0.1:${String(port)}`);
-    const response = await fetch(`http://127.0.0.1:${String(port)}${HEALTH_PATH}`);
-    expect(response.status).toBe(OK);
+  it("listens on 127.0.0.1 at PORT before the plugins start, answering health while they load", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    let whileLoading: unknown = null;
+    const spawn: SpawnWorker = (data) => {
+      const worker = fakeWorker(data);
+      void fetch(healthUrl()).then(async (response) => response.json()).then((body: unknown) => {
+        whileLoading = body;
+        worker.ready();
+      });
+      return worker.handle;
+    };
+    const running = await started(env(), { ...fakes().ports, spawn });
+    expect(running.address).toBe(`http://127.0.0.1:${String(port)}`);
+    expect(whileLoading).toMatchObject({ plugins: { loaded: 0, disabled: 0 } });
+    expect(await (await fetch(healthUrl())).json()).toMatchObject({ plugins: { loaded: 1, disabled: 0 } });
   });
 });
 
@@ -194,15 +231,84 @@ describe("App startup failures", () => {
   });
 });
 
+describe("App startup when the port is taken", () => {
+  it("fails before any plugin starts or any scan is armed, and frees what it opened", async () => {
+    const blocker = createNetServer();
+    await new Promise<void>((resolve) => blocker.listen(port, "127.0.0.1", resolve));
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const { ports, armed, spawned, fetchLatest } = fakes();
+    const result = await startApp(env(), ports);
+    await new Promise<void>((resolve) => blocker.close(() => {
+      resolve();
+    }));
+    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.StartupFailed } });
+    expect(JSON.stringify(result)).toContain("EADDRINUSE");
+    expect({ armed, spawned, fetched: fetchLatest.mock.calls.length }).toEqual({ armed: [], spawned: [], fetched: 0 });
+    expect(logText()).toContain("startup failed");
+    expect(() => {
+      openSqliteRepository(join(dataDir, DB_FILE)).close();
+    }).not.toThrow();
+  });
+
+  it("closes the server and the database when a later step throws, with a one-line message", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const spawn: SpawnWorker = () => {
+      throw new Error("cannot spawn");
+    };
+    const result = await startApp(env(), { ...fakes().ports, spawn });
+    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.StartupFailed } });
+    expect(result.ok ? "" : result.error.message).toBe("Error: cannot spawn");
+    const reuse = createNetServer();
+    await new Promise<void>((resolve) => reuse.listen(port, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => reuse.close(() => {
+      resolve();
+    }));
+  });
+});
+
 describe("App shutdown", () => {
-  it("stops the schedule, closes the server, the browser and then the database, once", async () => {
-    const { ports, order } = fakes();
-    const running = await started(env(), ports);
-    running.server.addHook("onClose", async () => Promise.resolve(void order.push("server")));
+  it("stops the schedule, then the server, the plugin host, the browser, the database and the log, once", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const workers: ReturnType<typeof fakeWorker>[] = [];
+    const spawn: SpawnWorker = (data) => {
+      const worker = fakeWorker(data);
+      workers.push(worker);
+      queueMicrotask(() => {
+        worker.ready();
+      });
+      return worker.handle;
+    };
+    const seen: Record<string, unknown>[] = [];
+    const holder: { app?: App } = {};
+    const observe = async (step: string): Promise<void> => {
+      const running = holder.app;
+      const listening = running?.server.server.listening;
+      const terminatedWorkers = workers.filter((worker) => worker.terminations() > 0).length;
+      running?.logger.info(`observed ${step}`);
+      const database = await running?.deps.repository.settings.get().then(() => "open", () => "closed");
+      seen.push({ step, listening, terminatedWorkers, database });
+    };
+    const { ports } = fakes();
+    const scheduler: Scheduler = { every: () => () => void observe("scheduler") };
+    const browser: ClosableBrowserDriver = {
+      fetchPage: async () => Promise.reject(new Error("unused")),
+      close: async () => observe("browser"),
+    };
+    const running = await started(env(), { ...ports, scheduler, browser, spawn });
+    holder.app = running;
     expect(await running.shutdown()).toBe(true);
     expect(await running.shutdown()).toBe(true);
-    expect(order).toEqual(["scheduler", "server", "browser"]);
+    expect(seen).toEqual([
+      { step: "scheduler", listening: true, terminatedWorkers: 0, database: "open" },
+      { step: "browser", listening: false, terminatedWorkers: 1, database: "open" },
+    ]);
     await expect(running.deps.repository.settings.get()).rejects.toThrow();
+    expect(logText()).toContain("observed browser");
+    running.logger.info("after the log closed");
+    expect(logText()).not.toContain("after the log closed");
   });
 
   it("reports a failing step and still closes the rest", async () => {
@@ -215,5 +321,16 @@ describe("App shutdown", () => {
     expect(await running.shutdown()).toBe(false);
     await expect(running.deps.repository.settings.get()).rejects.toThrow();
     expect(logText()).toContain("browser stuck");
+  });
+});
+
+describe("DATA_DIR permission check", () => {
+  it.each([
+    [OPEN_DIR, "linux", true],
+    [GROUP_READABLE, "darwin", true],
+    [OWNER_ONLY, "linux", false],
+    [PERMISSIONS, "win32", false],
+  ] as const)("mode %o on %s is open to others: %s", (mode, platform, open) => {
+    expect(isOpenToOthers(mode, platform)).toBe(open);
   });
 });

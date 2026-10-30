@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { migrate } from "../../src/adapters/sqlite/migrate.ts";
 import { openSqliteRepository } from "../../src/adapters/sqlite/repository.ts";
-import { ExitCode, SHUTDOWN_MESSAGE } from "../../src/app/lifecycle.ts";
+import { ExitCode, SHUTDOWN_DEADLINE_MS, SHUTDOWN_MESSAGE } from "../../src/app/lifecycle.ts";
 import { DB_FILE } from "../../src/app/start.ts";
 import { HEALTH_PATH } from "../../src/server/health.ts";
 
@@ -111,6 +111,18 @@ describe("App process", () => {
     const exited = exitCode(running.process);
     running.process.kill("SIGTERM");
     expect(await exited).toBe(ExitCode.Clean);
+  }, BOOT_TIMEOUT_MS);
+
+  it("exits non-zero with one line, well inside the shutdown deadline, when the port is taken", async () => {
+    const port = await freePort();
+    const blocker = createServer();
+    await new Promise<void>((resolve) => blocker.listen(port, "127.0.0.1", resolve));
+    const startedAt = Date.now();
+    const running = boot({ ...withoutAnthropic(), PORT: String(port), DATA_DIR: dataDir });
+    expect(await exitCode(running.process)).toBe(ExitCode.Failed);
+    blocker.close();
+    expect(Date.now() - startedAt).toBeLessThan(SHUTDOWN_DEADLINE_MS);
+    expect(running.stderr()).toMatch(/^fpving did not start: .*EADDRINUSE.*\n$/u);
   }, BOOT_TIMEOUT_MS);
 
   it("exits non-zero with a clear message on a bad environment, never printing the key", async () => {
