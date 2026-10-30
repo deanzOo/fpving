@@ -30,17 +30,25 @@ describe("Health route", () => {
     await server?.close();
   });
 
-  it("reports the version and the loaded and disabled plugin counts, rejected entries as disabled", async () => {
+  it("reports readiness, the version and the plugin counts, rejected entries as disabled", async () => {
     let states: readonly PluginState[] = [loaded, disabled, loaded];
+    let ready = false;
     const starting = { isReady: () => false, openWhileStarting: [HEALTH_PATH] };
     server = createServer({ port: PORT, logger: recordingLogger(), ...starting });
-    registerHealthRoute(server, { version: VERSION, plugins: () => states, rejectedEntries: () => REJECTED });
+    registerHealthRoute(server, {
+      version: VERSION,
+      ready: () => ready,
+      plugins: () => states,
+      rejectedEntries: () => REJECTED,
+    });
     const get = async () => server?.inject({ method: "GET", url: HEALTH_PATH, headers: HOST });
     const first = await get();
     expect(first?.statusCode).toBe(OK);
     const plugins = { loaded: 2, disabled: 1 + REJECTED };
-    expect(healthSchema.parse(first?.json())).toEqual({ ok: true, version: VERSION, plugins });
+    expect(healthSchema.parse(first?.json())).toEqual({ ok: true, ready: false, version: VERSION, plugins });
     states = [disabled];
-    expect((await get())?.json()).toEqual({ ok: true, version: VERSION, plugins: { ...plugins, loaded: 0 } });
+    ready = true;
+    const later = { ok: true, ready: true, version: VERSION, plugins: { ...plugins, loaded: 0 } };
+    expect((await get())?.json()).toEqual(later);
   });
 });

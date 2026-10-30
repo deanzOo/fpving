@@ -72,7 +72,12 @@ describe("App startup", () => {
     const running = await started(env(), ports);
     const response = await health(running);
     expect(response.statusCode).toBe(OK);
-    expect(response.json()).toEqual({ ok: true, version: readAppVersion(), plugins: { loaded: 0, disabled: 0 } });
+    expect(response.json()).toEqual({
+      ok: true,
+      ready: true,
+      version: readAppVersion(),
+      plugins: { loaded: 0, disabled: 0 },
+    });
     expect(Object.keys(running.deps).toSorted()).toEqual(
       ["clock", "ids", "llm", "logger", "notifier", "rates", "repository", "scheduler", "stores"],
     );
@@ -174,7 +179,7 @@ describe("App startup", () => {
     };
     const running = await started(env(), { ...fakes().ports, spawn });
     expect(running.address).toBe(`http://127.0.0.1:${String(port)}`);
-    expect(whileLoading).toMatchObject({ plugins: { loaded: 0, disabled: 0 } });
+    expect(whileLoading).toMatchObject({ ready: false, plugins: { loaded: 0, disabled: 0 } });
     expect(otherRoute).toBe(UNAVAILABLE);
     expect((await fetch(`http://127.0.0.1:${String(port)}/api/anything`)).status).toBe(NOT_FOUND);
     expect(await (await fetch(healthUrl())).json()).toMatchObject({ plugins: { loaded: 1, disabled: 0 } });

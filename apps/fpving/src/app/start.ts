@@ -234,7 +234,12 @@ export const startApp = async (
     });
     opened({ name: ShutdownStepName.Browser, run: async () => browser.close() });
     const server = createServer({ port: env.PORT, logger, isReady: () => ready, openWhileStarting: [HEALTH_PATH] });
-    registerHealthRoute(server, { version, plugins: () => pluginStates(), rejectedEntries: () => rejectedEntries });
+    registerHealthRoute(server, {
+      version,
+      ready: () => ready,
+      plugins: () => pluginStates(),
+      rejectedEntries: () => rejectedEntries,
+    });
     opened({ name: ShutdownStepName.Server, run: async () => server.close() });
     const address = await server.listen({ host: LOOPBACK_HOST, port: env.PORT });
     checkpoint();

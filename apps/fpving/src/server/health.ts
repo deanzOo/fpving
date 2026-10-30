@@ -9,9 +9,13 @@ export const HEALTH_PATH = "/api/health";
 const HTTP_OK = 200;
 const countSchema = z.int().nonnegative();
 
-/** The health answer: the app version and how many plugins are loaded and disabled. */
+/**
+ * The health answer: whether startup completed, so the other routes answer, the app version and how many plugins
+ * are loaded and disabled.
+ */
 export const healthSchema = z.object({
   ok: z.literal(true),
+  ready: z.boolean(),
   version: z.string().min(1),
   plugins: z.object({ loaded: countSchema, disabled: countSchema }),
 });
@@ -19,6 +23,8 @@ export const healthSchema = z.object({
 /** What the health route reads on each request. */
 export interface HealthSource {
   readonly version: string;
+  /** Whether startup completed. */
+  ready(): boolean;
   /** The plugin host's current plugin states. */
   plugins(): readonly PluginState[];
   /** How many `plugins.json` entries were rejected before reaching the host; they count as disabled. */
@@ -37,6 +43,7 @@ export const registerHealthRoute = (server: AppServer, source: HealthSource): vo
     const loaded = states.filter(({ status }) => status.kind === PluginStatusKind.Loaded).length;
     return {
       ok: true,
+      ready: source.ready(),
       version: source.version,
       plugins: { loaded, disabled: states.length - loaded + source.rejectedEntries() },
     } as const;
