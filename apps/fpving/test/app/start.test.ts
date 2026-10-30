@@ -390,6 +390,22 @@ describe("App settings changes", () => {
       .toEqual([{ shipTo: "IL", terminated: true }, { shipTo: "US", terminated: false }]);
   });
 
+  it("logs a failed change once, as the request that failed", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const ready = readyWorkers();
+    const spawn: SpawnWorker = (data) => {
+      if (data.shipTo === "US") {
+        throw new Error("cannot spawn");
+      }
+      return ready.spawn(data);
+    };
+    const running = await started(env(), { ...fakes().ports, spawn });
+    const payload = { ...(await running.deps.repository.settings.get()), shipToCountry: "US" };
+    await running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    expect(logText().match(/cannot spawn/gu)).toEqual(["cannot spawn"]);
+  });
+
   it("restarts nothing when only the drop threshold changes", async () => {
     const { running, workers, armed, put } = await startWithPlugin();
     await put({ priceDropMinBasisPoints: 100 });

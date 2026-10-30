@@ -1,4 +1,3 @@
-import { inspect } from "node:util";
 import { startScheduler } from "@fpving/core";
 import type { MatchDeps, SchedulerDeps, SchedulerHandle, Settings, StoreGateway } from "@fpving/core";
 import type { PluginHost } from "../plugins/runtime/host.js";
@@ -30,6 +29,8 @@ export interface SettingsApplier {
   apply(settings: Settings): Promise<void>;
   settled(): Promise<void>;
 }
+
+const settledEither = (): void => undefined;
 
 const pluginsChanged = (before: Settings, after: Settings): boolean =>
   before.shipToCountry !== after.shipToCountry || before.displayCurrency !== after.displayCurrency;
@@ -77,9 +78,8 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
   return {
     apply: async (next) => {
       const run = queue.then(async () => reconfigure(next));
-      queue = run.catch((error: unknown) => {
-        live.deps.logger.error("settings change failed", { detail: inspect(error) });
-      });
+      // The caller gets the failure and the server logs it; the queue only waits for it.
+      queue = run.then(settledEither, settledEither);
       return run;
     },
     settled: async () => queue,
