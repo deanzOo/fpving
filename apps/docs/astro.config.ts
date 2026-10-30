@@ -27,7 +27,7 @@ export default defineConfig({
           label: "Project",
           items: ["contributing", { label: "Decisions (ADRs)", items: [{ autogenerate: { directory: "adr" } }] }],
         },
-        { label: "Reference", items: ["reference/behaviour-spec", typeDocSidebarGroup] },
+        { label: "Reference", items: ["reference/http-api", "reference/behaviour-spec", typeDocSidebarGroup] },
       ],
     }),
   ],

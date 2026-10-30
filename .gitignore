@@ -7,6 +7,7 @@ reports
 graphify-out
 *.tsbuildinfo
 apps/docs/src/content/docs/reference/behaviour-spec.md
+apps/docs/src/content/docs/reference/http-api.md
 apps/docs/src/content/docs/api
 .astro
 *.db
