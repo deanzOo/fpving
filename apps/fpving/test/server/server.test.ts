@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createServer,
   GuardRefusal,
+  CLIENT_ERROR,
   HttpStatus,
   INTERNAL_ERROR,
   MAX_REQUEST_BODY_BYTES,
@@ -17,6 +18,7 @@ const NOT_FOUND = 404;
 const TOO_LARGE = 413;
 const ECHO = "/api/test/echo";
 const BOOM = "/api/test/boom";
+const TEAPOT = "/api/test/teapot";
 const SECRET_DETAIL = "database file /secret/path is locked";
 const LOCAL = `127.0.0.1:${String(PORT)}`;
 const LOCALHOST = `localhost:${String(PORT)}`;
@@ -32,6 +34,9 @@ describe("HTTP server shell", () => {
     server.get(ECHO, () => ({ echoed: true }));
     server.get(BOOM, () => {
       throw new Error(SECRET_DETAIL);
+    });
+    server.get(TEAPOT, () => {
+      throw Object.assign(new Error(SECRET_DETAIL), { statusCode: BAD_REQUEST });
     });
     await server.ready();
   });
@@ -83,6 +88,20 @@ describe("HTTP server shell", () => {
       expect(response.json()).toEqual({ text: "hi" });
     });
 
+    it.each(["cross-site", "same-site"])(
+      "refuses a state-changing request without Origin whose Sec-Fetch-Site is %s with 403",
+      async (site) => {
+        const response = await post({ ...json, "host": LOCAL, "sec-fetch-site": site });
+        expect(response.statusCode).toBe(HttpStatus.Forbidden);
+        expect(response.json()).toEqual({ error: GuardRefusal.Origin });
+      },
+    );
+
+    it.each(["same-origin", "none"])("accepts a state-changing request whose Sec-Fetch-Site is %s", async (site) => {
+      const response = await post({ ...json, "host": LOCAL, "sec-fetch-site": site });
+      expect(response.statusCode).toBe(OK);
+    });
+
     it("accepts a state-changing request from the same origin", async () => {
       const response = await post({ ...json, host: LOCALHOST, origin: `http://${LOCALHOST}` });
       expect(response.statusCode).toBe(OK);
@@ -119,11 +138,21 @@ describe("HTTP server shell", () => {
     it("rejects a body that fails the route schema with 400", async () => {
       const response = await post({ ...json, host: LOCAL }, { text: 1 });
       expect(response.statusCode).toBe(BAD_REQUEST);
-      expect(z.object({ error: z.string() }).parse(response.json()).error).not.toBe("");
+      expect(z.object({ error: z.string() }).parse(response.json()).error).toMatch(/text/u);
     });
   });
 
   describe("Errors", () => {
+    it("keeps the status of a 4xx error the app did not classify but hides its message", async () => {
+      const response = await server.inject({ method: "GET", url: TEAPOT, headers: { host: LOCAL } });
+      expect(response.statusCode).toBe(BAD_REQUEST);
+      expect(response.json()).toEqual({ error: CLIENT_ERROR });
+      expect(response.body).not.toContain(SECRET_DETAIL);
+      expect(logger.events.map(({ level, message }) => ({ level, message }))).toEqual([
+        { level: "warn", message: "request refused" },
+      ]);
+    });
+
     it("answers an unexpected error with a generic 500 and logs the detail", async () => {
       const response = await server.inject({ method: "GET", url: BOOM, headers: { host: LOCAL } });
       expect(response.statusCode).toBe(HttpStatus.InternalServerError);
