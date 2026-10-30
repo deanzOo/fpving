@@ -1,6 +1,13 @@
 import pino from "pino";
 import type { Logger } from "@fpving/core";
 import type { LogLevel } from "../../config/env.js";
+import { openRotatingFile } from "./rotating-file.js";
+
+/** The size a log file may reach before it is rotated: 10 MiB. */
+export const LOG_MAX_BYTES = 10_485_760;
+
+/** How many rotated log files are kept beside the current one. */
+export const LOG_KEPT_FILES = 5;
 
 /** What a masked field holds. */
 export const REDACTED = "[redacted]";
@@ -16,10 +23,21 @@ export interface PinoLoggerOptions {
   readonly level: LogLevel;
   /** The log file; missing directories are created. */
   readonly file: string;
+  /** The rotation size; {@link LOG_MAX_BYTES} by default. */
+  readonly maxFileBytes?: number;
+  /** How many rotated files to keep; {@link LOG_KEPT_FILES} by default. */
+  readonly keptFiles?: number;
+}
+
+/** A logger that owns its open file. */
+export interface ClosableLogger extends Logger {
+  /** Closes the log file; later events are dropped. Idempotent. */
+  close(): void;
 }
 
 /**
- * Creates the core {@link Logger} on pino, writing JSON lines to a file. Pino's `redact` paths match whole keys
+ * Creates the core {@link Logger} on pino, writing JSON lines synchronously to a file that rotates by size, see
+ * `openRotatingFile`. Pino's `redact` paths match whole keys
  * and do not take wildcards inside a name, so every field whose name contains `key`, `token`, `secret`,
  * `password`, `authorization` or `cookie`, in any letter case, is masked instead. That covers api keys, the
  * `authorization`, `x-api-key`, `cookie` and `set-cookie` headers and the likes of `accessToken`.
@@ -27,8 +45,12 @@ export interface PinoLoggerOptions {
  * @param options - The level and the file.
  * @returns The logger.
  */
-export const createPinoLogger = (options: PinoLoggerOptions): Logger => {
-  const destination = pino.destination({ dest: options.file, mkdir: true, sync: true });
+export const createPinoLogger = (options: PinoLoggerOptions): ClosableLogger => {
+  const destination = openRotatingFile({
+    file: options.file,
+    maxBytes: options.maxFileBytes ?? LOG_MAX_BYTES,
+    keptFiles: options.keptFiles ?? LOG_KEPT_FILES,
+  });
   const logger = pino(
     {
       level: options.level,
@@ -50,6 +72,9 @@ export const createPinoLogger = (options: PinoLoggerOptions): Logger => {
     },
     error: (message, fields) => {
       logger.error(fields ?? {}, message);
+    },
+    close: () => {
+      destination.close();
     },
   };
 };
