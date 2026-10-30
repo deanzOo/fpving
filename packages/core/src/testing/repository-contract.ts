@@ -528,6 +528,14 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.alerts.list({ unreadOnly: true })).toEqual([newer]);
       });
 
+      it("lists alerts created at the same instant greater id first by code point", async () => {
+        for (const id of ["a2", "a3", "a1"]) {
+          await repo.alerts.save(alert(id, l1, JAN_2, s1.id));
+        }
+        const ids = (await repo.alerts.list({ unreadOnly: false })).map((row) => row.id);
+        expect(ids).toEqual(["a3", "a2", "a1"]);
+      });
+
       it("reports not_found when marking an alert read that does not exist", async () => {
         expect(await repo.alerts.markRead(alertIdSchema.parse("missing"), JAN_1)).toEqual(notFound);
       });

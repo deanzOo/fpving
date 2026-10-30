@@ -121,7 +121,10 @@ export interface VerdictCacheRepository {
 export interface AlertRepository {
   /** Stores a new alert. */
   save(alert: Alert): Promise<void>;
-  /** Alerts newest first; only unread ones when `unreadOnly`. */
+  /**
+   * Alerts newest first; only unread ones when `unreadOnly`. Of alerts created at the same instant, the one with the
+   * greater id by code point comes first.
+   */
   list(filter: { readonly unreadOnly: boolean }): Promise<Alert[]>;
   /** Marks an alert read at `at`. */
   markRead(id: AlertId, at: Date): Promise<Result<void, NotFound>>;

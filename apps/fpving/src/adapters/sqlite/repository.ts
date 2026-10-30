@@ -265,7 +265,7 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
       list: async ({ unreadOnly }) =>
         settle(() =>
           db.select().from(alerts).where(unreadOnly ? isNull(alerts.readAt) : undefined)
-            .orderBy(desc(alerts.createdAt))
+            .orderBy(desc(alerts.createdAt), desc(alerts.id))
             .all()
             .map((row) => alertSchema.parse(row))),
       markRead: async (id, at) =>
