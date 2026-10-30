@@ -17,7 +17,6 @@ export const ApiErrorKind = {
   ...MatchErrorKind,
   PluginUnavailable: "plugin_unavailable",
   ScanRunning: "scan_running",
-  Stopping: "stopping",
 } as const;
 
 /** One of the {@link ApiErrorKind} values. */
