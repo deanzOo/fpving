@@ -7,9 +7,11 @@ import {
   HttpStatus,
   INTERNAL_ERROR,
   MAX_REQUEST_BODY_BYTES,
+  NO_ROUTE,
   STARTING,
 } from "../../src/server/server.ts";
 import type { AppServer } from "../../src/server/server.ts";
+import { apiError, ApiErrorKind, apiErrorSchema } from "../../src/server/errors.ts";
 import { recordingLogger } from "../support/recording-logger.ts";
 
 const PORT = 4321;
@@ -77,7 +79,7 @@ describe("HTTP server shell", () => {
     ])("refuses a request addressed to %s with 421 before routing", async (_label, host) => {
       const response = await server.inject({ method: "GET", url: ECHO, headers: { host } });
       expect(response.statusCode).toBe(HttpStatus.MisdirectedRequest);
-      expect(response.json()).toEqual({ error: GuardRefusal.Host });
+      expect(response.json()).toEqual(apiError(ApiErrorKind.MisdirectedRequest, GuardRefusal.Host));
     });
   });
 
@@ -99,7 +101,7 @@ describe("HTTP server shell", () => {
       async (site) => {
         const response = await post({ ...json, "host": LOCAL, "sec-fetch-site": site });
         expect(response.statusCode).toBe(HttpStatus.Forbidden);
-        expect(response.json()).toEqual({ error: GuardRefusal.Origin });
+        expect(response.json()).toEqual(apiError(ApiErrorKind.CrossOrigin, GuardRefusal.Origin));
       },
     );
 
@@ -121,7 +123,7 @@ describe("HTTP server shell", () => {
     ])("refuses a state-changing request from %s with 403", async (_label, origin) => {
       const response = await post({ ...json, host: LOCAL, origin });
       expect(response.statusCode).toBe(HttpStatus.Forbidden);
-      expect(response.json()).toEqual({ error: GuardRefusal.Origin });
+      expect(response.json()).toEqual(apiError(ApiErrorKind.CrossOrigin, GuardRefusal.Origin));
     });
 
     it("serves a cross-origin read with no CORS header, so the browser hides the answer from that page", async () => {
@@ -144,7 +146,9 @@ describe("HTTP server shell", () => {
     it("rejects a body that fails the route schema with 400", async () => {
       const response = await post({ ...json, host: LOCAL }, { text: 1 });
       expect(response.statusCode).toBe(BAD_REQUEST);
-      expect(z.object({ error: z.string() }).parse(response.json()).error).toMatch(/text/u);
+      const { error } = apiErrorSchema.parse(response.json());
+      expect(error.kind).toBe(ApiErrorKind.InvalidRequest);
+      expect(error.message).toMatch(/text/u);
     });
   });
 
@@ -153,7 +157,7 @@ describe("HTTP server shell", () => {
       ready = false;
       const get = async (url: string) => server.inject({ method: "GET", url, headers: { host: LOCAL } });
       expect((await get(ECHO)).statusCode).toBe(UNAVAILABLE);
-      expect((await get(ECHO)).json()).toEqual({ error: STARTING });
+      expect((await get(ECHO)).json()).toEqual(apiError(ApiErrorKind.Starting, STARTING));
       expect((await get("/api/nope")).statusCode).toBe(UNAVAILABLE);
       expect((await get(`${OPEN}?probe=1`)).statusCode).toBe(OK);
       ready = true;
@@ -171,7 +175,7 @@ describe("HTTP server shell", () => {
     it("keeps the status of a 4xx error the app did not classify but hides its message", async () => {
       const response = await server.inject({ method: "GET", url: TEAPOT, headers: { host: LOCAL } });
       expect(response.statusCode).toBe(BAD_REQUEST);
-      expect(response.json()).toEqual({ error: CLIENT_ERROR });
+      expect(response.json()).toEqual(apiError(ApiErrorKind.RequestRefused, CLIENT_ERROR));
       expect(response.body).not.toContain(SECRET_DETAIL);
       expect(logger.events.map(({ level, message }) => ({ level, message }))).toEqual([
         { level: "warn", message: "request refused" },
@@ -181,7 +185,7 @@ describe("HTTP server shell", () => {
     it("answers an unexpected error with a generic 500 and logs the detail", async () => {
       const response = await server.inject({ method: "GET", url: BOOM, headers: { host: LOCAL } });
       expect(response.statusCode).toBe(HttpStatus.InternalServerError);
-      expect(response.json()).toEqual({ error: INTERNAL_ERROR });
+      expect(response.json()).toEqual(apiError(ApiErrorKind.Internal, INTERNAL_ERROR));
       expect(response.body).not.toContain(SECRET_DETAIL);
       expect(logger.events.map(({ level, message }) => ({ level, message }))).toEqual([
         { level: "error", message: "request failed" },
@@ -189,9 +193,15 @@ describe("HTTP server shell", () => {
       expect(loggedFailure.safeParse(logger.events[0]?.fields).success).toBe(true);
     });
 
-    it("answers an unknown route with 404", async () => {
+    it("answers an unknown route with 404 in the error envelope", async () => {
       const response = await server.inject({ method: "GET", url: "/api/nope", headers: { host: LOCAL } });
       expect(response.statusCode).toBe(NOT_FOUND);
+      expect(response.json()).toEqual(apiError(ApiErrorKind.NotFound, NO_ROUTE));
+    });
+
+    it("refuses a too large body in the error envelope", async () => {
+      const response = await post({ ...json, host: LOCAL }, { text: "x".repeat(MAX_REQUEST_BODY_BYTES) });
+      expect(apiErrorSchema.parse(response.json()).error.kind).toBe(ApiErrorKind.InvalidRequest);
     });
   });
 });

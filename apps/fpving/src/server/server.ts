@@ -4,6 +4,7 @@ import fastify from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { apiError, ApiErrorKind } from "./errors.js";
 
 /** The only address the server binds. */
 export const LOOPBACK_HOST = "127.0.0.1";
@@ -14,6 +15,7 @@ export const MAX_REQUEST_BODY_BYTES = 65_536;
 /** The statuses the shell itself answers with. */
 export const HttpStatus = {
   Forbidden: 403,
+  NotFound: 404,
   MisdirectedRequest: 421,
   InternalServerError: 500,
   ServiceUnavailable: 503,
@@ -33,6 +35,9 @@ export const CLIENT_ERROR = "request refused";
 
 /** What an unexpected error answers; the detail goes to the log only. */
 export const INTERNAL_ERROR = "internal error";
+
+/** What a path no route serves answers. */
+export const NO_ROUTE = "no route serves this method and path";
 
 const LOCAL_HOSTNAMES = [LOOPBACK_HOST, "localhost"] as const;
 const READ_METHODS: readonly string[] = ["GET", "HEAD", "OPTIONS"];
@@ -68,7 +73,8 @@ const clientErrorSchema = z.object({
  * 403, and so is one without `Origin` whose `Sec-Fetch-Site` is `cross-site` or `same-site`; one with neither, such as
  * from curl, is served. No CORS header is ever sent. Bodies over {@link MAX_REQUEST_BODY_BYTES} get 413. A 4xx error
  * Fastify raised (validation, body limit, content type) answers its message; another 4xx keeps its status, answers
- * {@link CLIENT_ERROR} and logs its message; any other error answers 500 with {@link INTERNAL_ERROR} and logs it.
+ * {@link CLIENT_ERROR} and logs its message; any other error answers 500 with {@link INTERNAL_ERROR} and logs it. An
+ * unknown path answers 404. Every refusal is an {@link apiError} envelope.
  *
  * @param options - The port and the logger.
  * @returns The server, not yet listening.
@@ -82,16 +88,17 @@ export const createServer = (options: ServerOptions) => {
   server.addHook("onRequest", async (request, reply) => {
     const host = request.host.toLowerCase();
     if (!allowedHosts.includes(host)) {
-      return reply.status(HttpStatus.MisdirectedRequest).send({ error: GuardRefusal.Host });
+      const refusal = apiError(ApiErrorKind.MisdirectedRequest, GuardRefusal.Host);
+      return reply.status(HttpStatus.MisdirectedRequest).send(refusal);
     }
     const { origin } = request.headers;
     const site = request.headers["sec-fetch-site"] ?? "";
     const foreign = origin === undefined ? CROSS_SITE_FETCHES.includes(site) : origin !== `${HTTP_SCHEME}${host}`;
     if (!READ_METHODS.includes(request.method) && foreign) {
-      return reply.status(HttpStatus.Forbidden).send({ error: GuardRefusal.Origin });
+      return reply.status(HttpStatus.Forbidden).send(apiError(ApiErrorKind.CrossOrigin, GuardRefusal.Origin));
     }
     if (!isReady() && !openWhileStarting.includes(request.routeOptions.url ?? "")) {
-      return reply.status(HttpStatus.ServiceUnavailable).send({ error: STARTING });
+      return reply.status(HttpStatus.ServiceUnavailable).send(apiError(ApiErrorKind.Starting, STARTING));
     }
     return undefined;
   });
@@ -100,14 +107,16 @@ export const createServer = (options: ServerOptions) => {
     if (client.success) {
       const { statusCode, message, code } = client.data;
       if (code?.startsWith(FASTIFY_ERROR_CODE) === true) {
-        return reply.status(statusCode).send({ error: message });
+        return reply.status(statusCode).send(apiError(ApiErrorKind.InvalidRequest, message));
       }
       logger.warn("request refused", { method: request.method, url: request.url, statusCode, detail: message });
-      return reply.status(statusCode).send({ error: CLIENT_ERROR });
+      return reply.status(statusCode).send(apiError(ApiErrorKind.RequestRefused, CLIENT_ERROR));
     }
     logger.error("request failed", { method: request.method, url: request.url, detail: inspect(error) });
-    return reply.status(HttpStatus.InternalServerError).send({ error: INTERNAL_ERROR });
+    return reply.status(HttpStatus.InternalServerError).send(apiError(ApiErrorKind.Internal, INTERNAL_ERROR));
   });
+  server.setNotFoundHandler(async (_request, reply) =>
+    reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, NO_ROUTE)));
   return server;
 };
 
