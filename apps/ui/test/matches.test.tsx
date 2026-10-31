@@ -109,6 +109,25 @@ describe("Match review", () => {
     await expect.element(screen.getByRole("link", { name: "Acme X5 c1" })).not.toBeInTheDocument();
   });
 
+  it("moves focus to the next candidate after a review, or to the product heading when none is left", async () => {
+    const api = scripted([candidate("c1", FRAME), candidate("c2", FRAME)]);
+    api.on(at(apiRoutes.acceptCandidate, { candidateId: "c1" }), () => {
+      api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, [candidate("c2", FRAME)]));
+      return reply(wire.addedListing, accepted, HttpStatus.Created)();
+    });
+    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c2" }), () => {
+      api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, []));
+      return noContent();
+    });
+    const screen = await renderApp(api.client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    await frame.getByRole("button", { name: "Accept Acme X5 c1" }).click();
+    await expect.element(frame.getByRole("listitem")).toHaveFocus();
+    await frame.getByRole("button", { name: "Reject Acme X5 c2" }).click();
+    await expect.element(frame.getByRole("heading", { level: 2, name: "Acme X5 frame" })).toHaveFocus();
+    await expect.element(frame.getByRole("status")).toHaveTextContent("Rejected Acme X5 c2.");
+  });
+
   it("rejects a candidate and drops it from the queue", async () => {
     const api = scripted([candidate("c1", FRAME)]);
     api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), () => {

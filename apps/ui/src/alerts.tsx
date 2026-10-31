@@ -1,8 +1,9 @@
 import { AlertKind } from "@fpving/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toFailure, useClient } from "./client.ts";
+import { focusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
 import { fromNow } from "./time.ts";
 
@@ -12,6 +13,8 @@ const KIND_LABEL = {
   [AlertKind.NewCheapest]: "New cheapest listing",
 } as const;
 
+const GONE = "a product no longer watched";
+const item = "flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2";
 const button = "rounded-md border border-line px-3 py-1 font-medium disabled:opacity-60";
 
 /**
@@ -38,12 +41,31 @@ export const Alerts = () => {
     queryClient.invalidateQueries({ queryKey: QueryKey.Alerts }),
     queryClient.invalidateQueries({ queryKey: QueryKey.Watchlist }),
   ]);
-  const markOne = useMutation({ mutationFn: client.markAlertRead, onSuccess: changed });
+  const list = useRef<HTMLUListElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [refocus, setRefocus] = useState<{ readonly id: string; readonly index: number } | null>(null);
+  useEffect(() => {
+    if (refocus !== null && !alerts?.some(({ id, readAt }) => id === refocus.id && readAt === null)) {
+      focusAfterRemoval(list.current, refocus.index, heading.current);
+      setRefocus(null);
+    }
+  }, [refocus, alerts]);
+  const markOne = useMutation({
+    mutationFn: async ({ alertId }: { readonly alertId: string; readonly index: number }) =>
+      client.markAlertRead({ alertId }),
+    onMutate: ({ alertId, index }) => {
+      setRefocus({ id: alertId, index });
+    },
+    onError: () => {
+      setRefocus(null);
+    },
+    onSuccess: changed,
+  });
   const markAll = useMutation({ mutationFn: client.markAllAlertsRead, onSuccess: changed });
   const failed = markOne.error ?? markAll.error;
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Alerts</h1>
+      <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold">Alerts</h1>
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <label className="flex items-center gap-2">
           <input
@@ -74,24 +96,26 @@ export const Alerts = () => {
       {alerts?.length === 0 && (
         <p className="mt-6 text-ink-muted">{unreadOnly ? "No unread alerts." : "No alerts yet."}</p>
       )}
-      <ul className="mt-6 flex flex-col gap-2">
-        {alerts?.map((alert) => {
+      <ul ref={list} className="mt-6 flex flex-col gap-2">
+        {alerts?.map((alert, index) => {
           const name = names.get(alert.productId);
+          const when = fromNow(alert.createdAt);
           return (
-            <li key={alert.id} className="flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2">
+            <li key={alert.id} tabIndex={-1} className={item}>
               <span className="font-medium">{KIND_LABEL[alert.kind]}</span>
               {name === undefined
-                ? <span className="text-ink-muted">a product no longer watched</span>
+                ? <span className="text-ink-muted">{GONE}</span>
                 : <Link to="/products/$id" params={{ id: alert.productId }} className="underline">{name}</Link>}
-              <span className="text-sm text-ink-muted">{fromNow(alert.createdAt)}</span>
+              <span className="text-sm text-ink-muted">{when}</span>
               <span className="text-sm">{alert.readAt === null ? "Unread" : "Read"}</span>
               {alert.readAt === null && (
                 <button
                   type="button"
                   className={button}
                   disabled={markOne.isPending}
+                  aria-label={`Mark read: ${KIND_LABEL[alert.kind]} on ${name ?? GONE}, ${when}`}
                   onClick={() => {
-                    markOne.mutate({ alertId: alert.id });
+                    markOne.mutate({ alertId: alert.id, index });
                   }}
                 >
                   Mark read

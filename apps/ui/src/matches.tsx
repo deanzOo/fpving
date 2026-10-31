@@ -1,8 +1,9 @@
 import { LlmVerdict } from "@fpving/core";
 import type { MatchCandidate, Product } from "@fpving/core";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toFailure, useClient } from "./client.ts";
+import { focusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
 
@@ -30,24 +31,41 @@ interface CandidateProps {
   readonly candidate: MatchCandidate;
   readonly product: Product;
   readonly announce: (said: string) => void;
+  readonly reviewing: (underway: boolean) => void;
 }
 
-const Candidate = ({ candidate, product, announce }: CandidateProps) => {
+const Candidate = ({ candidate, product, announce, reviewing }: CandidateProps) => {
   const client = useClient();
   const reviewed = useReviewed(product.id);
+  const tracked = {
+    onMutate: () => {
+      reviewing(true);
+    },
+    onError: () => {
+      reviewing(false);
+    },
+  };
   const accept = useMutation({
     mutationFn: client.acceptCandidate,
+    ...tracked,
     onSuccess: async () => {
       announce(`Added ${candidate.title} to ${product.name}.`);
       await reviewed();
     },
   });
-  const reject = useMutation({ mutationFn: client.rejectCandidate, onSuccess: reviewed });
+  const reject = useMutation({
+    mutationFn: client.rejectCandidate,
+    ...tracked,
+    onSuccess: async () => {
+      announce(`Rejected ${candidate.title}.`);
+      await reviewed();
+    },
+  });
   const failed = accept.error ?? reject.error;
   const params = { candidateId: candidate.id };
   const busy = accept.isPending || reject.isPending;
   return (
-    <li className="flex flex-col gap-1 rounded-md border border-line px-3 py-2">
+    <li tabIndex={-1} className="flex flex-col gap-1 rounded-md border border-line px-3 py-2">
       <a href={candidate.url} target="_blank" rel="noreferrer" className="font-medium underline">{candidate.title}</a>
       <p>
         {VERDICT_LABEL[candidate.llmVerdict]}
@@ -95,6 +113,15 @@ const Group = ({ product, candidates }: GroupProps) => {
   const headingId = useId();
   const queryClient = useQueryClient();
   const [said, announce] = useState("");
+  const list = useRef<HTMLUListElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [refocus, setRefocus] = useState<{ readonly id: string; readonly index: number } | null>(null);
+  useEffect(() => {
+    if (refocus !== null && !candidates.some(({ id }) => id === refocus.id)) {
+      focusAfterRemoval(list.current, refocus.index, heading.current);
+      setRefocus(null);
+    }
+  }, [refocus, candidates]);
   const find = useMutation({
     mutationFn: client.findMatches,
     onSuccess: async (found) => {
@@ -108,7 +135,7 @@ const Group = ({ product, candidates }: GroupProps) => {
   return (
     <section aria-labelledby={headingId} className="mt-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 id={headingId} className="text-xl font-semibold">{product.name}</h2>
+        <h2 ref={heading} id={headingId} tabIndex={-1} className="text-xl font-semibold">{product.name}</h2>
         <button
           type="button"
           className={button}
@@ -125,9 +152,17 @@ const Group = ({ product, candidates }: GroupProps) => {
       {candidates.length === 0
         ? <p className="mt-2 text-ink-muted">No pending candidates.</p>
         : (
-            <ul className="mt-2 flex flex-col gap-2">
-              {candidates.map((candidate) => (
-                <Candidate key={candidate.id} candidate={candidate} product={product} announce={announce} />
+            <ul ref={list} className="mt-2 flex flex-col gap-2">
+              {candidates.map((candidate, index) => (
+                <Candidate
+                  key={candidate.id}
+                  candidate={candidate}
+                  product={product}
+                  announce={announce}
+                  reviewing={(underway) => {
+                    setRefocus(underway ? { id: candidate.id, index } : null);
+                  }}
+                />
               ))}
             </ul>
           )}

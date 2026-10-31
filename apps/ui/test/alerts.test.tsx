@@ -60,10 +60,38 @@ describe("Alerts", () => {
     });
     const screen = await renderApp(api.client, "/alerts");
     await expect.element(screen.getByRole("link", { name: "Alerts, 1 unread" })).toBeVisible();
-    await screen.getByRole("button", { name: "Mark read" }).click();
+    await screen.getByRole("button", { name: /^Mark read: Price drop on Acme X5 frame/u }).click();
     await expect.element(screen.getByRole("listitem").getByText("Read", { exact: true })).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Mark read" })).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("button", { name: /^Mark read: Price drop on Acme X5 frame/u }))
+      .not.toBeInTheDocument();
     await expect.element(screen.getByRole("link", { name: "Alerts", exact: true })).toBeVisible();
+  });
+
+  it("names each mark read button after its alert", async () => {
+    const screen = await renderApp(scripted([drop, gone]).client, "/alerts");
+    await expect.element(screen.getByRole("button", { name: /^Mark read: Price drop on Acme X5 frame, /u }))
+      .toBeVisible();
+    await expect.element(screen.getByRole("button", { name: /^Mark read: New cheapest listing on a product no/u }))
+      .toBeVisible();
+  });
+
+  it("moves focus to the next alert once one leaves the unread list, or to the heading when none is left", async () => {
+    const other = { ...unreadAlert("a4", "p1"), kind: AlertKind.BackInStock };
+    const api = scripted([drop, other]);
+    const markedOne = (id: string, left: Alert[]) => {
+      api.on(at(apiRoutes.markAlertRead, { alertId: id }), () => {
+        api.on(apiRoutes.listAlerts, reply(wire.alerts, left), UNREAD);
+        return noContent();
+      });
+    };
+    markedOne("a2", [other]);
+    markedOne("a4", []);
+    const screen = await renderApp(api.client, "/alerts");
+    await screen.getByRole("checkbox", { name: "Unread only" }).click();
+    await screen.getByRole("button", { name: /^Mark read: Price drop/u }).click();
+    await expect.element(screen.getByRole("listitem")).toHaveFocus();
+    await screen.getByRole("button", { name: /^Mark read: Back in stock/u }).click();
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Alerts" })).toHaveFocus();
   });
 
   it("marks every alert read and says how many it marked", async () => {
@@ -85,7 +113,7 @@ describe("Alerts", () => {
       failWith(HttpStatus.NotFound, ApiErrorKind.AlertNotFound, "no alert has this id"),
     );
     const screen = await renderApp(api.client, "/alerts");
-    await screen.getByRole("button", { name: "Mark read" }).click();
+    await screen.getByRole("button", { name: /^Mark read: Price drop on Acme X5 frame/u }).click();
     await expect.element(screen.getByRole("alert").getByText("no alert has this id", { exact: true })).toBeVisible();
   });
 
