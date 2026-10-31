@@ -3,7 +3,7 @@ import type { Product } from "@fpving/core";
 import { ShippingKind } from "@fpving/plugin-sdk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toFailure, useClient } from "./client.ts";
 import type { Client } from "./client.ts";
 import { Confirm } from "./confirm.tsx";
@@ -39,11 +39,16 @@ const Header = ({ product }: { readonly product: Product }) => {
   const renameButton = useRef<HTMLButtonElement>(null);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(product.name);
+  const [returning, setReturning] = useState(false);
+  useEffect(() => {
+    if (returning) {
+      renameButton.current?.focus();
+      setReturning(false);
+    }
+  }, [returning]);
   const stopEditing = () => {
     setEditing(false);
-    requestAnimationFrame(() => {
-      renameButton.current?.focus();
-    });
+    setReturning(true);
   };
   const rename = useMutation({
     mutationFn: async (next: string) => client.renameProduct({ productId: product.id }, { name: next }),
