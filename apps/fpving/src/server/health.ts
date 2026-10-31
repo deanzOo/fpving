@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { PluginState } from "../plugins/runtime/host.js";
 import { PluginStatusKind } from "../plugins/status.js";
-import { HttpStatus } from "./server.js";
+import { HttpStatus } from "./http-status.js";
 import type { AppServer } from "./server.js";
 
 /** Where the health route answers. */

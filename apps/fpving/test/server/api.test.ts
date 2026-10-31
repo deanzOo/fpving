@@ -20,7 +20,8 @@ import { GatewayRefusal } from "../../src/plugins/store-gateway.ts";
 import { NOT_ATTACHED, registerApiRoutes } from "../../src/server/api.ts";
 import { apiRoutes } from "../../src/server/api-routes.ts";
 import { ApiErrorKind, apiErrorSchema } from "../../src/server/errors.ts";
-import { createServer, HttpStatus } from "../../src/server/server.ts";
+import { HttpStatus } from "../../src/server/http-status.ts";
+import { createServer } from "../../src/server/server.ts";
 import {
   API_HOST,
   API_PORT,

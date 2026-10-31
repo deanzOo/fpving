@@ -17,7 +17,7 @@ import { manifestSchema, moneySchema, storeErrorSchema } from "@fpving/plugin-sd
 import { z } from "zod";
 import { PluginIssueKind, PluginStatusKind } from "../plugins/status.js";
 import { apiErrorSchema } from "./errors.js";
-import { HttpStatus } from "./server.js";
+import { HttpStatus } from "./http-status.js";
 
 const countSchema = z.int().nonnegative();
 const urlBodySchema = z.object({ url: z.string().min(1) });

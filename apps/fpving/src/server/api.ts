@@ -28,7 +28,7 @@ import { apiRoutes } from "./api-routes.js";
 import type { PluginRow, ScanStatus } from "./api-routes.js";
 import type { PluginActivity } from "./plugin-rows.js";
 import { apiError, ApiErrorKind } from "./errors.js";
-import { HttpStatus } from "./server.js";
+import { HttpStatus } from "./http-status.js";
 import type { AppServer } from "./server.js";
 
 /** Why a settings change was not applied: the app is shutting down, or a plugin host failed to start or a save. */
