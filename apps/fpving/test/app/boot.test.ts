@@ -17,6 +17,7 @@ const ENTRY = fileURLToPath(new URL("../../src/main.ts", import.meta.url));
 const SOURCE_HOOKS = new URL("../support/source-hooks.ts", import.meta.url).href;
 const BOOT_TIMEOUT_MS = 60_000;
 const LISTENING = "fpving listening on";
+const LISTEN_TIMEOUT_MS = 45_000;
 const OK = 200;
 const FAKE_KEY = "sk-ant-test-not-a-real-secret";
 const isWindows = process.platform === "win32";
@@ -62,13 +63,18 @@ const boot = (env: NodeJS.ProcessEnv): { process: ChildProcess; stderr: () => st
 
 const listening = async (spawned: ChildProcess): Promise<void> => new Promise((resolve, reject) => {
   let out = "";
+  const gaveUp = setTimeout(() => {
+    reject(new Error(`the app never printed "${LISTENING}" within ${String(LISTEN_TIMEOUT_MS)} ms; stdout: ${out}`));
+  }, LISTEN_TIMEOUT_MS);
   spawned.stdout?.on("data", (chunk: Buffer) => {
     out += chunk.toString();
     if (out.includes(LISTENING)) {
+      clearTimeout(gaveUp);
       resolve();
     }
   });
   spawned.once("exit", (code) => {
+    clearTimeout(gaveUp);
     reject(new Error(`the app exited with ${String(code)} before serving`));
   });
 });
