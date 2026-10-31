@@ -7,8 +7,7 @@ import { z } from "zod";
 import { createClient } from "../../src/client.ts";
 import type { Fetch } from "../../src/client.ts";
 
-/** One request the fake transport received. */
-export interface SentRequest {
+interface SentRequest {
   readonly method: string;
   readonly path: string;
   readonly body: unknown;
