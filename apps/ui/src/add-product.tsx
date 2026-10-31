@@ -5,10 +5,12 @@ import { toFailure, useClient } from "./client.ts";
 import type { ApiFailure } from "./client.ts";
 import { QueryKey } from "./queries.ts";
 
-const refusal = (failure: ApiFailure, url: string): string => {
+const LIST_ONE = "List one in plugins.json, then check Plugins.";
+
+const refusal = (failure: ApiFailure): string => {
   switch (failure.kind) {
     case ApiErrorKind.NoPluginForDomain:
-      return `No installed plugin handles ${new URL(url).hostname}. List one in plugins.json, then check Plugins.`;
+      return `No installed plugin handles this store (${failure.message}). ${LIST_ONE}`;
     case ApiErrorKind.PluginUnavailable:
       return "The plugin for this store is installed but not loaded. Check Plugins.";
     case ApiErrorKind.AlreadyTracked:
@@ -37,7 +39,7 @@ export const AddProduct = () => {
       await queryClient.invalidateQueries({ queryKey: QueryKey.Watchlist });
     },
   });
-  const error = added.isError ? refusal(toFailure(added.error), added.variables) : null;
+  const error = added.isError ? refusal(toFailure(added.error)) : null;
   return (
     <form
       className="mt-4 flex flex-wrap items-end gap-3"

@@ -161,8 +161,9 @@ describe("Adding a product by URL", () => {
   });
 
   it.each([
-    [ApiErrorKind.NoPluginForDomain, HttpStatus.UnprocessableContent, "no plugin handles shop.example",
-      "No installed plugin handles shop.example. List one in plugins.json, then check Plugins."],
+    [ApiErrorKind.NoPluginForDomain, HttpStatus.UnprocessableContent, "no plugin handles shop-mirror.example",
+      "No installed plugin handles this store (no plugin handles shop-mirror.example). List one in plugins.json, "
+      + "then check Plugins."],
     [ApiErrorKind.PluginUnavailable, HttpStatus.UnprocessableContent, "the plugin is not loaded",
       "The plugin for this store is installed but not loaded. Check Plugins."],
     [ApiErrorKind.AlreadyTracked, HttpStatus.Conflict, "already tracked by product p1 \"Acme X5 frame\"",
