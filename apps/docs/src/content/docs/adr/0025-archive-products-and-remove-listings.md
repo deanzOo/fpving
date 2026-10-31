@@ -43,3 +43,10 @@ The API needs to delete a product and remove a listing, but snapshots, alerts an
 - A settings change that starts a new plugin host now saves the settings before the gateway moves to the new host, so a failed save shuts the new host down and leaves the app as it was. Calls still running through the old gateway get up to five seconds to finish before the old host shuts down, and an old host that fails to shut down is logged as a warning while the change succeeds.
 - Good: deleting or removing by mistake is undone by pasting the URL again.
 - Bad: a listing can only move between products by being restored on its own product; there is no move.
+
+## Amendment, 2026-10-31: typed settings failures and the shutdown window
+
+- Amends [ADR 0024](../0024-http-api-error-envelope-and-route-table/): adds the `settings_not_applied` and `shutting_down` kinds, both 503.
+- A settings change whose new plugin host fails to start, or whose settings fail to save, answers 503 `settings_not_applied` instead of 500, since it is an expected failure, not a bug. The cause is logged as an error; a new host that then fails to shut down is logged as a warning and does not replace that cause.
+- Shutdown stops the schedule before it closes the server, so for a moment the server still answers. In that window a settings change and scan now answer 503 `shutting_down` instead of 500 or a 202 for a scan that never starts.
+- Calls on the old gateway that outlast the five-second drain are logged as their own warning, not as a missed shutdown deadline.

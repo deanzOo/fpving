@@ -180,8 +180,8 @@ const judgeFor = (env: Env, logger: ClosableLogger): LlmJudge => {
  * While starting, only the health route answers; every other route answers 503. Then it migrates and opens the
  * database, starts the plugin host with the saved ship-to country and display currency, wires every adapter into
  * core and starts the scan schedule. Any failure after the log opened, and a shutdown requested through `signal`
- * while starting, closes what was opened, within the shutdown deadline. The plugin host keeps the settings it started
- * with, so a settings change needs a restart.
+ * while starting, closes what was opened, within the shutdown deadline. A settings change restarts the plugin host or
+ * the schedule as needed, see `createSettingsApplier`.
  *
  * @param source - The `process.env`-shaped environment.
  * @param overrides - Ports to use instead of the real adapters, see {@link AppPorts}.
