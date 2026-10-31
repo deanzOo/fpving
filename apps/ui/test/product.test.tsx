@@ -150,7 +150,7 @@ describe("Product detail", () => {
     await expect.element(screen.getByRole("button", { name: "Stop watching" })).toHaveFocus();
   });
 
-  it("stops watching once confirmed and goes back to the watchlist with focus on its content", async () => {
+  it("stops watching once confirmed and goes back to the watchlist without reading the product again", async () => {
     const api = scripted();
     api.on(at(apiRoutes.archiveProduct, { productId: ID }), noContent);
     const screen = await open(api);
@@ -159,6 +159,10 @@ describe("Product detail", () => {
     await expect.element(screen.getByRole("heading", { level: 1, name: "Watchlist" })).toBeVisible();
     await expect.element(screen.getByRole("main")).toHaveFocus();
     expect(api.sent).toContainEqual({ method: "DELETE", path: `/api/products/${ID}`, body: undefined });
+    const archived = api.sent.findIndex(({ method }) => method === "DELETE");
+    const reads = api.sent.slice(archived)
+      .filter(({ method, path }) => method === "GET" && path === `/api/products/${ID}`);
+    expect(reads).toEqual([]);
   });
 
   it("explains a refused stop watching", async () => {

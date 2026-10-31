@@ -33,6 +33,7 @@ const useChanged = (productId: string) => {
 const Header = ({ product }: { readonly product: Product }) => {
   const client = useClient();
   const changed = useChanged(product.id);
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const renameButton = useRef<HTMLButtonElement>(null);
   const [editing, setEditing] = useState(false);
@@ -53,8 +54,9 @@ const Header = ({ product }: { readonly product: Product }) => {
   const archive = useMutation({
     mutationFn: async () => client.archiveProduct({ productId: product.id }),
     onSuccess: async () => {
-      await changed();
       await navigate({ to: "/" });
+      queryClient.removeQueries({ queryKey: [...QueryKey.Product, product.id] });
+      await queryClient.invalidateQueries({ queryKey: QueryKey.Watchlist });
     },
   });
   const failed = rename.error ?? archive.error;
