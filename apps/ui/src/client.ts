@@ -5,8 +5,15 @@ import { HttpStatus } from "@fpving/app/http-status";
 import { createContext, useContext } from "react";
 import { z } from "zod";
 
-/** Failures the client itself detects: the server could not be reached, or it answered outside its schemas. */
-export const ClientErrorKind = { Unreachable: "unreachable", BadResponse: "bad_response" } as const;
+/**
+ * Failures the UI itself detects: the server could not be reached, it answered outside its schemas, or something
+ * else went wrong on the page.
+ */
+export const ClientErrorKind = {
+  Unreachable: "unreachable",
+  BadResponse: "bad_response",
+  Unexpected: "unexpected",
+} as const;
 
 /** What a failed call reports: one of the server's error kinds or a {@link ClientErrorKind}. */
 export type FailureKind = ApiErrorKind | (typeof ClientErrorKind)[keyof typeof ClientErrorKind];
@@ -25,6 +32,17 @@ export class ApiFailure extends Error {
     this.kind = kind;
   }
 }
+
+const UNEXPECTED = "something unexpected went wrong on this page";
+
+/**
+ * The failure behind a thrown value: itself when it is an {@link ApiFailure}, otherwise an `unexpected` one.
+ *
+ * @param error - What was thrown.
+ * @returns The failure to show.
+ */
+export const toFailure = (error: unknown): ApiFailure =>
+  error instanceof ApiFailure ? error : new ApiFailure(ClientErrorKind.Unexpected, UNEXPECTED);
 
 /** The transport: `fetch`, or a fake in tests. */
 export type Fetch = (path: string, init: RequestInit) => Promise<Response>;
@@ -130,8 +148,11 @@ export const createClient = (fetcher: Fetch) => ({
 /** The client the screens call. */
 export type Client = ReturnType<typeof createClient>;
 
+/** The client over the browser's `fetch`. */
+export const browserClient = createClient(globalThis.fetch.bind(globalThis));
+
 /** The client in use; tests provide one over a fake transport. */
-export const ClientContext = createContext<Client>(createClient(globalThis.fetch.bind(globalThis)));
+export const ClientContext = createContext<Client>(browserClient);
 
 /**
  * The client in use.

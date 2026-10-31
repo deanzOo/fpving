@@ -1,23 +1,24 @@
-import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { defaultClientConditions } from "vite";
 import { defineConfig } from "vitest/config";
 
+const ACTION_TIMEOUT_MS = 2000;
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { conditions: ["@fpving/source", ...defaultClientConditions] },
+  resolve: { conditions: ["@fpving/source", ...defaultClientConditions], dedupe: ["react", "react-dom"] },
   build: { outDir: "dist/web", emptyOutDir: true },
+  optimizeDeps: { entries: ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"] },
   test: {
     name: "ui",
-    root: fileURLToPath(new URL("../..", import.meta.url)),
-    include: ["apps/ui/test/**/*.test.{ts,tsx}"],
+    include: ["test/**/*.test.{ts,tsx}"],
     browser: {
       enabled: true,
       headless: true,
       screenshotFailures: false,
-      provider: playwright({ contextOptions: { locale: "en-US" } }),
+      provider: playwright({ actionTimeout: ACTION_TIMEOUT_MS, contextOptions: { locale: "en-US" } }),
       instances: [{ browser: "chromium" }],
     },
   },
