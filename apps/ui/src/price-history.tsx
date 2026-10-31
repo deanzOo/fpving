@@ -33,21 +33,29 @@ const dateOf = (day: number): string => dateFormat.format(new Date(day * DAY_MS)
  * The landed cost of each listing once a day, one line per listing in a fixed series colour, from the first day with
  * a snapshot to today; a day's value is that day's last snapshot. A day without a landed cost leaves a gap and a
  * priced day with no priced neighbour is a dot. The chart's name sums each listing's range up, and hovering, or
- * focusing it and pressing the arrow keys, shows every listing's cost that day. The palette has eight series, so a
- * ninth listing and after are left to the table.
+ * focusing it and pressing the arrow keys, shows every listing's cost that day. Only listings with a landed cost are
+ * charted, and the palette has eight series, so at most the eight most recently priced are; a note counts the others,
+ * which the table still lists.
  *
  * @param props - The listings with their priced histories.
  * @returns The chart, or a note when nothing has a landed cost.
  */
 export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
   const headingId = useId();
+  const pricedListings = listings.flatMap(({ listing, history }) => {
+    const byDay = new Map(history.map(({ observedAt, landedCost }) => [dayOf(observedAt), landedCost]));
+    const costs = [...byDay].flatMap(([day, cost]) => (cost === null ? [] : [{ day, cost }]));
+    const last = costs.at(-1);
+    return last === undefined ? [] : [{ listing, byDay, costs, last }];
+  });
+  const recent = new Set([...pricedListings].sort((a, b) => b.last.day - a.last.day).slice(0, SERIES_COLORS.length));
   const charted = SERIES_COLORS.flatMap((color, index) => {
-    const entry = listings[index];
+    const entry = pricedListings.filter((candidate) => recent.has(candidate))[index];
     return entry === undefined ? [] : [{ ...entry, color }];
   });
-  const priced = charted.flatMap(({ history }) => history.flatMap(({ landedCost }) => landedCost ?? []));
-  const [first] = priced;
+  const notCharted = listings.length - charted.length;
   const heading = <h2 id={headingId} className="text-xl font-semibold">Price history</h2>;
+  const [first] = charted;
   if (first === undefined) {
     return (
       <section className="mt-8">
@@ -56,25 +64,24 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
       </section>
     );
   }
-  const money = (amountMinor: number): string => formatMoney({ amountMinor, currency: first.currency });
-  const start = Math.min(...charted.flatMap(({ history }) => history.map(({ observedAt }) => dayOf(observedAt))));
+  const money = (amountMinor: number): string => formatMoney({ amountMinor, currency: first.last.cost.currency });
+  const start = Math.min(...charted.map(({ costs }) => Math.min(...costs.map(({ day }) => day))));
   const days = Array.from({ length: dayOf(new Date()) - start + 1 }, (_, index) => start + index);
-  const series = charted.map(({ listing, history, color }) => {
-    const byDay = new Map(history.map(({ observedAt, landedCost }) => [dayOf(observedAt), landedCost]));
-    const values = days.map((day): Money | null => byDay.get(day) ?? null);
-    return { key: listing.id, name: listing.pluginId, color, byDay, values };
-  });
+  const series = charted.map(({ listing, byDay, color }) => ({
+    key: listing.id,
+    name: listing.pluginId,
+    color,
+    byDay,
+    values: days.map((day): Money | null => byDay.get(day) ?? null),
+  }));
   const rows = days.map((day, index) => {
     const cells: [string, number | null][] = series.map(({ key, values }) => [key, values[index]?.amountMinor ?? null]);
     return Object.fromEntries([[DAY, day], ...cells]);
   });
-  const summary = series.map(({ name, values }) => {
-    const amounts = values.flatMap((value) => (value === null ? [] : [value.amountMinor]));
-    const latest = amounts.at(-1);
-    return latest === undefined
-      ? `${name} no price`
-      : `${name} lowest ${money(Math.min(...amounts))}, highest ${money(Math.max(...amounts))}, `
-        + `latest ${money(latest)}`;
+  const summary = charted.map(({ listing, costs, last }) => {
+    const amounts = costs.map(({ cost }) => cost.amountMinor);
+    return `${listing.pluginId} lowest ${money(Math.min(...amounts))}, highest ${money(Math.max(...amounts))}, `
+      + `latest ${money(last.cost.amountMinor)}`;
   }).join("; ");
   const name = `Landed cost over the last ${String(days.length)} days: ${summary}`;
   const TooltipBody = ({ active, label }: TooltipContentProps) => {
@@ -101,9 +108,11 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     <section className="mt-8">
       {heading}
       <figure aria-labelledby={headingId} className="mt-4">
-        {listings.length > charted.length && (
+        {notCharted > 0 && (
           <p className="mb-2 text-sm text-ink-muted">
-            The chart shows the first {charted.length} of {listings.length} listings; the table lists them all.
+            {`Not charted: ${String(notCharted)} ${notCharted === 1 ? "listing" : "listings"}. The chart shows up to `
+              + `${String(SERIES_COLORS.length)} listings with a landed cost, the most recently priced first; the `
+              + "table lists them all."}
           </p>
         )}
         <ul aria-label="Legend" className="mb-2 flex flex-wrap gap-4 text-sm text-ink-muted">

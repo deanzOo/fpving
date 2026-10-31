@@ -317,10 +317,20 @@ describe("Price history chart", () => {
     await expect.element(screen.getByText("No landed cost to chart yet.")).toBeVisible();
   });
 
-  it("charts only the first eight listings and says so, since the palette has eight series", async () => {
-    const screen = await open(scripted(charted(Array.from({ length: SERIES_LIMIT + 1 }, () => other))));
-    await expect.element(screen.getByText("The chart shows the first 8 of 9 listings; the table lists them all."))
-      .toBeVisible();
+  it("charts the eight most recently priced listings and counts the ones it leaves out", async () => {
+    const oldOnly = [LOWER_MINOR, null, null, null, null, null];
+    const screen = await open(scripted(charted([oldOnly, ...Array.from({ length: SERIES_LIMIT }, () => other)])));
+    await expect.element(screen.getByText("Not charted: 1 listing.", { exact: false })).toBeVisible();
+    const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
+    await expect.element(legend.getByText("store1", { exact: true })).not.toBeInTheDocument();
+    await expect.element(legend.getByText("store9", { exact: true })).toBeVisible();
     expect(curves(chartOf(screen).element())).toHaveLength(SERIES_LIMIT);
+  });
+
+  it("gives no chart slot to a listing without a landed cost", async () => {
+    const screen = await open(scripted(charted([steady, [null, null], [null]])));
+    await expect.element(screen.getByText("Not charted: 2 listings.", { exact: false })).toBeVisible();
+    const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
+    await expect.element(legend.getByRole("listitem")).toHaveTextContent("store1");
   });
 });
