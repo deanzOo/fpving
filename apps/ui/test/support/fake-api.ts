@@ -1,5 +1,6 @@
 import { apiRoutes } from "@fpving/app/api-routes";
-import { apiError, ApiErrorKind } from "@fpving/app/errors";
+import { alreadyTrackedError, apiError, ApiErrorKind } from "@fpving/app/errors";
+import type { PlainErrorKind } from "@fpving/app/errors";
 import { HttpStatus } from "@fpving/app/http-status";
 import { AlertKind, alertIdSchema, listingIdSchema, productIdSchema, snapshotIdSchema, TREND_DAYS } from "@fpving/core";
 import type { Alert, Product } from "@fpving/core";
@@ -20,8 +21,14 @@ export const reply = <S extends z.ZodType>(schema: S, data: z.output<S>, status:
   () => Response.json(z.encode(schema, data), { status });
 
 /** An error envelope answer. */
-export const failWith = (status: number, kind: ApiErrorKind, message: string): Answer =>
+export const failWith = (status: number, kind: PlainErrorKind, message: string): Answer =>
   () => Response.json(apiError(kind, message), { status });
+
+/** The 409 `already_tracked` answer naming the product that tracks the URL. */
+export const alreadyTracked = (id: string, name: string): Answer => () => Response.json(
+  alreadyTrackedError({ id: productIdSchema.parse(id), name }, `already tracked by product ${id} "${name}"`),
+  { status: HttpStatus.Conflict },
+);
 
 /** A client over a scripted in-memory transport: no network. Unscripted requests answer the 404 envelope. */
 export const fakeApi = () => {

@@ -118,13 +118,17 @@ describe("Products API", () => {
     });
   });
 
-  it("answers 409 already_tracked naming the product that tracks the URL", async () => {
+  it("answers 409 already_tracked naming the product that tracks the URL, with its id and name", async () => {
     const first = await addProduct();
     const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
     expect(response.statusCode).toBe(HttpStatus.Conflict);
-    const error = errorOf(response.json());
-    expect(error.kind).toBe(ApiErrorKind.AlreadyTracked);
-    expect(error.message).toBe(`already tracked by product ${first.product.id} "${LISTING.title}"`);
+    expect(response.json()).toEqual({
+      error: {
+        kind: ApiErrorKind.AlreadyTracked,
+        message: `already tracked by product ${first.product.id} "${LISTING.title}"`,
+        product: { id: first.product.id, name: LISTING.title },
+      },
+    });
   });
 
   it("answers a product with its listings and each listing's price history, oldest first", async () => {
@@ -295,11 +299,12 @@ describe("Listings API", () => {
       .toEqual({ status: HttpStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
-  it("answers 409 already_tracked naming the product for a URL another listing tracks", async () => {
+  it("answers 409 already_tracked with the id and name of the product for a URL another listing tracks", async () => {
     const { product } = await addProduct();
     const other = await addProduct(OTHER_PAGE);
     const response = await api.request("POST", `/api/products/${other.product.id}/listings`, { url: PAGE });
     expect(response.statusCode).toBe(HttpStatus.Conflict);
+    expect(response.json()).toMatchObject({ error: { product: { id: product.id, name: LISTING.title } } });
     expect(errorOf(response.json()).message).toContain(product.id);
   });
 
@@ -460,13 +465,16 @@ describe("Match candidates API", () => {
       .toEqual({ status: HttpStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
-  it("answers 409 already_tracked when a listing started tracking the candidate's URL", async () => {
-    const id = await pendingId();
-    await addProduct(MATCH);
-    const response = await api.request("POST", `/api/candidates/${id}/accept`);
-    expect(response.statusCode).toBe(HttpStatus.Conflict);
-    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.AlreadyTracked);
-  });
+  it("answers 409 already_tracked with the tracking product when a listing started tracking the candidate's URL",
+    async () => {
+      const id = await pendingId();
+      const tracking = await addProduct(MATCH);
+      const response = await api.request("POST", `/api/candidates/${id}/accept`);
+      expect(response.statusCode).toBe(HttpStatus.Conflict);
+      expect(response.json()).toMatchObject({
+        error: { kind: ApiErrorKind.AlreadyTracked, product: { id: tracking.product.id, name: LISTING.title } },
+      });
+    });
 });
 
 describe("Alerts API", () => {

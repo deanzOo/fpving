@@ -7,7 +7,7 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { z } from "zod";
-import { emptyTrend, failWith, fakeApi, product, reply, wire } from "./support/fake-api.ts";
+import { alreadyTracked, emptyTrend, failWith, fakeApi, product, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 
 type Row = z.output<typeof wire.watchlist>[number];
@@ -178,8 +178,6 @@ describe("Adding a product by URL", () => {
       + "then check Plugins."],
     [ApiErrorKind.PluginUnavailable, HttpStatus.UnprocessableContent, "the plugin is not loaded",
       "The plugin for this store is installed but not loaded. Check Plugins."],
-    [ApiErrorKind.AlreadyTracked, HttpStatus.Conflict, "already tracked by product p1 \"Acme X5 frame\"",
-      "This page is already watched: already tracked by product p1 \"Acme X5 frame\"."],
     [ApiErrorKind.Restarting, HttpStatus.ServiceUnavailable, "restarting",
       "fpving is restarting its plugins for a settings change. Try again in a moment."],
     [ApiErrorKind.FetchFailed, HttpStatus.BadGateway, "the store could not fetch the page: network",
@@ -194,5 +192,15 @@ describe("Adding a product by URL", () => {
     await expect.element(screen.getByRole("alert")).toHaveTextContent(shown);
     await expect.element(field).toHaveAttribute("aria-invalid", "true");
     await expect.element(field).toHaveAccessibleDescription(shown);
+  });
+
+  it("explains an already_tracked refusal next to the URL field", async () => {
+    const api = scripted([]);
+    api.on(apiRoutes.addProduct, alreadyTracked("p1", "Acme X5 frame"));
+    const screen = await renderApp(api.client);
+    await screen.getByLabelText("Store URL").fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expect.element(screen.getByRole("alert"))
+      .toHaveTextContent("This page is already watched: already tracked by product p1 \"Acme X5 frame\".");
   });
 });

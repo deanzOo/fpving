@@ -68,10 +68,10 @@ describe("API client", () => {
 
   it("throws the kind and message of an error envelope", async () => {
     const api = fakeApi();
-    api.on(apiRoutes.addProduct, failWith(HttpStatus.Conflict, ApiErrorKind.AlreadyTracked, "already tracked"));
+    api.on(apiRoutes.addProduct, failWith(HttpStatus.UnprocessableContent, ApiErrorKind.InvalidUrl, "not a URL"));
     const failure = await failureOf(api.client.addProduct({ url: PAGE }));
-    expect(failure.kind).toBe(ApiErrorKind.AlreadyTracked);
-    expect(failure.message).toBe("already tracked");
+    expect(failure.kind).toBe(ApiErrorKind.InvalidUrl);
+    expect(failure.message).toBe("not a URL");
   });
 
   it.each([
