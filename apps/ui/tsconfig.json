@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "@vitest/browser-playwright"],
+    "rootDir": ".",
+    "outDir": "dist/types",
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "test"],
+  "references": [{ "path": "../fpving" }, { "path": "../../packages/plugin-sdk" }, { "path": "../../packages/core" }]
+}

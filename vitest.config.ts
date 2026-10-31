@@ -12,6 +12,7 @@ export default defineConfig({
       { extends: true, test: { name: "core", root: "packages/core", include: ["test/**/*.test.ts"] } },
       { extends: true, test: { name: "plugin-sdk", root: "packages/plugin-sdk", include: ["test/**/*.test.ts"] } },
       { extends: true, test: { name: "app", root: "apps/fpving", include: ["test/**/*.test.ts"] } },
+      "apps/ui/vite.config.ts",
       { extends: true, test: { name: "tooling", include: ["tests/tooling/**/*.test.ts", "tools/**/*.test.ts"] } },
     ],
     coverage: {
