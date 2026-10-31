@@ -1,4 +1,3 @@
-import { ApiErrorKind } from "@fpving/app/errors";
 import { settingsSchema, ThresholdBasis } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { CURRENCY_MINOR_UNITS } from "@fpving/plugin-sdk";
@@ -7,9 +6,9 @@ import { useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { toFailure, useClient } from "./client.ts";
-import type { ApiFailure } from "./client.ts";
 import { fromDecimal, toDecimal } from "./money.ts";
 import { QueryKey } from "./queries.ts";
+import { explain } from "./refusal.tsx";
 
 const PERCENT_DECIMALS = 2;
 const { shape } = settingsSchema;
@@ -22,19 +21,6 @@ const BASIS_LABEL = {
 } as const;
 
 const input = "rounded-md border border-line bg-surface px-3 py-2";
-
-const refusal = (failure: ApiFailure): string => {
-  switch (failure.kind) {
-    case ApiErrorKind.SettingsNotApplied:
-      return "The settings were not applied and the old ones still hold. See the log, then try again.";
-    case ApiErrorKind.Restarting:
-      return "fpving is restarting its plugins for a settings change. Try again in a moment.";
-    case ApiErrorKind.ShuttingDown:
-      return "fpving is shutting down.";
-    default:
-      return failure.message;
-  }
-};
 
 interface ControlProps {
   readonly "id": string;
@@ -247,7 +233,7 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
         </button>
         <p role="status" className="text-ink-muted">{saving.isSuccess ? "Settings saved." : ""}</p>
       </div>
-      {saving.isError && <p role="alert" className="text-critical">{refusal(toFailure(saving.error))}</p>}
+      {saving.isError && <p role="alert" className="text-critical">{explain(toFailure(saving.error))}</p>}
     </form>
   );
 };

@@ -1,25 +1,11 @@
-import { ApiErrorKind } from "@fpving/app/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { toFailure, useClient } from "./client.ts";
-import type { ApiFailure } from "./client.ts";
 import { QueryKey } from "./queries.ts";
+import { explain } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
 
 const POLL_MS = 1000;
-
-const refusal = (failure: ApiFailure): string => {
-  switch (failure.kind) {
-    case ApiErrorKind.ScanRunning:
-      return "A scan is already running.";
-    case ApiErrorKind.Restarting:
-      return "fpving is restarting its plugins for a settings change. Try again in a moment.";
-    case ApiErrorKind.ShuttingDown:
-      return "fpving is shutting down.";
-    default:
-      return failure.message;
-  }
-};
 
 /**
  * The scan now control and the scan status: running, or when the last scan finished with how many listings it
@@ -70,7 +56,7 @@ export const ScanNow = () => {
       >
         Scan now
       </button>
-      {started.isError && <p role="alert" className="w-full text-critical">{refusal(toFailure(started.error))}</p>}
+      {started.isError && <p role="alert" className="w-full text-critical">{explain(toFailure(started.error))}</p>}
     </div>
   );
 };

@@ -1,35 +1,7 @@
-import { ApiErrorKind } from "@fpving/app/errors";
 import { useMutation } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useId, useState } from "react";
-import type { ReactNode } from "react";
-import { AlreadyTrackedFailure, toFailure } from "./client.ts";
-import type { ApiFailure } from "./client.ts";
-
-const LIST_ONE = "List one in plugins.json, then check Plugins.";
-
-const refusal = (failure: ApiFailure): ReactNode => {
-  if (failure instanceof AlreadyTrackedFailure) {
-    const { id, name } = failure.product;
-    return (
-      <>
-        Already watched as <Link to="/products/$id" params={{ id }} className="underline">{name}</Link>
-      </>
-    );
-  }
-  switch (failure.kind) {
-    case ApiErrorKind.NoPluginForDomain:
-      return `No installed plugin handles this store (${failure.message}). ${LIST_ONE}`;
-    case ApiErrorKind.PluginUnavailable:
-      return "The plugin for this store is installed but not loaded. Check Plugins.";
-    case ApiErrorKind.Restarting:
-      return "fpving is restarting its plugins for a settings change. Try again in a moment.";
-    case ApiErrorKind.ProductNotFound:
-      return "This product is not watched any more.";
-    default:
-      return failure.message;
-  }
-};
+import { toFailure } from "./client.ts";
+import { explain } from "./refusal.tsx";
 
 interface UrlFormProps<T> {
   readonly submitLabel: string;
@@ -56,7 +28,7 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
       await done(result);
     },
   });
-  const error = added.isError ? refusal(toFailure(added.error)) : null;
+  const error = added.isError ? explain(toFailure(added.error)) : null;
   return (
     <form
       className="mt-4 flex flex-wrap items-end gap-3"
