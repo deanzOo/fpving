@@ -63,6 +63,12 @@ describe("Serving the UI", () => {
     expect(response.body).toBe(INDEX);
   });
 
+  it("answers a HEAD request for a client route as it answers the GET", async () => {
+    const response = await server.inject({ method: "HEAD", url: "/products/abc", headers: HOST });
+    expect(response.statusCode).toBe(HttpStatus.Ok);
+    expect(response.headers["content-type"]).toMatch(/^text\/html/u);
+  });
+
   it("answers an unknown API path with the 404 envelope, not the index page", async () => {
     const response = await get("/api/nope");
     expect(response.statusCode).toBe(HttpStatus.NotFound);

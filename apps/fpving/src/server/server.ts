@@ -48,6 +48,7 @@ const SECURITY_HEADERS = {
 } as const;
 
 const INDEX_PAGE = "index.html";
+const PAGE_METHODS: readonly string[] = ["GET", "HEAD"];
 
 const HEX_RADIX = 16;
 const PERCENT_ESCAPE = /%([0-9a-f]{2})/giu;
@@ -88,9 +89,9 @@ const clientErrorSchema = z.object({
 /**
  * Creates the Fastify server with the Zod type provider, the localhost guards and a readiness gate, without routes.
  * Until `isReady()` is true every `/api` path but those in `openWhileStarting`, unknown ones included, answers 503 with
- * {@link STARTING}, after the guards; the UI is served meanwhile. With `uiRoot`, a GET outside `/api` serves the file
- * it names from that folder, or the index page when none matches, or {@link UI_NOT_BUILT} when the folder has no
- * index page. Every answer carries {@link CONTENT_SECURITY_POLICY}, `nosniff` and `no-referrer`. A request whose
+ * {@link STARTING}, after the guards; the UI is served meanwhile. With `uiRoot`, a GET or HEAD outside `/api` serves
+ * the file it names from that folder, or the index page when none matches, or {@link UI_NOT_BUILT} when the folder
+ * has no index page. Every answer carries {@link CONTENT_SECURITY_POLICY}, `nosniff` and `no-referrer`. A request whose
  * Host header is not `127.0.0.1:<port>` or `localhost:<port>` is refused with 421, which defeats DNS rebinding. A
  * request with a method other than GET, HEAD or OPTIONS that carries an `Origin` other than its own is refused with
  * 403, and so is one without `Origin` whose `Sec-Fetch-Site` is `cross-site` or `same-site`; one with neither, such as
@@ -143,7 +144,7 @@ export const createServer = (options: ServerOptions) => {
     void server.register(fastifyStatic, { root: uiRoot });
   }
   server.setNotFoundHandler(async (request, reply) => {
-    if (uiRoot === undefined || request.method !== "GET" || isApiRequest(request.url)) {
+    if (uiRoot === undefined || !PAGE_METHODS.includes(request.method) || isApiRequest(request.url)) {
       return reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, NO_ROUTE));
     }
     if (!existsSync(join(uiRoot, INDEX_PAGE))) {
