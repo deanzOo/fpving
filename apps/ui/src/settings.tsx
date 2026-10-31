@@ -9,6 +9,7 @@ import { toFailure, useClient } from "./client.ts";
 import { fromDecimal, toDecimal } from "./money.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
+import { unlessPending } from "./pending.ts";
 
 const PERCENT_DECIMALS = 2;
 const { shape } = settingsSchema;
@@ -100,15 +101,14 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
       ref={form}
       noValidate
       className="mt-6 grid max-w-xl gap-4"
-      onSubmit={(event) => {
-        event.preventDefault();
+      onSubmit={unlessPending(saving.isPending, () => {
         setChecked(true);
         if (settingsSchema.safeParse(body).success) {
           saving.mutate(body);
           return;
         }
         form.current?.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
-      }}
+      })}
     >
       <Field label="Display currency" error={null}>
         {(aria) => (
@@ -228,8 +228,8 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={saving.isPending}
-          className="rounded-md bg-action px-4 py-2 font-medium text-on-action disabled:opacity-60"
+          aria-disabled={saving.isPending}
+          className="rounded-md bg-action px-4 py-2 font-medium text-on-action aria-disabled:opacity-60"
         >
           {saving.isPending ? "Saving…" : "Save settings"}
         </button>

@@ -106,15 +106,17 @@ describe("Alerts", () => {
     await expect.element(screen.getByRole("link", { name: "Alerts", exact: true })).toBeVisible();
   });
 
-  it("explains a failed mark read", async () => {
+  it("explains a failed mark read and leaves focus on its button", async () => {
     const api = scripted([drop]);
     api.on(
       at(apiRoutes.markAlertRead, { alertId: "a2" }),
       failWith(HttpStatus.NotFound, ApiErrorKind.AlertNotFound, "no alert has this id"),
     );
     const screen = await renderApp(api.client, "/alerts");
-    await screen.getByRole("button", { name: /^Mark read: Price drop on Acme X5 frame/u }).click();
+    const button = screen.getByRole("button", { name: /^Mark read: Price drop on Acme X5 frame/u });
+    await button.click();
     await expect.element(screen.getByRole("alert").getByText("no alert has this id", { exact: true })).toBeVisible();
+    await expect.element(button).toHaveFocus();
   });
 
   it("says when there is no alert at all", async () => {

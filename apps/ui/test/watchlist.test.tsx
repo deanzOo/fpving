@@ -169,7 +169,7 @@ describe("Adding a product by URL", () => {
     await expect.poll(() => region?.textContent).toBe("Now watching Acme X5 kit");
   });
 
-  it("disables the button while the store page is being fetched", async () => {
+  it("marks the button unavailable while fetching, keeps focus on it and ignores another press", async () => {
     const api = scripted([]);
     const fetched = gate();
     api.on(apiRoutes.addProduct, async () => {
@@ -179,9 +179,13 @@ describe("Adding a product by URL", () => {
     const screen = await renderApp(api.client);
     await screen.getByLabelText("Store URL").fill(PAGE);
     await screen.getByRole("button", { name: "Add product" }).click();
-    await expect.element(screen.getByRole("button", { name: "Adding…" })).toBeDisabled();
+    const adding = screen.getByRole("button", { name: "Adding…" });
+    await expect.element(adding).toHaveAttribute("aria-disabled", "true");
+    await expect.element(adding).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
     fetched.release();
-    await expect.element(screen.getByRole("button", { name: "Add product" })).toBeEnabled();
+    await expect.element(screen.getByRole("button", { name: "Add product" })).toHaveAttribute("aria-disabled", "false");
+    expect(api.sent.filter(({ method }) => method === "POST")).toHaveLength(1);
   });
 
   it.each([

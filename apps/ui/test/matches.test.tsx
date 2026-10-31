@@ -157,7 +157,8 @@ describe("Match review", () => {
     const screen = await renderApp(api.client, "/matches");
     const frame = group(screen, "Acme X5 frame");
     await frame.getByRole("button", { name: "Find matches" }).click();
-    await expect.element(frame.getByRole("button", { name: "Searching the other stores…" })).toBeDisabled();
+    await expect.element(frame.getByRole("button", { name: "Searching the other stores…" }))
+      .toHaveAttribute("aria-disabled", "true");
     searched.release();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
     await expect.element(frame.getByRole("status"))
@@ -183,15 +184,17 @@ describe("Match review", () => {
       "The plugin for this store is installed but not loaded. Check Plugins."],
     ["accept", HttpStatus.NotFound, ApiErrorKind.ProductNotFound, "This product is not watched any more."],
     ["reject", HttpStatus.NotFound, ApiErrorKind.NotPending, "This candidate was already reviewed."],
-  ] satisfies [string, number, PlainErrorKind, string][])("explains a refused %s: %s %s", async (
+  ] satisfies [string, number, PlainErrorKind, string][])("explains a refused %s: %s %s, focus kept", async (
     action, status, kind, said,
   ) => {
     const api = scripted([candidate("c1", FRAME)]);
     const route = action === "accept" ? apiRoutes.acceptCandidate : apiRoutes.rejectCandidate;
     api.on(at(route, { candidateId: "c1" }), failWith(status, kind, "refused"));
     const screen = await renderApp(api.client, "/matches");
-    await screen.getByRole("button", { name: `${action === "accept" ? "Accept" : "Reject"} Acme X5 c1` }).click();
+    const button = screen.getByRole("button", { name: `${action === "accept" ? "Accept" : "Reject"} Acme X5 c1` });
+    await button.click();
     await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(said);
+    await expect.element(button).toHaveFocus();
   });
 
   it("links an accepted candidate that another product already watches to that product", async () => {
@@ -215,7 +218,9 @@ describe("Match review", () => {
     const api = scripted([]);
     api.on(at(apiRoutes.findMatches, { productId: FRAME }), failWith(status, kind, "refused"));
     const screen = await renderApp(api.client, "/matches");
-    await group(screen, "Acme X5 frame").getByRole("button", { name: "Find matches" }).click();
+    const find = group(screen, "Acme X5 frame").getByRole("button", { name: "Find matches" });
+    await find.click();
     await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(said);
+    await expect.element(find).toHaveFocus();
   });
 });

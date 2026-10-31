@@ -1,24 +1,26 @@
 import { useId, useRef } from "react";
+import { unlessPending } from "./pending.ts";
 
 interface ConfirmProps {
   readonly action: string;
   readonly actionLabel?: string;
   readonly question: string;
   readonly confirm: string;
-  readonly disabled: boolean;
+  readonly pending: boolean;
   readonly onConfirm: () => void;
 }
 
-const button = "rounded-md border border-line px-3 py-1 font-medium disabled:opacity-60";
+const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
 
 /**
  * A button that asks first in a modal dialog. Cancel, or Escape, closes it and the browser puts focus back on the
- * button; the confirm button closes it and runs `onConfirm`.
+ * button; the confirm button closes it and runs `onConfirm`. While `pending` the button stays focusable but does
+ * nothing.
  *
  * @param props - The button's text and accessible name, the question, the confirm button's text and the action.
  * @returns The button and its dialog.
  */
-export const Confirm = ({ action, actionLabel, question, confirm, disabled, onConfirm }: ConfirmProps) => {
+export const Confirm = ({ action, actionLabel, question, confirm, pending, onConfirm }: ConfirmProps) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const questionId = useId();
   return (
@@ -26,11 +28,11 @@ export const Confirm = ({ action, actionLabel, question, confirm, disabled, onCo
       <button
         type="button"
         className={button}
-        disabled={disabled}
+        aria-disabled={pending}
         aria-label={actionLabel}
-        onClick={() => {
+        onClick={unlessPending(pending, () => {
           dialog.current?.showModal();
-        }}
+        })}
       >
         {action}
       </button>

@@ -80,7 +80,7 @@ describe("Scan now", () => {
     const screen = await renderApp(api.client);
     await screen.getByRole("button", { name: "Scan now" }).click();
     await expect.element(screen.getByText("Scanning every listing…")).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Scan now" })).toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "Scan now" })).toHaveAttribute("aria-disabled", "true");
     await expect.element(screen.getByText(/^Last scan finished .+: 3 listings fetched/u), { timeout: SCAN_DONE_MS })
       .toBeVisible();
     await expect.element(screen.getByRole("link", { name: "Acme X5 frame" })).toBeVisible();
@@ -96,7 +96,7 @@ describe("Scan now", () => {
     await expect.element(screen.getByText(/^Last scan finished/u)).toBeVisible();
     await screen.getByRole("button", { name: "Scan now" }).click();
     await expect.element(screen.getByText("Scanning every listing…")).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Scan now" })).toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "Scan now" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it.each([
@@ -108,7 +108,9 @@ describe("Scan now", () => {
     const api = scripted(idle);
     api.on(apiRoutes.startScan, failWith(status, kind, "refused"));
     const screen = await renderApp(api.client);
-    await screen.getByRole("button", { name: "Scan now" }).click();
+    const button = screen.getByRole("button", { name: "Scan now" });
+    await button.click();
     await expect.element(screen.getByRole("alert")).toHaveTextContent(shown);
+    await expect.element(button).toHaveFocus();
   });
 });

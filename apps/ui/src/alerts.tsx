@@ -6,6 +6,7 @@ import { toFailure, useClient } from "./client.ts";
 import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
 import { fromNow } from "./time.ts";
+import { unlessPending } from "./pending.ts";
 
 const KIND_LABEL = {
   [AlertKind.PriceDrop]: "Price drop",
@@ -15,7 +16,7 @@ const KIND_LABEL = {
 
 const GONE = "a product no longer watched";
 const item = "flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2";
-const button = "rounded-md border border-line px-3 py-1 font-medium disabled:opacity-60";
+const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
 
 /**
  * The alerts screen: every alert newest first, or only the unread ones, each with its product, and marking one or
@@ -74,10 +75,10 @@ export const Alerts = () => {
         <button
           type="button"
           className={button}
-          disabled={markAll.isPending}
-          onClick={() => {
+          aria-disabled={markAll.isPending}
+          onClick={unlessPending(markAll.isPending, () => {
             markAll.mutate();
-          }}
+          })}
         >
           Mark all read
         </button>
@@ -106,11 +107,11 @@ export const Alerts = () => {
                 <button
                   type="button"
                   className={button}
-                  disabled={markOne.isPending}
+                  aria-disabled={markOne.isPending}
                   aria-label={`Mark read: ${KIND_LABEL[alert.kind]} on ${name ?? GONE}, ${when}`}
-                  onClick={() => {
+                  onClick={unlessPending(markOne.isPending, () => {
                     markOne.mutate({ alertId: alert.id, index });
-                  }}
+                  })}
                 >
                   Mark read
                 </button>

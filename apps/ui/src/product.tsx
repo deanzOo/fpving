@@ -13,12 +13,13 @@ import { PriceHistory } from "./price-history.tsx";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
 import { UrlForm } from "./url-form.tsx";
+import { unlessPending } from "./pending.ts";
 
 type Detail = Awaited<ReturnType<Client["getProduct"]>>;
 type ListingRow = Detail["listings"][number];
 
 const cell = "border-b border-line px-3 py-2";
-const button = "rounded-md border border-line px-3 py-1 font-medium disabled:opacity-60";
+const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
 
 const isNotFound = (error: unknown): boolean => toFailure(error).kind === ApiErrorKind.ProductNotFound;
 
@@ -66,10 +67,9 @@ const Header = ({ product }: { readonly product: Product }) => {
         ? (
             <form
               className="flex flex-wrap items-end gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
+              onSubmit={unlessPending(rename.isPending, () => {
                 rename.mutate(name);
-              }}
+              })}
             >
               <label className="flex min-w-72 flex-1 flex-col gap-1">
                 <span className="font-medium">Product name</span>
@@ -82,7 +82,9 @@ const Header = ({ product }: { readonly product: Product }) => {
                   className="rounded-md border border-line bg-surface px-3 py-2"
                 />
               </label>
-              <button type="submit" className={button} disabled={rename.isPending}>Save name</button>
+              <button type="submit" className={button} aria-disabled={rename.isPending}>
+                Save name
+              </button>
               <button type="button" className={button} onClick={stopEditing}>Cancel</button>
             </form>
           )
@@ -105,7 +107,7 @@ const Header = ({ product }: { readonly product: Product }) => {
                 action="Stop watching"
                 question={`Stop watching ${product.name}? Its price history is kept.`}
                 confirm="Stop watching"
-                disabled={archive.isPending}
+                pending={archive.isPending}
                 onConfirm={() => {
                   archive.mutate();
                 }}
@@ -170,7 +172,7 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
                       actionLabel={`Remove ${listingName(listing)}`}
                       question={`Remove ${listingName(listing)}? It is never scanned again; its history is kept.`}
                       confirm="Remove"
-                      disabled={remove.isPending}
+                      pending={remove.isPending}
                       onConfirm={() => {
                         remove.mutate(listing.id);
                       }}

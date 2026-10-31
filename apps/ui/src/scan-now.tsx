@@ -5,6 +5,7 @@ import { toFailure, useClient } from "./client.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
+import { unlessPending } from "./pending.ts";
 
 const POLL_MS = 1000;
 
@@ -57,11 +58,11 @@ export const ScanNow = () => {
       <p role="status" className="text-sm text-ink-muted">{status === undefined ? "" : said}</p>
       <button
         type="button"
-        disabled={started.isPending || running}
-        onClick={() => {
+        aria-disabled={started.isPending || running}
+        onClick={unlessPending(started.isPending || running, () => {
           started.mutate();
-        }}
-        className="rounded-md border border-line px-4 py-2 font-medium disabled:opacity-60"
+        })}
+        className="rounded-md border border-line px-4 py-2 font-medium aria-disabled:opacity-60"
       >
         Scan now
       </button>

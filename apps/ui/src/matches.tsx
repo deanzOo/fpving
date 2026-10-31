@@ -6,6 +6,7 @@ import { toFailure, useClient } from "./client.ts";
 import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
+import { unlessPending } from "./pending.ts";
 
 const PERCENT = 100;
 
@@ -16,7 +17,7 @@ const VERDICT_LABEL = {
   [LlmVerdict.Unjudged]: "Not judged yet",
 } as const;
 
-const button = "rounded-md border border-line px-3 py-1 font-medium disabled:opacity-60";
+const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
 
 const useReviewed = (productId: string) => {
   const queryClient = useQueryClient();
@@ -78,22 +79,22 @@ const Candidate = ({ candidate, product, announce, reviewing }: CandidateProps) 
         <button
           type="button"
           className={button}
-          disabled={busy}
+          aria-disabled={busy}
           aria-label={`Accept ${candidate.title}`}
-          onClick={() => {
+          onClick={unlessPending(busy, () => {
             accept.mutate(params);
-          }}
+          })}
         >
           Accept
         </button>
         <button
           type="button"
           className={button}
-          disabled={busy}
+          aria-disabled={busy}
           aria-label={`Reject ${candidate.title}`}
-          onClick={() => {
+          onClick={unlessPending(busy, () => {
             reject.mutate(params);
-          }}
+          })}
         >
           Reject
         </button>
@@ -133,10 +134,10 @@ const Group = ({ product, candidates }: GroupProps) => {
         <button
           type="button"
           className={button}
-          disabled={find.isPending}
-          onClick={() => {
+          aria-disabled={find.isPending}
+          onClick={unlessPending(find.isPending, () => {
             find.mutate({ productId: product.id });
-          }}
+          })}
         >
           {find.isPending ? "Searching the other stores…" : "Find matches"}
         </button>

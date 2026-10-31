@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { toFailure } from "./client.ts";
 import { explain } from "./refusal.tsx";
+import { unlessPending } from "./pending.ts";
 
 interface UrlFormProps<T> {
   readonly submitLabel: string;
@@ -32,10 +33,9 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
   return (
     <form
       className="mt-4 flex flex-wrap items-end gap-3"
-      onSubmit={(event) => {
-        event.preventDefault();
+      onSubmit={unlessPending(added.isPending, () => {
         added.mutate(url);
-      }}
+      })}
     >
       <label className="flex min-w-72 flex-1 flex-col gap-1">
         <span className="font-medium">Store URL</span>
@@ -54,8 +54,8 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
       </label>
       <button
         type="submit"
-        disabled={added.isPending}
-        className="rounded-md bg-action px-4 py-2 font-medium text-on-action disabled:opacity-60"
+        aria-disabled={added.isPending}
+        className="rounded-md bg-action px-4 py-2 font-medium text-on-action aria-disabled:opacity-60"
       >
         {added.isPending ? pendingLabel : submitLabel}
       </button>
