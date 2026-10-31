@@ -8,6 +8,7 @@ import { toFailure, useClient } from "./client.ts";
 import type { Client } from "./client.ts";
 import { Confirm } from "./confirm.tsx";
 import { formatMoney } from "./money.ts";
+import { PriceHistory } from "./price-history.tsx";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
 import { UrlForm } from "./url-form.tsx";
@@ -130,13 +131,14 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
       {remove.isError && <p role="alert" className="mt-2 text-critical">{explain(toFailure(remove.error))}</p>}
       <div className="mt-4 overflow-x-auto">
         <table className="w-full border-collapse text-left">
-          <caption className="sr-only">Listings, with each one's latest price</caption>
+          <caption className="sr-only">Listings, with each one's latest price and landed cost</caption>
           <thead>
             <tr className="text-sm text-ink-muted">
               <th scope="col" className={cell}>Store</th>
               <th scope="col" className={cell}>Listing</th>
               <th scope="col" className={cell}>Price</th>
               <th scope="col" className={cell}>Shipping</th>
+              <th scope="col" className={cell}>Landed cost</th>
               <th scope="col" className={cell}>Stock</th>
               <th scope="col" className={cell}>Status</th>
               <th scope="col" className={cell}><span className="sr-only">Actions</span></th>
@@ -154,6 +156,9 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
                   <td className={`${cell} tabular-nums`}>{formatMoney(latest.itemPrice)}</td>
                   <td className={`${cell} tabular-nums`}>
                     {latest.shipping.kind === ShippingKind.Known ? formatMoney(latest.shipping) : "Unknown"}
+                  </td>
+                  <td className={`${cell} tabular-nums`}>
+                    {latest.landedCost === null ? "Not priced" : formatMoney(latest.landedCost)}
                   </td>
                   <td className={cell}>{latest.inStock ? "In stock" : "Out of stock"}</td>
                   <td className={cell}>{listing.status}</td>
@@ -216,6 +221,7 @@ export const ProductDetail = ({ id }: { readonly id: string }) => {
     <section>
       <Header product={product} />
       <Listings productId={product.id} rows={listings} />
+      <PriceHistory listings={listings} />
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Add a listing</h2>
         <UrlForm

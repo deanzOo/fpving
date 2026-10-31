@@ -23,6 +23,11 @@ const SHIPPING_MINOR = 1500;
 const OLDER_MINOR = 13_000;
 const DAY_MS = 86_400_000;
 const TWO_DAYS = 2;
+const LANDED_MINOR = 13_845;
+const LANDED_BEFORE_MINOR = 15_000;
+const LOWER_MINOR = 12_000;
+const DAYS = 6;
+const SERIES_LIMIT = 8;
 
 const listing = (id: string, overrides: Partial<Listing> = {}): Listing => ({
   id: listingIdSchema.parse(id), productId: product(ID, "x").id, pluginId: pluginIdSchema.parse("shop"),
@@ -38,14 +43,16 @@ const snapshot = (listingId: string, daysAgo: number, overrides: Partial<Priced>
   landedCost: null, ...overrides,
 });
 
+const usd = (amountMinor: number) => ({ amountMinor, currency: "USD" } as const);
+
 const detail = (): Detail => ({
   product: product(ID, "Acme X5 frame"),
   listings: [
     {
       listing: listing("l1"),
       history: [
-        snapshot("l1", TWO_DAYS, { itemPrice: { amountMinor: OLDER_MINOR, currency: "USD" } }),
-        snapshot("l1", 0),
+        snapshot("l1", TWO_DAYS, { itemPrice: usd(OLDER_MINOR), landedCost: usd(LANDED_BEFORE_MINOR) }),
+        snapshot("l1", 0, { landedCost: usd(LANDED_MINOR) }),
       ],
     },
     {
@@ -86,6 +93,14 @@ describe("Product detail", () => {
     await expect.element(second.getByRole("cell", { name: "Unknown" })).toBeVisible();
     await expect.element(second.getByRole("cell", { name: "Out of stock" })).toBeVisible();
     await expect.element(second.getByRole("cell", { name: "stale" })).toBeVisible();
+  });
+
+  it("shows each listing's latest landed cost, or says it cannot be priced", async () => {
+    const screen = await open();
+    await expect.element(screen.getByRole("row", { name: /^shop/u }).getByRole("cell", { name: "$138.45" }))
+      .toBeVisible();
+    await expect.element(screen.getByRole("row", { name: /^mall/u }).getByRole("cell", { name: "Not priced" }))
+      .toBeVisible();
   });
 
   it("renames the product through an inline form and focuses the rename action again", async () => {
@@ -231,5 +246,73 @@ describe("Product detail", () => {
     const screen = await renderApp(api.client, `/products/${ID}`);
     await expect.element(screen.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
     expect(takeLogged().flat()).toContainEqual(expect.objectContaining({ kind: ApiErrorKind.Starting }));
+  });
+});
+
+const daily = (listingId: string, landed: readonly (number | null)[]): Priced[] =>
+  landed.map((amountMinor, index) => snapshot(listingId, landed.length - 1 - index, {
+    landedCost: amountMinor === null ? null : usd(amountMinor),
+  }));
+
+const charted = (series: readonly (readonly (number | null)[])[]): Detail => ({
+  product: product(ID, "Acme X5 frame"),
+  listings: series.map((landed, index) => {
+    const id = `l${String(index + 1)}`;
+    const pluginId = pluginIdSchema.parse(`store${String(index + 1)}`);
+    return { listing: listing(id, { pluginId }), history: daily(id, landed) };
+  }),
+});
+
+const chartOf = (screen: Awaited<ReturnType<typeof open>>) =>
+  screen.getByRole("application", { name: /^Landed cost over the last/u });
+
+const curves = (container: Element) => [...container.querySelectorAll(".recharts-line-curve")]
+  .map((curve) => (curve.getAttribute("d") ?? "").split("M").length - 1);
+
+describe("Price history chart", () => {
+  const steady = [LANDED_BEFORE_MINOR, LANDED_BEFORE_MINOR, null, LANDED_MINOR, LANDED_MINOR, LANDED_MINOR];
+  const other = [LOWER_MINOR, LOWER_MINOR, LOWER_MINOR, LOWER_MINOR, LOWER_MINOR, LOWER_MINOR];
+
+  it("draws one line per listing with a legend, and names each listing's range for screen readers", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    const name = `Landed cost over the last ${String(DAYS)} days: store1 lowest $138.45, highest $150.00, `
+      + "latest $138.45; store2 lowest $120.00, highest $120.00, latest $120.00";
+    await expect.element(screen.getByRole("application", { name })).toBeVisible();
+    const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
+    await expect.element(legend.getByText("store1", { exact: true })).toBeVisible();
+    await expect.element(legend.getByText("store2", { exact: true })).toBeVisible();
+    expect(curves(chartOf(screen).element())).toHaveLength(TWO_DAYS);
+  });
+
+  it("leaves a gap over a day without a landed cost instead of bridging it", async () => {
+    const screen = await open(scripted(charted([steady])));
+    await expect.element(chartOf(screen)).toBeVisible();
+    expect(curves(chartOf(screen).element())).toEqual([TWO_DAYS]);
+  });
+
+  it("draws a landed cost with no priced neighbour as a dot", async () => {
+    const screen = await open(scripted(charted([[LANDED_MINOR, null, LANDED_MINOR, null, null, null]])));
+    await expect.element(chartOf(screen)).toBeVisible();
+    expect(chartOf(screen).element().querySelectorAll(".history-dot")).toHaveLength(TWO_DAYS);
+  });
+
+  it("lets the keyboard reach the chart and step through the days to read every listing's cost", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    chartOf(screen).element().focus();
+    await expect.element(chartOf(screen)).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(screen.getByText(/^store2 \$120\.00$/u)).toBeVisible();
+  });
+
+  it("says when no listing has a landed cost to chart", async () => {
+    const screen = await open(scripted(charted([[null, null]])));
+    await expect.element(screen.getByText("No landed cost to chart yet.")).toBeVisible();
+  });
+
+  it("charts only the first eight listings and says so, since the palette has eight series", async () => {
+    const screen = await open(scripted(charted(Array.from({ length: SERIES_LIMIT + 1 }, () => other))));
+    await expect.element(screen.getByText("The chart shows the first 8 of 9 listings; the table lists them all."))
+      .toBeVisible();
+    expect(curves(chartOf(screen).element())).toHaveLength(SERIES_LIMIT);
   });
 });
