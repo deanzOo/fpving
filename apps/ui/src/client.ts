@@ -118,7 +118,7 @@ const send = async <S extends z.ZodType>(
   const response = await fetcher(path, init).catch(() => {
     throw new ApiFailure(ClientErrorKind.Unreachable, Message.Unreachable);
   });
-  const json = readJson(await response.text());
+  const json = response.status === HttpStatus.NoContent ? null : readJson(await response.text());
   if (response.ok) {
     const parsed = success.safeParse(reviveDates(success, json));
     if (parsed.success) {

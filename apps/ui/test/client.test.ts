@@ -92,6 +92,12 @@ describe("API client", () => {
       .toEqual(["DELETE /api/products/p%201%2F2/listings/l%3F1"]);
   });
 
+  it("reads a 204 answer as no body", async () => {
+    const api = fakeApi();
+    api.on({ method: "POST", url: "/api/alerts/a1/read" }, () => new Response(null, { status: HttpStatus.NoContent }));
+    expect(await api.client.markAlertRead({ alertId: "a1" })).toBeNull();
+  });
+
   it("throws unreachable when the request cannot be sent", async () => {
     const client = createClient(async () => Promise.reject(new TypeError("Failed to fetch")));
     expect((await failureOf(client.listProducts())).kind).toBe(ClientErrorKind.Unreachable);
