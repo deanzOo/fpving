@@ -4,7 +4,7 @@ description: The planned first-run flow, how to run the server today, and what e
 ---
 
 :::caution[Not built yet]
-The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts and answers a JSON API (see the [HTTP API reference](../reference/http-api/)); the UI is not built yet.
+The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts, answers a JSON API (see the [HTTP API reference](../reference/http-api/)) and serves the UI, of which only the Watchlist screen is built.
 :::
 
 ## Planned flow
@@ -35,6 +35,7 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
 - `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
 
+- The UI in `apps/ui`: the app shell with its navigation and the Watchlist, where you paste a store URL to watch a product and see each product's cheapest landed cost, its 30-day price trend and its unread alerts. The other screens are placeholders.
 - The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health` and the domain routes (the watchlist, products, listings, match candidates, alerts, settings, plugins, scan now), refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
 
 To work on it, follow the setup in [Contributing](../contributing/).
@@ -44,7 +45,18 @@ To work on it, follow the setup in [Contributing](../contributing/).
 After the contributor setup and `pnpm worktree:init`:
 
 ```sh
+pnpm build
 pnpm --filter @fpving/app start
 ```
+
+`pnpm build` also builds the UI into `apps/ui/dist/web`. Open `http://127.0.0.1:<PORT>` (or `http://localhost:<PORT>`), with the `PORT` from your `.env`, to use it; the address is printed when the server is listening. Any other host name is refused. Without a UI build the page says to run `pnpm build`.
+
+To work on the UI with hot reload, keep the server running and start Vite in a second terminal:
+
+```sh
+pnpm dev
+```
+
+Then open the address Vite prints. Vite forwards `/api` to the server on your worktree's `PORT`, so both must belong to the same worktree.
 
 It builds, loads the worktree's `.env` (a variable already set in the shell wins), creates `DATA_DIR`, listens on `http://127.0.0.1:<PORT>` and migrates the database; until startup completes only the health route answers. Check it with `curl http://127.0.0.1:<PORT>/api/health`. Logs go to `DATA_DIR/logs/fpving.log`. Stop it with Ctrl+C. During a scan, stopping waits up to ten seconds for it and then exits 1; a second Ctrl+C is ignored meanwhile. Ctrl+C while it starts cancels the startup. A startup failure, such as the port being taken by another instance, prints one line and exits 1 before the database is touched. Leaving it running starts the scan schedule, which fetches exchange rates from the Frankfurter API on the first boot. See [Configuration](../configuration/).
