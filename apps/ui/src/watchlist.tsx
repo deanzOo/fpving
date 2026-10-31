@@ -29,39 +29,43 @@ export const Watchlist = () => {
       {rows === undefined && <p className="mt-6 text-ink-muted">Loading…</p>}
       {rows?.length === 0 && <p className="mt-6 text-ink-muted">{EMPTY}</p>}
       {rows !== undefined && rows.length > 0 && (
-        <table className="mt-6 w-full border-collapse text-left">
-          <caption className="sr-only">Watched products</caption>
-          <thead>
-            <tr className="text-sm text-ink-muted">
-              <th scope="col" className={cell}>Product</th>
-              <th scope="col" className={cell}>Cheapest landed</th>
-              <th scope="col" className={cell}>Last 30 days</th>
-              <th scope="col" className={cell}>Alerts</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ product, cheapest, trend, unreadAlerts }) => (
-              <tr key={product.id}>
-                <th scope="row" className={`${cell} font-medium`}>
-                  <Link to="/products/$id" params={{ id: product.id }} className="hover:underline">
-                    {product.name}
-                  </Link>
-                </th>
-                <td className={`${cell} tabular-nums`}>
-                  {cheapest === null
-                    ? <span className="text-ink-muted">No price yet</span>
-                    : formatMoney(cheapest.landedCost)}
-                </td>
-                <td className={cell}><Sparkline trend={trend} /></td>
-                <td className={cell}>
-                  {unreadAlerts > 0 && (
-                    <span className="rounded-full bg-action px-2 text-sm text-on-action">{unreadAlerts} unread</span>
-                  )}
-                </td>
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <caption className="sr-only">Watched products</caption>
+            <thead>
+              <tr className="text-sm text-ink-muted">
+                <th scope="col" className={cell}>Product</th>
+                <th scope="col" className={cell}>Cheapest landed</th>
+                <th scope="col" className={cell}>Last 30 days</th>
+                <th scope="col" className={cell}>Alerts</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map(({ product, cheapest, trend, unreadAlerts }) => (
+                <tr key={product.id}>
+                  <th scope="row" className={`${cell} font-medium`}>
+                    <Link to="/products/$id" params={{ id: product.id }} className="hover:underline">
+                      {product.name}
+                    </Link>
+                  </th>
+                  <td className={`${cell} tabular-nums`}>
+                    {cheapest === null
+                      ? <span className="text-ink-muted">No price yet</span>
+                      : formatMoney(cheapest.landedCost)}
+                  </td>
+                  <td className={cell}><Sparkline trend={trend} /></td>
+                  <td className={cell}>
+                    {unreadAlerts > 0 && (
+                      <span className="whitespace-nowrap rounded-full bg-action px-2 text-sm text-on-action">
+                        {unreadAlerts} unread
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

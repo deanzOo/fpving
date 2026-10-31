@@ -40,7 +40,7 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
     const price = trend[day];
     const shown = price ? formatMoney(price) : "No price";
     return (
-      <p className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink">
+      <p className="whitespace-nowrap rounded border border-line bg-surface px-2 py-1 text-sm text-ink">
         {shown}, {relativeDay.format(day - today, "day")}
       </p>
     );
@@ -50,7 +50,14 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
       <LineChart width={WIDTH} height={HEIGHT} data={data} accessibilityLayer={false} margin={MARGIN}>
         <XAxis dataKey={DAY} hide />
         <YAxis hide domain={["dataMin", "dataMax"]} />
-        <Tooltip content={TooltipBody} cursor={false} filterNull={false} isAnimationActive={false} />
+        <Tooltip
+          content={TooltipBody}
+          cursor={false}
+          filterNull={false}
+          isAnimationActive={false}
+          allowEscapeViewBox={{ x: true, y: true }}
+          position={{ y: 0 }}
+        />
         <Line
           dataKey="amountMinor"
           stroke="currentColor"
