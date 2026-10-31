@@ -62,7 +62,7 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
   const series = charted.map(({ listing, history, color }) => {
     const byDay = new Map(history.map(({ observedAt, landedCost }) => [dayOf(observedAt), landedCost]));
     const values = days.map((day): Money | null => byDay.get(day) ?? null);
-    return { key: listing.id, name: listing.pluginId, color, values };
+    return { key: listing.id, name: listing.pluginId, color, byDay, values };
   });
   const rows = days.map((day, index) => {
     const cells: [string, number | null][] = series.map(({ key, values }) => [key, values[index]?.amountMinor ?? null]);
@@ -81,12 +81,12 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     if (!active) {
       return null;
     }
-    const index = Number(label) - start;
+    const day = Number(label);
     return (
       <div className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink">
-        <p className="font-medium">{dateOf(Number(label))}</p>
-        {series.map(({ key, name: listingName, color, values }) => {
-          const value = values[index] ?? null;
+        <p className="font-medium">{dateOf(day)}</p>
+        {series.map(({ key, name: listingName, color, byDay }) => {
+          const value = byDay.get(day) ?? null;
           return (
             <p key={key} className="flex items-center gap-2 whitespace-nowrap">
               <span aria-hidden="true" className="inline-block h-0.5 w-3" style={{ backgroundColor: color }} />

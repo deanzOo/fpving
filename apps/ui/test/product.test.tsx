@@ -304,6 +304,14 @@ describe("Price history chart", () => {
     await expect.element(screen.getByText(/^store2 \$120\.00$/u)).toBeVisible();
   });
 
+  it("says a listing had no price on a day the keyboard steps to", async () => {
+    const lateOnly = [null, null, null, null, null, LANDED_MINOR];
+    const screen = await open(scripted(charted([lateOnly, other])));
+    chartOf(screen).element().focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(screen.getByText(/^store1 No price$/u)).toBeVisible();
+  });
+
   it("says when no listing has a landed cost to chart", async () => {
     const screen = await open(scripted(charted([[null, null]])));
     await expect.element(screen.getByText("No landed cost to chart yet.")).toBeVisible();
