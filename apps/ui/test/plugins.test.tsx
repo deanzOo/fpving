@@ -58,9 +58,9 @@ describe("Plugins", () => {
     await expect.element(row.getByRole("cell", { name: "3", exact: true })).toBeVisible();
   });
 
-  it("shows a plugin backing off until when", async () => {
+  it("shows a plugin backing off and when it retries", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
-    await expect.element(screen.getByRole("row", { name: /^Mall mall/u }).getByText("Backing off until in 2 hours"))
+    await expect.element(screen.getByRole("row", { name: /^Mall mall/u }).getByText("Backing off, retrying in 2 hours"))
       .toBeVisible();
   });
 

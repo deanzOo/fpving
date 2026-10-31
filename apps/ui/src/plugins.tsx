@@ -21,7 +21,7 @@ const state = ({ status, issues, backoffUntil }: Row): string[] => [
     }
     return status === Loaded ? `Warning (${kind}): ${detail}` : `Disabled (${kind}): ${detail}`;
   }),
-  ...(backoffUntil === null ? [] : [`Backing off until ${fromNow(backoffUntil)}`]),
+  ...(backoffUntil === null ? [] : [`Backing off, retrying ${fromNow(backoffUntil)}`]),
 ];
 
 /**
