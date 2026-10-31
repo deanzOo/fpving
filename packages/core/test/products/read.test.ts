@@ -217,6 +217,31 @@ describe("A product's detail", () => {
     expect(detail.ok && detail.value.product).toEqual(row);
   });
 
+  it("prices each snapshot at its landed cost in the display currency over the latest rates", async () => {
+    const repository = await withRates();
+    const row = product("p1", NOW);
+    const priced = snapshot("s1", "l1", price(CHEAP));
+    await watched(repository, row, [[listing("l1"), priced]]);
+    const detail = await productDetail({ repository }, row.id);
+    const [entry] = detail.ok ? detail.value.listings.flatMap(({ history }) => history) : [];
+    expect(entry).toEqual({ ...priced, landedCost: landed(priced) });
+    expect(entry?.landedCost?.currency).toBe(settings.displayCurrency);
+  });
+
+  it.each([
+    ["shipping is unknown", snapshot("s1", "l1", { shipping: { kind: ShippingKind.Unknown } }), true],
+    ["a rate is missing", snapshot("s1", "l1", { itemPrice: { amountMinor: CHEAP, currency: "EUR" } }), true],
+    ["the snapshot was quoted for another ship-to country", snapshot("s1", "l1", { shipTo: "DE" }), true],
+    ["no rates were stored yet", snapshot("s1", "l1"), false],
+  ] as const)("prices a snapshot at null when %s", async (_label, unpriced, storeRates) => {
+    const repository = storeRates ? await withRates() : inMemoryRepository();
+    const row = product("p1", NOW);
+    await watched(repository, row, [[listing("l1"), unpriced]]);
+    const detail = await productDetail({ repository }, row.id);
+    expect(detail.ok && detail.value.listings.flatMap(({ history }) => history.map((s) => s.landedCost)))
+      .toEqual([null]);
+  });
+
   it("leaves removed listings out", async () => {
     const repository = inMemoryRepository();
     const row = product("p1", NOW);

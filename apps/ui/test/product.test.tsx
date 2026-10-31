@@ -2,7 +2,7 @@ import { apiRoutes } from "@fpving/app/api-routes";
 import { ApiErrorKind } from "@fpving/app/errors";
 import { HttpStatus } from "@fpving/app/http-status";
 import { listingIdSchema, ListingOrigin, ListingStatus, pluginIdSchema, snapshotIdSchema } from "@fpving/core";
-import type { Listing, PriceSnapshot } from "@fpving/core";
+import type { Listing } from "@fpving/core";
 import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
@@ -14,6 +14,7 @@ import {
 import { renderApp } from "./support/render-app.tsx";
 
 type Detail = z.output<typeof wire.detail>;
+type Priced = Detail["listings"][number]["history"][number];
 
 const ID = "p1";
 const PAGE = "https://mall.example/item/frame";
@@ -29,11 +30,12 @@ const listing = (id: string, overrides: Partial<Listing> = {}): Listing => ({
   origin: ListingOrigin.Manual, addedAt: new Date(0), failureStreak: 0, notFoundStreak: 0, ...overrides,
 });
 
-const snapshot = (listingId: string, daysAgo: number, overrides: Partial<PriceSnapshot> = {}): PriceSnapshot => ({
+const snapshot = (listingId: string, daysAgo: number, overrides: Partial<Priced> = {}): Priced => ({
   id: snapshotIdSchema.parse(`${listingId}-${String(daysAgo)}`), listingId: listingIdSchema.parse(listingId),
   observedAt: new Date(Date.now() - daysAgo * DAY_MS), shipTo: "IL",
   itemPrice: { amountMinor: PRICE_MINOR, currency: "USD" },
-  shipping: { kind: ShippingKind.Known, amountMinor: SHIPPING_MINOR, currency: "USD" }, inStock: true, ...overrides,
+  shipping: { kind: ShippingKind.Known, amountMinor: SHIPPING_MINOR, currency: "USD" }, inStock: true,
+  landedCost: null, ...overrides,
 });
 
 const detail = (): Detail => ({
@@ -185,7 +187,8 @@ describe("Product detail", () => {
     api.on(at(apiRoutes.addListing, { productId: ID }), () => {
       const shown = detail();
       api.on(at(apiRoutes.getProduct, { productId: ID }), reply(wire.detail, {
-        ...shown, listings: [...shown.listings, { listing: added.listing, history: [added.snapshot] }],
+        ...shown,
+        listings: [...shown.listings, { listing: added.listing, history: [{ ...added.snapshot, landedCost: null }] }],
       }));
       return reply(wire.addedListing, added, HttpStatus.Created)();
     });

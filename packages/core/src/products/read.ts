@@ -36,10 +36,17 @@ export interface WatchlistEntry {
   readonly unreadAlerts: number;
 }
 
-/** A listing with every snapshot of it, oldest first. */
+/**
+ * A snapshot with its landed cost in the display currency over the latest stored exchange rates, or null when it
+ * cannot be priced: unknown shipping, a missing rate, no rates stored yet, or quoted for a ship-to country other than
+ * the saved one.
+ */
+export type PricedSnapshot = PriceSnapshot & { readonly landedCost: Money | null };
+
+/** A listing with every snapshot of it, oldest first, each with its landed cost. */
 export interface ListingHistory {
   readonly listing: Listing;
-  readonly history: PriceSnapshot[];
+  readonly history: PricedSnapshot[];
 }
 
 /** A product with its listings and their price histories. */
@@ -105,9 +112,11 @@ export const watchlist = async (
 };
 
 /**
- * A product with its listings that are not removed, oldest first, and each listing's snapshots, oldest first.
+ * A product with its listings that are not removed, oldest first, and each listing's snapshots, oldest first, each
+ * priced as the watchlist prices a listing: the exact landed cost in the display currency over the latest stored
+ * exchange rates, rounded to a minor unit, or null when it cannot be priced (see {@link PricedSnapshot}).
  *
- * @param deps - The repository.
+ * @param deps - The repository, which holds the settings and the exchange rates.
  * @param productId - The product.
  * @returns The detail, or `product_not_found` for a product that is missing or archived.
  */
@@ -122,9 +131,19 @@ export const productDetail = async (
   const kept = (await repository.listings.listByProduct(productId)).filter(
     ({ status }) => status !== ListingStatus.Removed,
   );
+  const [settings, rates] = await Promise.all([repository.settings.get(), repository.fxRates.latest()]);
+  const priced = (snapshot: PriceSnapshot): PricedSnapshot => {
+    const exact = rates === null || snapshot.shipTo !== settings.shipToCountry
+      ? null
+      : landedCostExact(snapshot, settings, rates);
+    const landedCost = exact?.ok === true
+      ? { amountMinor: roundMinor(exact.value), currency: settings.displayCurrency }
+      : null;
+    return { ...snapshot, landedCost };
+  };
   const listings = await Promise.all(kept.map(async (listing) => ({
     listing,
-    history: await repository.snapshots.listSince(listing.id, EPOCH),
+    history: (await repository.snapshots.listSince(listing.id, EPOCH)).map(priced),
   })));
   return ok({ product, listings });
 };

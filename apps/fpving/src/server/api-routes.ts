@@ -29,7 +29,10 @@ const addedListingSchema = z.object({ listing: listingSchema, snapshot: priceSna
 
 const productDetailSchema = z.object({
   product: productSchema,
-  listings: z.array(z.object({ listing: listingSchema, history: z.array(priceSnapshotSchema).min(1) })),
+  listings: z.array(z.object({
+    listing: listingSchema,
+    history: z.array(priceSnapshotSchema.extend({ landedCost: moneySchema.nullable() })).min(1),
+  })),
 });
 
 const watchlistSchema = z.array(z.object({
@@ -93,7 +96,8 @@ export const apiRoutes = {
   getProduct: {
     method: "GET",
     url: "/api/products/:productId",
-    summary: "A product with its listings and each listing's price history, oldest first; 404 once archived.",
+    summary: "A product with its listings and each listing's price history, oldest first, each snapshot with its "
+      + "landed cost in the display currency or null when it cannot be priced; 404 once archived.",
     schema: { params: productParams, response: { [Ok]: productDetailSchema, [NotFound]: apiErrorSchema } },
   },
   renameProduct: {

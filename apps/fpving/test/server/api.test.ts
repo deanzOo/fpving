@@ -145,6 +145,20 @@ describe("Products API", () => {
     expect(detail.listings[0]?.history[0]?.id).toBe(first?.id);
   });
 
+  it("answers each snapshot of a product's detail with its landed cost, the watchlist's cheapest price", async () => {
+    const settings = await api.repository.settings.get();
+    await api.repository.settings.save({ ...settings, displayCurrency: "USD" });
+    await api.scans.current.scanNow();
+    const { product } = await addProduct();
+    const detail = z.object({
+      listings: z.array(z.object({ history: z.array(z.object({ landedCost: z.unknown() })) })),
+    }).parse((await api.request("GET", `/api/products/${product.id}`)).json());
+    const [row] = z.array(z.object({ cheapest: z.object({ landedCost: z.unknown() }) }))
+      .parse((await api.request("GET", "/api/products")).json());
+    expect(detail.listings[0]?.history.at(-1)?.landedCost).toEqual(row?.cheapest.landedCost);
+    expect(row?.cheapest.landedCost).toMatchObject({ currency: "USD" });
+  });
+
   it("answers 404 product_not_found for an unknown product", async () => {
     const response = await api.request("GET", "/api/products/nope");
     expect(response.statusCode).toBe(HttpStatus.NotFound);
