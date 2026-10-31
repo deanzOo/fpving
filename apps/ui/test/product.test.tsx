@@ -23,6 +23,11 @@ const PRICE_MINOR = 12_345;
 const SHIPPING_MINOR = 1500;
 const OLDER_MINOR = 13_000;
 const DAY_MS = 86_400_000;
+const NOON = 12;
+const DST_YEAR = 2026;
+const DST_MONTH = 2;
+const DST_DAY_BEFORE = 26;
+const DST_DAY_AFTER = 28;
 const TWO_DAYS = 2;
 const LANDED_MINOR = 13_845;
 const LANDED_BEFORE_MINOR = 15_000;
@@ -39,9 +44,14 @@ const listing = (id: string, overrides: Partial<Listing> = {}): Listing => ({
   origin: ListingOrigin.Manual, addedAt: new Date(0), failureStreak: 0, notFoundStreak: 0, ...overrides,
 });
 
+const localNoon = (daysAgo: number): Date => {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate() - daysAgo, NOON);
+};
+
 const snapshot = (listingId: string, daysAgo: number, overrides: Partial<Priced> = {}): Priced => ({
   id: snapshotIdSchema.parse(`${listingId}-${String(daysAgo)}`), listingId: listingIdSchema.parse(listingId),
-  observedAt: new Date(Date.now() - daysAgo * DAY_MS), shipTo: "IL",
+  observedAt: localNoon(daysAgo), shipTo: "IL",
   itemPrice: { amountMinor: PRICE_MINOR, currency: "USD" },
   shipping: { kind: ShippingKind.Known, amountMinor: SHIPPING_MINOR, currency: "USD" }, inStock: true,
   landedCost: null, ...overrides,
@@ -339,6 +349,28 @@ describe("Price history chart", () => {
     await expect.element(chartOf(screen)).toHaveAccessibleName(/^Landed cost over the last 5 days/u);
     expect(curveSegments(chartOf(screen).element())).toEqual([1]);
     expect(chartOf(screen).element().querySelectorAll(".history-dot")).toHaveLength(0);
+  });
+
+  it("counts each local calendar day once across a daylight saving change", async () => {
+    const beforeChange = new Date(DST_YEAR, DST_MONTH, DST_DAY_BEFORE, NOON);
+    const afterChange = new Date(DST_YEAR, DST_MONTH, DST_DAY_AFTER, NOON);
+    const now = new Date();
+    const days = (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+      - Date.UTC(DST_YEAR, DST_MONTH, DST_DAY_BEFORE)) / DAY_MS + 1;
+    const screen = await open(scripted({
+      product: product(ID, "Acme X5 frame"),
+      listings: [{
+        listing: listing("l1"),
+        history: [
+          snapshot("l1", 0, { observedAt: beforeChange, landedCost: usd(LANDED_BEFORE_MINOR) }),
+          snapshot("l1", 0, { observedAt: afterChange, landedCost: usd(LANDED_MINOR) }),
+        ],
+      }],
+    }));
+    await expect.element(chartOf(screen)).toHaveAccessibleName(
+      new RegExp(`^Landed cost over the last ${String(days)} days:`, "u"),
+    );
+    expect(curveSegments(chartOf(screen).element())).toEqual([1]);
   });
 
   it("buckets days in the viewer's time zone, so scans either side of local midnight are two days", async () => {
