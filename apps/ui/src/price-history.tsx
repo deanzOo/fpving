@@ -8,7 +8,6 @@ import { formatMoney } from "./money.ts";
 
 type Listings = Awaited<ReturnType<Client["getProduct"]>>["listings"];
 
-const DAY_MS = 86_400_000;
 const HEIGHT = 280;
 const STROKE = 2;
 const DOT_RADIUS = 4;
@@ -26,13 +25,13 @@ const SERIES_COLORS = [
 ] as const;
 const DAY = "day";
 
-const dayOf = (at: Date): number => Math.floor(at.getTime() / DAY_MS);
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeZone: "UTC" });
-const dateOf = (day: number): string => dateFormat.format(new Date(day * DAY_MS));
+const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const midnight = (at: Date, offset = 0): Date => new Date(at.getFullYear(), at.getMonth(), at.getDate() + offset);
 
 /**
  * The landed cost of each listing once a day, one line per listing in a fixed series colour, from the first day with
- * a snapshot to today; a day's value is that day's last snapshot. A day without a landed cost leaves a gap and a
+ * a price to today. Days are the viewer's local calendar days, and a day's value is the listing's latest snapshot by
+ * the end of that day, carried forward like the watchlist trend. A day without a landed cost leaves a gap and a
  * priced day with no priced neighbour is a dot. The chart's name sums each listing's range up, and hovering, or
  * focusing it and pressing the arrow keys, shows every listing's cost that day. Only listings with a landed cost are
  * charted, and the palette has eight series, so at most the eight most recently priced are; a note counts the others,
@@ -43,11 +42,22 @@ const dateOf = (day: number): string => dateFormat.format(new Date(day * DAY_MS)
  */
 export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
   const headingId = useId();
+  const firstSeen = Math.min(
+    ...listings.flatMap(({ history }) => history.map(({ observedAt }) => observedAt.getTime())),
+  );
+  const today = midnight(new Date()).getTime();
+  const allDays: Date[] = [];
+  for (let day = midnight(new Date(firstSeen)); day.getTime() <= today; day = midnight(day, 1)) {
+    allDays.push(day);
+  }
   const pricedListings = listings.flatMap(({ listing, history }) => {
-    const byDay = new Map(history.map(({ observedAt, landedCost }) => [dayOf(observedAt), landedCost]));
-    const costs = [...byDay].flatMap(([day, cost]) => (cost === null ? [] : [{ day, cost }]));
+    const values = allDays.map((day): Money | null => {
+      const end = midnight(day, 1);
+      return history.findLast(({ observedAt }) => observedAt < end)?.landedCost ?? null;
+    });
+    const costs = values.flatMap((cost, day) => (cost === null ? [] : [{ day, cost }]));
     const last = costs.at(-1);
-    return last === undefined ? [] : [{ listing, byDay, costs, last }];
+    return last === undefined ? [] : [{ listing, values, costs, last }];
   });
   const recent = new Set([...pricedListings].sort((a, b) => b.last.day - a.last.day).slice(0, SERIES_COLORS.length));
   const charted = SERIES_COLORS.flatMap((color, index) => {
@@ -66,18 +76,18 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     );
   }
   const money = (amountMinor: number): string => formatMoney({ amountMinor, currency: first.last.cost.currency });
-  const start = Math.min(...charted.map(({ costs }) => Math.min(...costs.map(({ day }) => day))));
-  const days = Array.from({ length: dayOf(new Date()) - start + 1 }, (_, index) => start + index);
-  const series = charted.map(({ listing, byDay, color }) => ({
+  const start = Math.min(...charted.flatMap(({ costs }) => costs.map(({ day }) => day)));
+  const days = allDays.slice(start);
+  const series = charted.map(({ listing, values, color }) => ({
     key: listing.id,
     name: listingName(listing),
     color,
-    byDay,
-    values: days.map((day): Money | null => byDay.get(day) ?? null),
+    values: values.slice(start),
   }));
-  const rows = days.map((day, index) => {
+  const dateOf = (index: number): string => dateFormat.format(days[index]);
+  const rows = days.map((_day, index) => {
     const cells: [string, number | null][] = series.map(({ key, values }) => [key, values[index]?.amountMinor ?? null]);
-    return Object.fromEntries([[DAY, day], ...cells]);
+    return Object.fromEntries([[DAY, index], ...cells]);
   });
   const summary = charted.map(({ listing, costs, last }) => {
     const amounts = costs.map(({ cost }) => cost.amountMinor);
@@ -93,8 +103,8 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     return (
       <div className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink">
         <p className="font-medium">{dateOf(day)}</p>
-        {series.map(({ key, name: listingName, color, byDay }) => {
-          const value = byDay.get(day) ?? null;
+        {series.map(({ key, name: listingName, color, values }) => {
+          const value = values[day] ?? null;
           return (
             <p key={key} className="flex items-center gap-2 whitespace-nowrap">
               <span aria-hidden="true" className="inline-block h-0.5 w-3" style={{ backgroundColor: color }} />

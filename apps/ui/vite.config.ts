@@ -19,7 +19,10 @@ export default defineConfig({
       enabled: true,
       headless: true,
       screenshotFailures: false,
-      provider: playwright({ actionTimeout: ACTION_TIMEOUT_MS, contextOptions: { locale: "en-US" } }),
+      provider: playwright({
+        actionTimeout: ACTION_TIMEOUT_MS,
+        contextOptions: { locale: "en-US", timezoneId: "Asia/Jerusalem" },
+      }),
       instances: [{ browser: "chromium" }],
     },
   },

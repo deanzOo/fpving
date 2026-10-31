@@ -28,6 +28,9 @@ const LANDED_BEFORE_MINOR = 15_000;
 const LOWER_MINOR = 12_000;
 const DAYS = 6;
 const SERIES_LIMIT = 8;
+const LATE_HOUR = 23;
+const LATE_MINUTE = 50;
+const EARLY_MINUTE = 10;
 
 const listing = (id: string, overrides: Partial<Listing> = {}): Listing => ({
   id: listingIdSchema.parse(id), productId: product(ID, "x").id, pluginId: pluginIdSchema.parse("shop"),
@@ -326,6 +329,37 @@ describe("Price history chart", () => {
     chartOf(screen).element().focus();
     await userEvent.keyboard("{ArrowRight}");
     await expect.element(screen.getByText(/^store1: Acme X5 frame at l1 No price$/u)).toBeVisible();
+  });
+
+  it("carries a price forward to the next scan, so scans less than daily still draw one line", async () => {
+    const everyOtherDay = [LANDED_MINOR, LOWER_MINOR, LANDED_MINOR].map((amountMinor, index) =>
+      snapshot("l1", (TWO_DAYS - index) * TWO_DAYS, { landedCost: usd(amountMinor) }));
+    const screen = await open(scripted({
+      product: product(ID, "Acme X5 frame"),
+      listings: [{ listing: listing("l1"), history: everyOtherDay }],
+    }));
+    await expect.element(chartOf(screen)).toHaveAccessibleName(/^Landed cost over the last 5 days/u);
+    expect(curves(chartOf(screen).element())).toEqual([1]);
+    expect(chartOf(screen).element().querySelectorAll(".history-dot")).toHaveLength(0);
+  });
+
+  it("buckets days in the viewer's time zone, so scans either side of local midnight are two days", async () => {
+    const now = new Date();
+    const lateYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, LATE_HOUR, LATE_MINUTE);
+    const earlyToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, EARLY_MINUTE);
+    const screen = await open(scripted({
+      product: product(ID, "Acme X5 frame"),
+      listings: [{
+        listing: listing("l1"),
+        history: [
+          snapshot("l1", 0, { observedAt: lateYesterday, landedCost: usd(LANDED_BEFORE_MINOR) }),
+          snapshot("l1", 0, { observedAt: earlyToday, landedCost: usd(LANDED_MINOR) }),
+        ],
+      }],
+    }));
+    await expect.element(chartOf(screen)).toHaveAccessibleName(
+      "Landed cost over the last 2 days: shop: Acme X5 frame at l1 lowest $138.45, highest $150.00, latest $138.45",
+    );
   });
 
   it("says when no listing has a landed cost to chart", async () => {
