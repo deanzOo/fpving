@@ -94,5 +94,16 @@ export const wire = {
   plugins: apiRoutes.listPlugins.schema.response[HttpStatus.Ok],
 } as const;
 
+/** A gate an answer can wait on, so a test sees the pending state and then opens it. */
+export const gate = () => {
+  let release = (): void => undefined;
+  const opened = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { opened, release: () => {
+    release();
+  } };
+};
+
 /** A 204 answer. */
 export const noContent: Answer = () => new Response(null, { status: HttpStatus.NoContent });

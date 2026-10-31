@@ -15,14 +15,13 @@ import type { MatchCandidate } from "@fpving/core";
 import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import {
-  alreadyTracked, at, emptyTrend, failWith, fakeApi, noContent, product, reply, wire,
+  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, noContent, product, reply, wire,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 
 const FRAME = "p1";
 const KIT = "p2";
 const SIMILAR = 0.87;
-const SEARCH_MS = 50;
 
 const candidate = (id: string, productId: string, overrides: Partial<MatchCandidate> = {}): MatchCandidate => ({
   id: matchCandidateIdSchema.parse(id),
@@ -123,10 +122,9 @@ describe("Match review", () => {
 
   it("finds matches for a product, showing the search while it runs and what it found", async () => {
     const api = scripted([]);
+    const searched = gate();
     api.on(at(apiRoutes.findMatches, { productId: FRAME }), async () => {
-      await new Promise((resolve) => {
-        setTimeout(resolve, SEARCH_MS);
-      });
+      await searched.opened;
       api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, [candidate("c1", FRAME)]));
       return reply(wire.found, {
         candidates: [candidate("c1", FRAME)],
@@ -140,6 +138,7 @@ describe("Match review", () => {
     const frame = group(screen, "Acme X5 frame");
     await frame.getByRole("button", { name: "Find matches" }).click();
     await expect.element(frame.getByRole("button", { name: "Searching the other stores…" })).toBeDisabled();
+    searched.release();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
     await expect.element(frame.getByRole("status"))
       .toHaveTextContent("Saved 1 candidates. The search failed on bazaar (blocked).");

@@ -7,7 +7,7 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { z } from "zod";
-import { alreadyTracked, at, emptyTrend, failWith, fakeApi, product, reply, wire } from "./support/fake-api.ts";
+import { alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, product, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 
 type Row = z.output<typeof wire.watchlist>[number];
@@ -158,19 +158,16 @@ describe("Adding a product by URL", () => {
 
   it("disables the button while the store page is being fetched", async () => {
     const api = scripted([]);
-    let release = (): void => undefined;
-    const fetched = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const fetched = gate();
     api.on(apiRoutes.addProduct, async () => {
-      await fetched;
+      await fetched.opened;
       return reply(wire.added, added("Acme X5 kit"), HttpStatus.Created)();
     });
     const screen = await renderApp(api.client);
     await screen.getByLabelText("Store URL").fill(PAGE);
     await screen.getByRole("button", { name: "Add product" }).click();
     await expect.element(screen.getByRole("button", { name: "Adding…" })).toBeDisabled();
-    release();
+    fetched.release();
     await expect.element(screen.getByRole("button", { name: "Add product" })).toBeEnabled();
   });
 
