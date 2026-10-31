@@ -1,16 +1,16 @@
 import type { Money } from "@fpving/plugin-sdk";
 import { useId } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { DotItemDotProps, TooltipContentProps } from "recharts";
+import type { TooltipContentProps } from "recharts";
 import type { Client } from "./client.ts";
 import { listingName } from "./listing-name.ts";
+import { loneDot } from "./lone-dot.tsx";
 import { formatMoney } from "./money.ts";
 
 type Listings = Awaited<ReturnType<Client["getProduct"]>>["listings"];
 
 const HEIGHT = 280;
 const STROKE = 2;
-const DOT_RADIUS = 4;
 const AXIS_WIDTH = 88;
 const MARGIN = { top: 8, right: 16, bottom: 8, left: 8 } as const;
 const SERIES_COLORS = [
@@ -154,29 +154,17 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
             />
             <Tooltip content={TooltipBody} filterNull={false} isAnimationActive={false} />
             {series.map(({ key, color, values }) => {
-              const hasPrice = (day: number): boolean => (values[day] ?? null) !== null;
-              const LoneDot = ({ cx, cy, index }: DotItemDotProps) =>
-                hasPrice(index) && !hasPrice(index - 1) && !hasPrice(index + 1)
-                  ? (
-                      <circle
-                        key={index}
-                        className="history-dot"
-                        cx={cx}
-                        cy={cy}
-                        r={DOT_RADIUS}
-                        fill={color}
-                        stroke="var(--color-surface)"
-                        strokeWidth={STROKE}
-                      />
-                    )
-                  : null;
               return (
                 <Line
                   key={key}
                   dataKey={key}
                   stroke={color}
                   strokeWidth={STROKE}
-                  dot={LoneDot}
+                  dot={loneDot(values, {
+                    className: "history-dot",
+                    fill: color,
+                    ring: { stroke: "var(--color-surface)", width: STROKE },
+                  })}
                   connectNulls={false}
                   isAnimationActive={false}
                 />

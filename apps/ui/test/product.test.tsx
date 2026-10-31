@@ -11,6 +11,7 @@ import { takeLogged } from "./support/console-guard.ts";
 import {
   alreadyTracked, at, failWith, fakeApi, noContent, product, reply, wire,
 } from "./support/fake-api.ts";
+import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
 
 type Detail = z.output<typeof wire.detail>;
@@ -285,9 +286,6 @@ const charted = (series: readonly (readonly (number | null)[])[]): Detail => ({
 const chartOf = (screen: Awaited<ReturnType<typeof open>>) =>
   screen.getByRole("application", { name: /^Landed cost over the last/u });
 
-const curves = (container: Element) => [...container.querySelectorAll(".recharts-line-curve")]
-  .map((curve) => (curve.getAttribute("d") ?? "").split("M").length - 1);
-
 describe("Price history chart", () => {
   const steady = [LANDED_BEFORE_MINOR, LANDED_BEFORE_MINOR, null, LANDED_MINOR, LANDED_MINOR, LANDED_MINOR];
   const other = [LOWER_MINOR, LOWER_MINOR, LOWER_MINOR, LOWER_MINOR, LOWER_MINOR, LOWER_MINOR];
@@ -300,13 +298,13 @@ describe("Price history chart", () => {
     const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
     await expect.element(legend.getByText("store1: Acme X5 frame at l1", { exact: true })).toBeVisible();
     await expect.element(legend.getByText("store2: Acme X5 frame at l2", { exact: true })).toBeVisible();
-    expect(curves(chartOf(screen).element())).toHaveLength(TWO_DAYS);
+    expect(curveSegments(chartOf(screen).element())).toHaveLength(TWO_DAYS);
   });
 
   it("leaves a gap over a day without a landed cost instead of bridging it", async () => {
     const screen = await open(scripted(charted([steady])));
     await expect.element(chartOf(screen)).toBeVisible();
-    expect(curves(chartOf(screen).element())).toEqual([TWO_DAYS]);
+    expect(curveSegments(chartOf(screen).element())).toEqual([TWO_DAYS]);
   });
 
   it("draws a landed cost with no priced neighbour as a dot", async () => {
@@ -339,7 +337,7 @@ describe("Price history chart", () => {
       listings: [{ listing: listing("l1"), history: everyOtherDay }],
     }));
     await expect.element(chartOf(screen)).toHaveAccessibleName(/^Landed cost over the last 5 days/u);
-    expect(curves(chartOf(screen).element())).toEqual([1]);
+    expect(curveSegments(chartOf(screen).element())).toEqual([1]);
     expect(chartOf(screen).element().querySelectorAll(".history-dot")).toHaveLength(0);
   });
 
@@ -374,7 +372,7 @@ describe("Price history chart", () => {
     const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
     await expect.element(legend.getByText("store1: Acme X5 frame at l1", { exact: true })).not.toBeInTheDocument();
     await expect.element(legend.getByText("store9: Acme X5 frame at l9", { exact: true })).toBeVisible();
-    expect(curves(chartOf(screen).element())).toHaveLength(SERIES_LIMIT);
+    expect(curveSegments(chartOf(screen).element())).toHaveLength(SERIES_LIMIT);
   });
 
   it("gives no chart slot to a listing without a landed cost", async () => {

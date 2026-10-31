@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { z } from "zod";
 import { alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, product, reply, wire } from "./support/fake-api.ts";
+import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
 
 type Row = z.output<typeof wire.watchlist>[number];
@@ -55,9 +56,6 @@ const scripted = (rows: Row[]) => {
   return api;
 };
 
-const lineSegments = (container: HTMLElement): number =>
-  (container.querySelector(".recharts-line-curve")?.getAttribute("d") ?? "").split("M").length - 1;
-
 describe("Watchlist", () => {
   it("lists each product with its cheapest landed cost, its unread count and a link to its page", async () => {
     const screen = await renderApp(scripted([row({ unreadAlerts: 3 })]).client);
@@ -81,7 +79,7 @@ describe("Watchlist", () => {
     const trend = row().trend.map((price, day) => (day === gapDay ? null : price));
     const screen = await renderApp(scripted([row({ trend })]).client);
     await expect.element(screen.getByRole("application", { name: /lowest \$123\.45/u })).toBeVisible();
-    expect(lineSegments(screen.container)).toBe(SEGMENTS_AROUND_ONE_GAP);
+    expect(curveSegments(screen.container)).toEqual([SEGMENTS_AROUND_ONE_GAP]);
   });
 
   it("draws a price with no priced neighbour as a dot, so a product added today shows on its trend", async () => {

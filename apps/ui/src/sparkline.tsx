@@ -1,6 +1,7 @@
 import type { Money } from "@fpving/plugin-sdk";
 import { Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
-import type { DotItemDotProps, TooltipContentProps } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import { loneDot } from "./lone-dot.tsx";
 import { formatMoney } from "./money.ts";
 
 const WIDTH = 128;
@@ -8,7 +9,6 @@ const HEIGHT = 32;
 const STROKE = 2;
 const INSET = 3;
 const DAY = "day";
-const DOT_RADIUS = 4;
 const MARGIN = { top: INSET, right: INSET, bottom: INSET, left: INSET } as const;
 
 const relativeDay = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
@@ -33,11 +33,6 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
     + `${money(Math.max(...amounts))}, latest ${formatMoney(latest)}, ${String(priced.length)} days with a price`;
   const data = trend.map((price, day) => ({ day, amountMinor: price?.amountMinor ?? null }));
   const today = trend.length - 1;
-  const hasPrice = (day: number): boolean => (trend[day] ?? null) !== null;
-  const LoneDot = ({ cx, cy, index }: DotItemDotProps) =>
-    hasPrice(index) && !hasPrice(index - 1) && !hasPrice(index + 1)
-      ? <circle key={index} className="sparkline-dot" cx={cx} cy={cy} r={DOT_RADIUS} fill="currentColor" />
-      : null;
   const TooltipBody = ({ active, label }: TooltipContentProps) => {
     if (!active) {
       return null;
@@ -68,7 +63,7 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
           dataKey="amountMinor"
           stroke="currentColor"
           strokeWidth={STROKE}
-          dot={LoneDot}
+          dot={loneDot(trend, { className: "sparkline-dot", fill: "currentColor" })}
           connectNulls={false}
           isAnimationActive={false}
         />
