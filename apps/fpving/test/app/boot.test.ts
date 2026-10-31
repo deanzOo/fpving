@@ -20,6 +20,7 @@ const POLL_MS = 100;
 const OK = 200;
 const FAKE_KEY = "sk-ant-test-not-a-real-secret";
 const isWindows = process.platform === "win32";
+const RM_RETRIES = 10;
 
 let dataDir = "";
 let child: ChildProcess | undefined;
@@ -31,7 +32,7 @@ beforeEach(() => {
 afterEach(() => {
   child?.kill();
   child = undefined;
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: RM_RETRIES });
 });
 
 const withoutAnthropic = (): NodeJS.ProcessEnv =>
