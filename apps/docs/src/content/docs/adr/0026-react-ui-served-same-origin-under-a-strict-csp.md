@@ -29,7 +29,7 @@ The JSON API exists ([ADR 0024](../0024-http-api-error-envelope-and-route-table/
 
 `pnpm dev` runs `tsc -b` and then `tools/dev-cli.ts`, which starts Vite through its API with a proxy that forwards `/api` to the worktree's app on `PORT`, read from `.env` through the app's `parseEnv` (a variable set in the shell wins; an invalid value fails without echoing any value). `changeOrigin` makes the `Host` header `127.0.0.1:PORT`. Only a request whose `Origin` is the dev page's own, `http://<its Host>`, gets `Origin: http://127.0.0.1:PORT`; any other `Origin` is passed on, so the app still refuses another site's changes, and Vite's own allowed-hosts check refuses a rebinding name. The guards themselves are unchanged. The proxy is passed in by that script rather than built in `vite.config.ts`, so the config imports no workspace package and loads before any build; a tooling test checks every config file for that. CI installs Chromium on all three operating systems for the `ui` project, through one composite action that the check matrix and the docs job share.
 
-Every new direct dependency is MIT licensed, and `pnpm licenses:check` passes with them.
+Every new direct dependency is MIT licensed except `playwright`, a devDependency of `@fpving/ui` for the browser tests, which is Apache-2.0; both are compatible with AGPL-3.0, and `pnpm licenses:check` passes with them.
 
 ## Consequences
 
