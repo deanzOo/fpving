@@ -180,10 +180,22 @@ describe("Product detail", () => {
       return noContent();
     });
     const screen = await open(api);
-    await screen.getByRole("button", { name: "Remove the mall listing" }).click();
+    await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
     await expect.element(screen.getByRole("row", { name: /^mall/u })).not.toBeInTheDocument();
     await expect.element(screen.getByRole("heading", { level: 2, name: "Listings" })).toHaveFocus();
+  });
+
+  it("tells two listings on the same store apart by store and title", async () => {
+    const shown = detail();
+    const twin = { listing: listing("l9", { title: "Acme X5 frame, black" }), history: [snapshot("l9", 0)] };
+    const screen = await open(scripted({ ...shown, listings: [...shown.listings, twin] }));
+    await expect.element(screen.getByRole("rowheader", { name: "shop: Acme X5 frame at l1" })).toBeVisible();
+    await expect.element(screen.getByRole("rowheader", { name: "shop: Acme X5 frame, black" })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Remove shop: Acme X5 frame at l1" })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Remove shop: Acme X5 frame, black" })).toBeVisible();
+    await expect.element(screen.getByRole("list", { name: "Legend" }).getByText("shop: Acme X5 frame at l1"))
+      .toBeVisible();
   });
 
   it("explains a refused listing removal", async () => {
@@ -191,7 +203,7 @@ describe("Product detail", () => {
     api.on(at(apiRoutes.removeListing, { productId: ID, listingId: "l2" }),
       failWith(HttpStatus.NotFound, ApiErrorKind.ListingNotFound, "the product has no listing with this id"));
     const screen = await open(api);
-    await screen.getByRole("button", { name: "Remove the mall listing" }).click();
+    await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
     await expect.element(screen.getByRole("alert")).toHaveTextContent("the product has no listing with this id");
   });
@@ -275,12 +287,12 @@ describe("Price history chart", () => {
 
   it("draws one line per listing with a legend, and names each listing's range for screen readers", async () => {
     const screen = await open(scripted(charted([steady, other])));
-    const name = `Landed cost over the last ${String(DAYS)} days: store1 lowest $138.45, highest $150.00, `
-      + "latest $138.45; store2 lowest $120.00, highest $120.00, latest $120.00";
+    const name = `Landed cost over the last ${String(DAYS)} days: store1: Acme X5 frame at l1 lowest $138.45, `
+      + "highest $150.00, latest $138.45; store2: Acme X5 frame at l2 lowest $120.00, highest $120.00, latest $120.00";
     await expect.element(screen.getByRole("application", { name })).toBeVisible();
     const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
-    await expect.element(legend.getByText("store1", { exact: true })).toBeVisible();
-    await expect.element(legend.getByText("store2", { exact: true })).toBeVisible();
+    await expect.element(legend.getByText("store1: Acme X5 frame at l1", { exact: true })).toBeVisible();
+    await expect.element(legend.getByText("store2: Acme X5 frame at l2", { exact: true })).toBeVisible();
     expect(curves(chartOf(screen).element())).toHaveLength(TWO_DAYS);
   });
 
@@ -301,7 +313,7 @@ describe("Price history chart", () => {
     chartOf(screen).element().focus();
     await expect.element(chartOf(screen)).toHaveFocus();
     await userEvent.keyboard("{ArrowRight}");
-    await expect.element(screen.getByText(/^store2 \$120\.00$/u)).toBeVisible();
+    await expect.element(screen.getByText(/^store2: Acme X5 frame at l2 \$120\.00$/u)).toBeVisible();
   });
 
   it("says a listing had no price on a day the keyboard steps to", async () => {
@@ -309,7 +321,7 @@ describe("Price history chart", () => {
     const screen = await open(scripted(charted([lateOnly, other])));
     chartOf(screen).element().focus();
     await userEvent.keyboard("{ArrowRight}");
-    await expect.element(screen.getByText(/^store1 No price$/u)).toBeVisible();
+    await expect.element(screen.getByText(/^store1: Acme X5 frame at l1 No price$/u)).toBeVisible();
   });
 
   it("says when no listing has a landed cost to chart", async () => {
@@ -322,8 +334,8 @@ describe("Price history chart", () => {
     const screen = await open(scripted(charted([oldOnly, ...Array.from({ length: SERIES_LIMIT }, () => other)])));
     await expect.element(screen.getByText("Not charted: 1 listing.", { exact: false })).toBeVisible();
     const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
-    await expect.element(legend.getByText("store1", { exact: true })).not.toBeInTheDocument();
-    await expect.element(legend.getByText("store9", { exact: true })).toBeVisible();
+    await expect.element(legend.getByText("store1: Acme X5 frame at l1", { exact: true })).not.toBeInTheDocument();
+    await expect.element(legend.getByText("store9: Acme X5 frame at l9", { exact: true })).toBeVisible();
     expect(curves(chartOf(screen).element())).toHaveLength(SERIES_LIMIT);
   });
 
@@ -331,6 +343,6 @@ describe("Price history chart", () => {
     const screen = await open(scripted(charted([steady, [null, null], [null]])));
     await expect.element(screen.getByText("Not charted: 2 listings.", { exact: false })).toBeVisible();
     const legend = screen.getByRole("figure", { name: "Price history" }).getByRole("list", { name: "Legend" });
-    await expect.element(legend.getByRole("listitem")).toHaveTextContent("store1");
+    await expect.element(legend.getByRole("listitem")).toHaveTextContent("store1: Acme X5 frame at l1");
   });
 });

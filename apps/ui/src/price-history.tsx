@@ -3,6 +3,7 @@ import { useId } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { DotItemDotProps, TooltipContentProps } from "recharts";
 import type { Client } from "./client.ts";
+import { listingName } from "./listing-name.ts";
 import { formatMoney } from "./money.ts";
 
 type Listings = Awaited<ReturnType<Client["getProduct"]>>["listings"];
@@ -69,7 +70,7 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
   const days = Array.from({ length: dayOf(new Date()) - start + 1 }, (_, index) => start + index);
   const series = charted.map(({ listing, byDay, color }) => ({
     key: listing.id,
-    name: listing.pluginId,
+    name: listingName(listing),
     color,
     byDay,
     values: days.map((day): Money | null => byDay.get(day) ?? null),
@@ -80,7 +81,7 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
   });
   const summary = charted.map(({ listing, costs, last }) => {
     const amounts = costs.map(({ cost }) => cost.amountMinor);
-    return `${listing.pluginId} lowest ${money(Math.min(...amounts))}, highest ${money(Math.max(...amounts))}, `
+    return `${listingName(listing)} lowest ${money(Math.min(...amounts))}, highest ${money(Math.max(...amounts))}, `
       + `latest ${money(last.cost.amountMinor)}`;
   }).join("; ");
   const name = `Landed cost over the last ${String(days.length)} days: ${summary}`;

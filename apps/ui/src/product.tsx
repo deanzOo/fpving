@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { toFailure, useClient } from "./client.ts";
 import type { Client } from "./client.ts";
 import { Confirm } from "./confirm.tsx";
+import { listingName } from "./listing-name.ts";
 import { formatMoney } from "./money.ts";
 import { PriceHistory } from "./price-history.tsx";
 import { QueryKey } from "./queries.ts";
@@ -134,7 +135,6 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
           <caption className="sr-only">Listings, with each one's latest price and landed cost</caption>
           <thead>
             <tr className="text-sm text-ink-muted">
-              <th scope="col" className={cell}>Store</th>
               <th scope="col" className={cell}>Listing</th>
               <th scope="col" className={cell}>Price</th>
               <th scope="col" className={cell}>Shipping</th>
@@ -149,10 +149,10 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
               const latest = history.reduce((_older, snapshot) => snapshot);
               return (
                 <tr key={listing.id}>
-                  <th scope="row" className={`${cell} font-medium`}>{listing.pluginId}</th>
-                  <td className={cell}>
+                  <th scope="row" className={`${cell} font-medium`}>
+                    {listing.pluginId}:{" "}
                     <a href={listing.url} target="_blank" rel="noreferrer" className="underline">{listing.title}</a>
-                  </td>
+                  </th>
                   <td className={`${cell} tabular-nums`}>{formatMoney(latest.itemPrice)}</td>
                   <td className={`${cell} tabular-nums`}>
                     {latest.shipping.kind === ShippingKind.Known ? formatMoney(latest.shipping) : "Unknown"}
@@ -165,10 +165,8 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
                   <td className={cell}>
                     <Confirm
                       action="Remove"
-                      actionLabel={`Remove the ${listing.pluginId} listing`}
-                      question={
-                        `Remove the ${listing.pluginId} listing? It is never scanned again; its history is kept.`
-                      }
+                      actionLabel={`Remove ${listingName(listing)}`}
+                      question={`Remove ${listingName(listing)}? It is never scanned again; its history is kept.`}
                       confirm="Remove"
                       disabled={remove.isPending}
                       onConfirm={() => {
