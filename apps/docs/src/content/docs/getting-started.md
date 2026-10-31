@@ -4,7 +4,7 @@ description: The planned first-run flow, how to run the server today, and what e
 ---
 
 :::caution[Not built yet]
-The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts, answers a JSON API (see the [HTTP API reference](../reference/http-api/)) and serves the UI, of which only the Watchlist screen is built.
+The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts, answers a JSON API (see the [HTTP API reference](../reference/http-api/)) and serves the UI with all of its screens. The product page does not show landed cost per listing or a price history chart yet.
 :::
 
 ## Planned flow
@@ -35,7 +35,13 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
 - `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
 
-- The UI in `apps/ui`: the app shell with its navigation and the Watchlist, where you paste a store URL to watch a product and see each product's cheapest landed cost, its 30-day price trend and its unread alerts. The other screens are placeholders.
+- The UI in `apps/ui`: the app shell with its navigation and six screens.
+  - Watchlist: paste a store URL to watch a product, see each product's cheapest landed cost, its 30-day price trend and its unread alerts, and start a scan with the last scan's result beside it. A URL another product already watches links to that product.
+  - Product: rename it, stop watching it (after a confirm step), see each listing's store, latest price, shipping, stock and status, remove a listing and add one by URL.
+  - Matches: the pending match candidates of every product, with the judge's verdict and reason and the similarity, to accept or reject, and a search for more per product.
+  - Alerts: every alert newest first or only the unread ones, marking one or all of them read.
+  - Settings: every setting in one form.
+  - Plugins: each `plugins.json` entry with its state (loaded, disabled with the reason, or backing off until when), its domains and its stale listing count, plus rejected entries and an unusable `plugins.json`.
 - The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health` and the domain routes (the watchlist, products, listings, match candidates, alerts, settings, plugins, scan now), refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
 
 To work on it, follow the setup in [Contributing](../contributing/).
