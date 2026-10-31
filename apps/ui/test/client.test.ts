@@ -5,8 +5,10 @@ import { listingIdSchema, snapshotIdSchema } from "@fpving/core";
 import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { ApiFailure, ClientErrorKind, createClient, reviveDates } from "../src/client.ts";
-import { emptyTrend, failWith, fakeApi, product, reply, unreadAlert, wire } from "./support/fake-api.ts";
+import { AlreadyTrackedFailure, ApiFailure, ClientErrorKind, createClient, reviveDates } from "../src/client.ts";
+import {
+  alreadyTracked, emptyTrend, failWith, fakeApi, product, reply, unreadAlert, wire,
+} from "./support/fake-api.ts";
 
 const USD_12 = { amountMinor: 1200, currency: "USD" } as const;
 const PAGE = "https://shop.example/item/frame";
@@ -96,6 +98,22 @@ describe("API client", () => {
     const api = fakeApi();
     api.on({ method: "POST", url: "/api/alerts/a1/read" }, () => new Response(null, { status: HttpStatus.NoContent }));
     expect(await api.client.markAlertRead({ alertId: "a1" })).toBeNull();
+  });
+
+  it("throws an already_tracked failure that carries the product that tracks the URL", async () => {
+    const api = fakeApi();
+    api.on(apiRoutes.addProduct, alreadyTracked("p1", "Frame"));
+    const failure = await failureOf(api.client.addProduct({ url: PAGE }));
+    expect(failure).toBeInstanceOf(AlreadyTrackedFailure);
+    expect(failure.kind).toBe(ApiErrorKind.AlreadyTracked);
+    expect(failure instanceof AlreadyTrackedFailure ? failure.product : null).toEqual({ id: "p1", name: "Frame" });
+  });
+
+  it("throws bad_response for an already_tracked answer that does not name the product", async () => {
+    const api = fakeApi();
+    const body = { error: { kind: ApiErrorKind.AlreadyTracked, message: "already tracked" } };
+    api.on(apiRoutes.addProduct, () => Response.json(body, { status: HttpStatus.Conflict }));
+    expect((await failureOf(api.client.addProduct({ url: PAGE }))).kind).toBe(ClientErrorKind.BadResponse);
   });
 
   it("throws unreachable when the request cannot be sent", async () => {

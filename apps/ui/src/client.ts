@@ -1,6 +1,6 @@
 import { apiRoutes } from "@fpving/app/api-routes";
-import { apiErrorSchema } from "@fpving/app/errors";
-import type { ApiErrorKind } from "@fpving/app/errors";
+import { apiErrorSchema, ApiErrorKind } from "@fpving/app/errors";
+import type { TrackedProduct } from "@fpving/app/errors";
 import { HttpStatus } from "@fpving/app/http-status";
 import { createContext, useContext } from "react";
 import { z } from "zod";
@@ -30,6 +30,16 @@ export class ApiFailure extends Error {
   constructor(kind: FailureKind, message: string) {
     super(message);
     this.kind = kind;
+  }
+}
+
+/** The `already_tracked` refusal, with the product that already tracks the URL. */
+export class AlreadyTrackedFailure extends ApiFailure {
+  readonly product: TrackedProduct;
+
+  constructor(message: string, product: TrackedProduct) {
+    super(ApiErrorKind.AlreadyTracked, message);
+    this.product = product;
   }
 }
 
@@ -128,7 +138,10 @@ const send = async <S extends z.ZodType>(
   }
   const failure = apiErrorSchema.safeParse(json);
   if (failure.success) {
-    throw new ApiFailure(failure.data.error.kind, failure.data.error.message);
+    const { error } = failure.data;
+    throw error.kind === ApiErrorKind.AlreadyTracked
+      ? new AlreadyTrackedFailure(error.message, error.product)
+      : new ApiFailure(error.kind, error.message);
   }
   throw badResponse();
 };
