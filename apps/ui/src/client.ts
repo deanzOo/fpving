@@ -52,7 +52,7 @@ interface Route {
   readonly url: string;
 }
 
-interface Request {
+interface CallInput {
   readonly query?: Readonly<Record<string, string | undefined>>;
   readonly body?: unknown;
 }
@@ -102,7 +102,7 @@ const send = async <S extends z.ZodType>(
   fetcher: Fetch,
   route: Route,
   success: S,
-  request: Request = {},
+  request: CallInput = {},
 ): Promise<z.output<S>> => {
   const query = Object.entries(request.query ?? {})
     .flatMap(([key, value]) => (value === undefined ? [] : [[key, value]]));
