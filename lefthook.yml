@@ -1,7 +1,7 @@
 pre-commit:
   jobs:
     - name: eslint
-      glob: "*.ts"
+      glob: "*.{ts,tsx}"
       run: pnpm exec eslint --fix {staged_files}
       stage_fixed: true
     - name: gitleaks
