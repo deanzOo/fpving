@@ -8,7 +8,8 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && pnpm --filter @fpving/ui build",
+    "dev": "tsc -b && pnpm --filter @fpving/ui dev",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
