@@ -21,6 +21,7 @@ export const ApiErrorKind = {
   ScanRunning: "scan_running",
   Restarting: "restarting",
   ShuttingDown: "shutting_down",
+  SettingsNotApplied: "settings_not_applied",
 } as const;
 
 /** One of the {@link ApiErrorKind} values. */

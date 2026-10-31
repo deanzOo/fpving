@@ -40,6 +40,7 @@ export interface SettingsApplier {
 }
 
 const OLD_HOST_STUCK = "the old plugin host did not shut down";
+const NOT_APPLIED = "settings change not applied";
 
 const DRAIN_DEADLINE_MS = 5000;
 
@@ -79,8 +80,9 @@ const pluginsChanged = (before: Settings, after: Settings): boolean =>
  * can be retried. An old host that fails to shut down is logged as a warning; the change still succeeds. That or a new
  * scan interval, which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which
  * waits for a running scan, so no scan loses its plugins halfway; it is started again whether or not the change
- * succeeded. A change that needs no restart is only saved. A failed change rejects for its caller; the next change
- * still runs.
+ * succeeded. A change that needs no restart is only saved. A change whose host failed to start or whose settings failed
+ * to save is logged and resolves `settings_not_applied`, and one made after `close` resolves `shutting_down`; any other
+ * failure rejects for its caller. The next change still runs.
  *
  * @param options - The running parts and how to start a host and a gateway.
  * @returns The applier.
@@ -93,19 +95,24 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
   let queue = Promise.resolve();
   let closed = false;
   let restarting = false;
-  const restart = async (next: Settings, restartPlugins: boolean): Promise<void> => {
+  const notApplied = (error: unknown): Result<void, SettingsChangeError> => {
+    live.deps.logger.error(NOT_APPLIED, { detail: inspect(error) });
+    return err({ kind: ApiErrorKind.SettingsNotApplied });
+  };
+  const restart = async (next: Settings, restartPlugins: boolean): Promise<Result<void, SettingsChangeError>> => {
     const { repository } = live.deps;
     await live.scans.stop();
     try {
       const old = live.host;
-      const host = restartPlugins ? await startHost(next) : old;
+      let host = old;
       try {
+        host = restartPlugins ? await startHost(next) : old;
         await repository.settings.save(next);
       } catch (error) {
         if (host !== old) {
           await host.shutdown();
         }
-        throw error;
+        return notApplied(error);
       }
       applied = next;
       if (host !== old) {
@@ -118,20 +125,25 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
           live.deps.logger.warn(OLD_HOST_STUCK, { detail: inspect(error) });
         });
       }
+      return changed;
     } finally {
       live.scans = await startScheduler(live.deps);
     }
   };
-  const reconfigure = async (next: Settings): Promise<void> => {
+  const reconfigure = async (next: Settings): Promise<Result<void, SettingsChangeError>> => {
     const restartPlugins = pluginsChanged(applied, next);
     if (!restartPlugins && applied.scanIntervalHours === next.scanIntervalHours) {
-      await live.deps.repository.settings.save(next);
+      try {
+        await live.deps.repository.settings.save(next);
+      } catch (error) {
+        return notApplied(error);
+      }
       applied = next;
-      return;
+      return changed;
     }
     restarting = true;
     try {
-      await restart(next, restartPlugins);
+      return await restart(next, restartPlugins);
     } finally {
       restarting = false;
     }
@@ -141,8 +153,8 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
       if (closed) {
         return err({ kind: ApiErrorKind.ShuttingDown });
       }
-      const run = queue.then(async () => reconfigure(next)).then(() => changed);
-      // The caller gets the failure and the server logs it; the queue only waits for it.
+      const run = queue.then(async () => reconfigure(next));
+      // The caller gets an unexpected failure and the server logs it; the queue only waits for it.
       queue = run.then(settledEither, settledEither);
       return run;
     },

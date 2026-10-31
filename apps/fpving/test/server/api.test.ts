@@ -506,13 +506,16 @@ describe("Settings API", () => {
     expect((await api.request("GET", apiRoutes.getSettings.url)).json()).toEqual(next);
   });
 
-  it("answers 503 shutting_down to a change the runtime refuses because it is shutting down", async () => {
+  it.each([
+    ["it is shutting down", ApiErrorKind.ShuttingDown],
+    ["the change was not applied", ApiErrorKind.SettingsNotApplied],
+  ] as const)("answers 503 to a change the runtime refuses because %s, naming the kind", async (_label, kind) => {
     const saved = await api.request("GET", apiRoutes.getSettings.url);
     const current = z.record(z.string(), z.unknown()).parse(saved.json());
-    api.applySettings.mockResolvedValueOnce(err({ kind: ApiErrorKind.ShuttingDown }));
+    api.applySettings.mockResolvedValueOnce(err({ kind }));
     const response = await api.request("PUT", apiRoutes.putSettings.url, current);
     expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
-    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ShuttingDown);
+    expect(errorOf(response.json()).kind).toBe(kind);
   });
 
   it("refuses settings that fail the schema with 400 and changes nothing", async () => {

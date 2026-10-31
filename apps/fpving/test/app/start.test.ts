@@ -28,7 +28,6 @@ const UNAVAILABLE = 503;
 const PLUGIN_LOAD_MS = 20_000;
 const MS_PER_HOUR = 3_600_000;
 const ACCEPTED = 202;
-const INTERNAL_ERROR = 500;
 const OWNER_ONLY = 0o700;
 const PERMISSIONS = 0o777;
 const OPEN_DIR = 0o755;
@@ -393,7 +392,9 @@ describe("App settings changes", () => {
 
   it("keeps the old settings and plugins when the host cannot restart, so retrying the same change works", async () => {
     const { running, workers, put } = await startRefusingUsOnce();
-    expect((await put()).statusCode).toBe(INTERNAL_ERROR);
+    const refused = await put();
+    expect(refused.statusCode).toBe(UNAVAILABLE);
+    expect(refused.json()).toMatchObject({ error: { kind: ApiErrorKind.SettingsNotApplied } });
     expect(await running.deps.repository.settings.get()).toMatchObject({ shipToCountry: "IL" });
     expect(running.plugins.plugins()[0]?.status.kind).toBe(PluginStatusKind.Loaded);
     expect(workers.map((worker) => worker.terminations())).toEqual([0]);

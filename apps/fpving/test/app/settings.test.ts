@@ -16,6 +16,8 @@ import { recordingLogger } from "../support/recording-logger.ts";
 
 const US: Settings = { ...settingsSchema.parse(DEFAULT_SETTINGS), shipToCountry: "US" };
 
+const notApplied = err({ kind: ApiErrorKind.SettingsNotApplied });
+
 afterEach(cleanUpTemp);
 
 const held = () => {
@@ -111,14 +113,14 @@ describe("Settings applier", () => {
   it("stops saying it is restarting when the plugin host failed to start", async () => {
     const { applier, startHost } = await applierHarness();
     startHost.mockRejectedValueOnce(new Error("cannot spawn"));
-    await expect(applier.apply(US)).rejects.toThrow("cannot spawn");
+    expect(await applier.apply(US)).toEqual(notApplied);
     expect(applier.restarting()).toBe(false);
   });
 
   it("keeps only the old host running and the old settings saved when saving fails, so a retry works", async () => {
     const { applier, live, hosts, shutdowns, saving, repository } = await applierHarness();
     saving.mockRejectedValueOnce(new Error("disk full"));
-    await expect(applier.apply(US)).rejects.toThrow("disk full");
+    expect(await applier.apply(US)).toEqual(notApplied);
     expect({ live: live.host === hosts[0], shutdowns: shutdowns() }).toEqual({ live: true, shutdowns: [0, 1] });
     expect(await repository.settings.get()).toMatchObject({ shipToCountry: "IL" });
     await applier.apply(US);
@@ -129,9 +131,19 @@ describe("Settings applier", () => {
   it("keeps the old schedule and settings when saving a new scan interval fails", async () => {
     const { applier, armed, shutdowns, saving, repository } = await applierHarness();
     saving.mockRejectedValueOnce(new Error("disk full"));
-    await expect(applier.apply({ ...US, shipToCountry: "IL", scanIntervalHours: 1 })).rejects.toThrow("disk full");
+    expect(await applier.apply({ ...US, shipToCountry: "IL", scanIntervalHours: 1 })).toEqual(notApplied);
     expect({ armed, shutdowns: shutdowns() }).toEqual({ armed: [armed[0]], shutdowns: [0] });
     expect(await repository.settings.get()).toEqual(settingsSchema.parse(DEFAULT_SETTINGS));
+  });
+
+  it("answers settings_not_applied to a change whose settings fail to save, and logs why", async () => {
+    const { applier, saving, logger } = await applierHarness();
+    saving.mockRejectedValueOnce(new Error("disk full"));
+    expect(await applier.apply({ ...US, shipToCountry: "IL", priceDropMinBasisPoints: 1 })).toEqual(notApplied);
+    const errors = logger.events.filter((event) => event.level === "error");
+    expect(errors.map(({ message, fields }) => [message, String(fields?.["detail"]).includes("disk full")])).toEqual([
+      ["settings change not applied", true],
+    ]);
   });
 
   it("lets a call through the old gateway finish before it shuts the old host down", async () => {

@@ -30,9 +30,9 @@ import { apiError, ApiErrorKind } from "./errors.js";
 import { HttpStatus } from "./server.js";
 import type { AppServer } from "./server.js";
 
-/** Why a settings change was not applied. */
+/** Why a settings change was not applied: the app is shutting down, or a plugin host failed to start or a save. */
 export interface SettingsChangeError {
-  readonly kind: typeof ApiErrorKind.ShuttingDown;
+  readonly kind: typeof ApiErrorKind.ShuttingDown | typeof ApiErrorKind.SettingsNotApplied;
 }
 
 /** What the domain routes read on each request, once startup completed. */
@@ -66,6 +66,7 @@ const Message = {
   ScanRunning: "a scan is already running",
   Restarting: "the plugins and the scan schedule are restarting for a settings change; try again shortly",
   ShuttingDown: "fpving is shutting down",
+  SettingsNotApplied: "the settings were not applied and the old ones still hold; see the log, then try again",
 } as const;
 
 const failure = <S extends (typeof HttpStatus)[keyof typeof HttpStatus]>(
@@ -323,9 +324,14 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     ...apiRoutes.putSettings,
     handler: async ({ body }, reply) => {
       const applied = await runtime().applySettings(body);
-      return applied.ok
-        ? reply.code(HttpStatus.Ok).send(body)
-        : reply.code(shuttingDown.status).send(shuttingDown.body);
+      if (applied.ok) {
+        return reply.code(HttpStatus.Ok).send(body);
+      }
+      const { kind } = applied.error;
+      const { status, body: refusal } = kind === ApiErrorKind.ShuttingDown
+        ? shuttingDown
+        : failure(HttpStatus.ServiceUnavailable, kind, Message.SettingsNotApplied);
+      return reply.code(status).send(refusal);
     },
   });
 
