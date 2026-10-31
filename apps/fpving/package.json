@@ -5,7 +5,22 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./api-routes": {
+      "@fpving/source": "./src/server/api-routes.ts",
+      "types": "./dist/server/api-routes.d.ts",
+      "import": "./dist/server/api-routes.js"
+    },
+    "./errors": {
+      "@fpving/source": "./src/server/errors.ts",
+      "types": "./dist/server/errors.d.ts",
+      "import": "./dist/server/errors.js"
+    },
+    "./http-status": {
+      "@fpving/source": "./src/server/http-status.ts",
+      "types": "./dist/server/http-status.d.ts",
+      "import": "./dist/server/http-status.js"
+    }
   },
   "types": "./dist/index.d.ts",
   "scripts": {
@@ -14,6 +29,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.3.0",
+    "@fastify/static": "10.1.8",
     "@fpving/core": "workspace:*",
     "@fpving/plugin-sdk": "workspace:*",
     "better-sqlite3": "13.0.3",
