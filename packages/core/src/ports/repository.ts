@@ -107,6 +107,12 @@ export interface SnapshotRepository {
    * at the same instant, the one with the greater id by code point is the newest.
    */
   latestPerListing(productId: ProductId): Promise<PriceSnapshot[]>;
+  /**
+   * Every snapshot of an active or stale listing of a product that is not archived observed at or after `since`, plus
+   * each such listing's newest snapshot before `since`, ordered by listing id by code point, then oldest first. Of
+   * snapshots before `since` observed at the same instant, the one with the greater id by code point is the newest.
+   */
+  listForTrend(since: Date): Promise<PriceSnapshot[]>;
 }
 
 /**
@@ -184,6 +190,8 @@ export interface FxRateRepository {
 export interface PluginHealthRepository {
   /** A plugin's health; a plugin without a record has no blocks and no backoff. */
   get(pluginId: PluginId): Promise<PluginHealth>;
+  /** Every stored plugin health record, by plugin id in code point order. */
+  list(): Promise<PluginHealth[]>;
   /** Stores a plugin's health, replacing its earlier record. */
   upsert(health: PluginHealth): Promise<void>;
 }

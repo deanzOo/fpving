@@ -44,6 +44,9 @@ export const inMemoryRepository = (): Repository => {
   let fxTable: FxTable | null = null;
   let settings: Settings = copy(DEFAULT_SETTINGS);
 
+  const scanned = (row: Listing | undefined): boolean =>
+    row !== undefined && SCANNED.includes(row.status) && products.get(row.productId)?.archivedAt === null;
+
   const urlTracked = (url: string): boolean => [...listings.values()].some((row) => row.url === url);
   const suggested = (row: Pick<MatchCandidate, "productId" | "url">, pool: Iterable<MatchCandidate>): boolean =>
     [...pool].some((other) => other.productId === row.productId && other.url === row.url);
@@ -154,7 +157,7 @@ export const inMemoryRepository = (): Repository => {
         Promise.resolve(
           copy(
             [...listings.values()]
-              .filter((row) => SCANNED.includes(row.status) && products.get(row.productId)?.archivedAt === null)
+              .filter(scanned)
               .toSorted(
                 (a, b) =>
                   byCodePoint(a.pluginId, b.pluginId)
@@ -225,6 +228,20 @@ export const inMemoryRepository = (): Repository => {
           }
         }
         return Promise.resolve(copy([...latest.values()]));
+      },
+      listForTrend: async (since) => {
+        const scoped = [...snapshots.values()].filter((row) => scanned(listings.get(row.listingId)));
+        const seeds = new Map<string, PriceSnapshot>();
+        for (const row of newestFirst(scoped.filter((s) => s.observedAt < since), (s) => s.observedAt)) {
+          if (!seeds.has(row.listingId)) {
+            seeds.set(row.listingId, row);
+          }
+        }
+        return Promise.resolve(copy([...seeds.values(), ...scoped.filter((s) => s.observedAt >= since)].toSorted(
+          (a, b) =>
+            byCodePoint(a.listingId, b.listingId) || a.observedAt.getTime() - b.observedAt.getTime()
+            || byCodePoint(a.id, b.id),
+        )));
       },
     },
     matchCandidates: {
@@ -353,6 +370,8 @@ export const inMemoryRepository = (): Repository => {
     pluginHealth: {
       get: async (pluginId) =>
         Promise.resolve(copy(health.get(pluginId) ?? { pluginId, consecutiveBlocks: 0, backoffUntil: null })),
+      list: async () =>
+        Promise.resolve(copy([...health.values()].toSorted((a, b) => byCodePoint(a.pluginId, b.pluginId)))),
       upsert: async (row) => {
         health.set(row.pluginId, copy(row));
         return Promise.resolve();

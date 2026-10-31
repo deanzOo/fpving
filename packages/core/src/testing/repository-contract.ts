@@ -460,6 +460,46 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
       });
     });
 
+    describe("Trend snapshots", () => {
+      it("returns nothing from an empty repository", async () => {
+        expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([]);
+      });
+
+      it("returns the snapshots from an instant on, plus each listing's newest one before it, by listing", async () => {
+        await seed();
+        const l0 = listing("l0", p2.id, url("zero"));
+        const beforeL0 = snapshot("s0", l0.id, JAN_1);
+        await repo.listings.addWithSnapshot(l0, beforeL0);
+        const window = [snapshot("s3", l1.id, JUST_BEFORE_JAN_2), snapshot("s4", l1.id, JAN_2)];
+        const later = snapshot("s5", l1.id, JAN_3);
+        for (const row of [later, ...window]) {
+          await repo.snapshots.append(row);
+        }
+        expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([beforeL0, ...window, later, s2]);
+      });
+
+      it("leaves out gone and removed listings and the listings of archived products, keeping stale ones", async () => {
+        await seed();
+        const stale = { ...listing("l3", p1.id, url("three")), status: ListingStatus.Stale };
+        const gone = { ...listing("l4", p1.id, url("four")), status: ListingStatus.Gone };
+        const removed = { ...listing("l5", p1.id, url("five")), status: ListingStatus.Removed };
+        const ofStale = snapshot("s-l3", stale.id, JAN_2);
+        for (const row of [stale, gone, removed]) {
+          await repo.listings.addWithSnapshot(row, snapshot(`s-${row.id}`, row.id, JAN_2));
+        }
+        await repo.products.archive(p2.id, JAN_2);
+        expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([s1, ofStale]);
+      });
+
+      it("picks the earlier snapshot with the greater id by code point on an observed instant tie", async () => {
+        await seed();
+        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
+          await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
+        }
+        expect(await repo.snapshots.listForTrend(JAN_3)).toEqual([snapshot(ASTRAL_ID_HIGH, l1.id, JAN_2), s2]);
+      });
+    });
+
     describe("Match candidates", () => {
       beforeEach(seed);
 
@@ -789,6 +829,16 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         await repo.pluginHealth.upsert(worse);
         expect(await repo.pluginHealth.get(PLUGIN)).toEqual(worse);
         expect(await repo.pluginHealth.get(OTHER_PLUGIN)).toEqual(other);
+      });
+
+      it("lists every stored health record by plugin id", async () => {
+        expect(await repo.pluginHealth.list()).toEqual([]);
+        const other = { pluginId: OTHER_PLUGIN, consecutiveBlocks: 1, backoffUntil: JAN_2 };
+        const blocked = { pluginId: PLUGIN, consecutiveBlocks: BLOCKS, backoffUntil: null };
+        await repo.pluginHealth.upsert(other);
+        await repo.pluginHealth.upsert({ ...blocked, consecutiveBlocks: 1 });
+        await repo.pluginHealth.upsert(blocked);
+        expect(await repo.pluginHealth.list()).toEqual([blocked, other]);
       });
     });
 
