@@ -1,6 +1,6 @@
 import type { Money } from "@fpving/plugin-sdk";
 import { Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
-import type { TooltipContentProps } from "recharts";
+import type { DotItemDotProps, TooltipContentProps } from "recharts";
 import { formatMoney } from "./money.ts";
 
 const WIDTH = 128;
@@ -8,13 +8,15 @@ const HEIGHT = 32;
 const STROKE = 2;
 const INSET = 3;
 const DAY = "day";
+const DOT_RADIUS = 4;
 const MARGIN = { top: INSET, right: INSET, bottom: INSET, left: INSET } as const;
 
 const relativeDay = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 
 /**
  * A product's cheapest price once a day, oldest first, as a 2px line with no axes. A day without a price leaves a
- * gap instead of a bridged segment. The figure's name sums the range up; hovering shows the day's price.
+ * gap instead of a bridged segment, and a price with no priced day beside it is a dot. The figure's name sums the
+ * range up; hovering shows the day's price.
  *
  * @param props - The trend, one entry a day, null on a day without a price.
  * @returns The sparkline, or a note when no day has a price.
@@ -32,6 +34,11 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
     + `${money(Math.max(...amounts))}, latest ${formatMoney(latest)}, ${String(priced.length)} days with a price`;
   const data = trend.map((price, day) => ({ day, amountMinor: price?.amountMinor ?? null }));
   const today = trend.length - 1;
+  const hasPrice = (day: number): boolean => (trend[day] ?? null) !== null;
+  const LoneDot = ({ cx, cy, index }: DotItemDotProps) =>
+    hasPrice(index) && !hasPrice(index - 1) && !hasPrice(index + 1)
+      ? <circle key={index} className="sparkline-dot" cx={cx} cy={cy} r={DOT_RADIUS} fill="currentColor" />
+      : null;
   const TooltipBody = ({ active, label }: TooltipContentProps) => {
     if (!active) {
       return null;
@@ -62,7 +69,7 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
           dataKey="amountMinor"
           stroke="currentColor"
           strokeWidth={STROKE}
-          dot={false}
+          dot={LoneDot}
           connectNulls={false}
           isAnimationActive={false}
         />

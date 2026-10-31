@@ -24,6 +24,8 @@ const LOWER = usd(LOWER_MINOR);
 const LEFT_EDGE = { x: 4, y: 16 };
 const HALF = 2;
 const SEGMENTS_AROUND_ONE_GAP = 2;
+const GAP_DAY = 10;
+const LONE_PRICES = 2;
 
 const row = (overrides: Partial<Row> = {}): Row => ({
   product: product("p1", "Acme X5 frame"),
@@ -79,6 +81,22 @@ describe("Watchlist", () => {
     const screen = await renderApp(scripted([row({ trend })]).client);
     await expect.element(screen.getByRole("img", { name: /lowest \$123\.45/u })).toBeVisible();
     expect(lineSegments(screen.container)).toBe(SEGMENTS_AROUND_ONE_GAP);
+  });
+
+  it("draws a price with no priced neighbour as a dot, so a product added today shows on its trend", async () => {
+    const today = emptyTrend().map((_none, day) => (day === TREND_DAYS - 1 ? PRICE : null));
+    const lone = emptyTrend().map((_none, day) => (day === GAP_DAY || day === TREND_DAYS - 1 ? PRICE : null));
+    const screen = await renderApp(scripted([
+      row({ trend: today }),
+      row({ product: product("p2", "Acme X5 kit"), trend: lone }),
+      row({ product: product("p3", "Acme X5 arms") }),
+    ]).client);
+    const dots = (name: RegExp) =>
+      screen.getByRole("row", { name }).element().querySelectorAll(".sparkline-dot").length;
+    await expect.element(screen.getByRole("row", { name: /Acme X5 arms/u })).toBeVisible();
+    expect(dots(/Acme X5 frame/u)).toBe(1);
+    expect(dots(/Acme X5 kit/u)).toBe(LONE_PRICES);
+    expect(dots(/Acme X5 arms/u)).toBe(0);
   });
 
   it("names the trend's range and latest price for screen readers", async () => {
