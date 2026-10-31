@@ -151,11 +151,12 @@ export const Matches = () => {
   const pending = useQueries({
     queries: (products ?? []).map(({ product }) => ({
       queryKey: [...QueryKey.Candidates, product.id],
-      queryFn: async () => client.listCandidates({ productId: product.id }),
+      queryFn: async () => ({ product, candidates: await client.listCandidates({ productId: product.id }) }),
       throwOnError: true,
     })),
   });
-  const loaded = products !== undefined && pending.every(({ data }) => data !== undefined);
+  const groups = pending.map(({ data }) => data).filter((group) => group !== undefined);
+  const loaded = groups.length === products?.length;
   return (
     <section>
       <h1 className="text-2xl font-semibold">Matches</h1>
@@ -163,11 +164,11 @@ export const Matches = () => {
       {products?.length === 0 && (
         <p className="mt-6 text-ink-muted">Nothing is watched yet. Add a product on the Watchlist first.</p>
       )}
-      {loaded && products.length > 0 && pending.every(({ data }) => data?.length === 0) && (
+      {loaded && groups.length > 0 && groups.every(({ candidates }) => candidates.length === 0) && (
         <p className="mt-6 text-ink-muted">No match candidates are waiting for review.</p>
       )}
-      {loaded && products.map(({ product }, index) => (
-        <Group key={product.id} product={product} candidates={pending[index]?.data ?? []} />
+      {loaded && groups.map(({ product, candidates }) => (
+        <Group key={product.id} product={product} candidates={candidates} />
       ))}
     </section>
   );

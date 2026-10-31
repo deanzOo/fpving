@@ -11,6 +11,7 @@ import { renderApp } from "./support/render-app.tsx";
 const saved = settingsSchema.parse(DEFAULT_SETTINGS);
 const SIX_HOURS = 6;
 const VAT_17_5 = 1750;
+const THRESHOLD_150_EUR = 15_000;
 
 const scripted = () => {
   const api = fakeApi();
@@ -60,11 +61,18 @@ describe("Settings", () => {
     await screen.getByLabelText("Scan every (hours)").fill(String(SIX_HOURS));
     await screen.getByLabelText("VAT (%)").fill("17.5");
     await screen.getByLabelText("Display currency").selectOptions("USD");
+    await screen.getByLabelText("Ship to").selectOptions("DE");
+    await screen.getByLabelText("Threshold currency").selectOptions("EUR");
+    await screen.getByLabelText("Duty-free threshold", { exact: true }).fill("150");
+    await screen.getByLabelText("Threshold applies to").selectOptions(ThresholdBasis.ItemAndShipping);
     await screen.getByRole("button", { name: "Save settings" }).click();
     await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
     const expected: Settings = {
-      ...saved, displayCurrency: "USD", scanIntervalHours: SIX_HOURS,
-      importTax: { ...saved.importTax, vatBasisPoints: VAT_17_5 },
+      ...saved, displayCurrency: "USD", shipToCountry: "DE", scanIntervalHours: SIX_HOURS,
+      importTax: {
+        dutyFreeThreshold: { amountMinor: THRESHOLD_150_EUR, currency: "EUR" }, vatBasisPoints: VAT_17_5,
+        thresholdBasis: ThresholdBasis.ItemAndShipping,
+      },
     };
     expect(api.sent).toContainEqual({ method: "PUT", path: apiRoutes.putSettings.url, body: expected });
   });
