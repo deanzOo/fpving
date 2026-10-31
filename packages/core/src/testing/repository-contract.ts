@@ -470,12 +470,12 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         const l0 = listing("l0", p2.id, url("zero"));
         const beforeL0 = snapshot("s0", l0.id, JAN_1);
         await repo.listings.addWithSnapshot(l0, beforeL0);
-        const window = [snapshot("s3", l1.id, JUST_BEFORE_JAN_2), snapshot("s4", l1.id, JAN_2)];
+        const l1Rows = [snapshot("s3", l1.id, JUST_BEFORE_JAN_2), snapshot("s4", l1.id, JAN_2)];
         const later = snapshot("s5", l1.id, JAN_3);
-        for (const row of [later, ...window]) {
+        for (const row of [later, ...l1Rows]) {
           await repo.snapshots.append(row);
         }
-        expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([beforeL0, ...window, later, s2]);
+        expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([beforeL0, ...l1Rows, later, s2]);
       });
 
       it("leaves out gone and removed listings and the listings of archived products, keeping stale ones", async () => {
