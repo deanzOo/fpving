@@ -46,6 +46,15 @@ export const fakeApi = () => {
   return { client: createClient(fetcher), on, sent };
 };
 
+/** The route at `params`, for scripting an answer to a route with path params. */
+export const at = (
+  route: { readonly method: string; readonly url: string },
+  params: Readonly<Record<string, string>>,
+) => ({
+  method: route.method,
+  url: Object.entries(params).reduce((url, [name, value]) => url.replace(`:${name}`, value), route.url),
+});
+
 /** A watched product as the server holds it. */
 export const product = (id: string, name: string): Product => ({
   id: productIdSchema.parse(id),
@@ -75,4 +84,15 @@ export const wire = {
   watchlist: apiRoutes.listProducts.schema.response[HttpStatus.Ok],
   added: apiRoutes.addProduct.schema.response[HttpStatus.Created],
   alerts: apiRoutes.listAlerts.schema.response[HttpStatus.Ok],
+  scan: apiRoutes.getScan.schema.response[HttpStatus.Ok],
+  detail: apiRoutes.getProduct.schema.response[HttpStatus.Ok],
+  addedListing: apiRoutes.addListing.schema.response[HttpStatus.Created],
+  candidates: apiRoutes.listCandidates.schema.response[HttpStatus.Ok],
+  found: apiRoutes.findMatches.schema.response[HttpStatus.Ok],
+  marked: apiRoutes.markAllAlertsRead.schema.response[HttpStatus.Ok],
+  settings: apiRoutes.getSettings.schema.response[HttpStatus.Ok],
+  plugins: apiRoutes.listPlugins.schema.response[HttpStatus.Ok],
 } as const;
+
+/** A 204 answer. */
+export const noContent: Answer = () => new Response(null, { status: HttpStatus.NoContent });

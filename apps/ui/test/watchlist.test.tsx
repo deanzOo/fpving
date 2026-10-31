@@ -148,7 +148,8 @@ describe("Adding a product by URL", () => {
     const field = screen.getByLabelText("Store URL");
     await field.fill(PAGE);
     await screen.getByRole("button", { name: "Add product" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Now watching Acme X5 kit");
+    await expect.element(screen.getByRole("status").filter({ hasText: "Now watching" }))
+      .toHaveTextContent("Now watching Acme X5 kit");
     await expect.element(screen.getByRole("link", { name: "Acme X5 kit" })).toBeVisible();
     await expect.element(field).toHaveValue("");
     expect(api.sent).toContainEqual({ method: "POST", path: apiRoutes.addProduct.url, body: { url: PAGE } });

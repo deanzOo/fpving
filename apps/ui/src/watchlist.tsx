@@ -4,6 +4,7 @@ import { AddProduct } from "./add-product.tsx";
 import { useClient } from "./client.ts";
 import { formatMoney } from "./money.ts";
 import { QueryKey } from "./queries.ts";
+import { ScanNow } from "./scan-now.tsx";
 import { Sparkline } from "./sparkline.tsx";
 
 const cell = "border-b border-line px-3 py-2";
@@ -24,7 +25,10 @@ export const Watchlist = () => {
   }).data;
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Watchlist</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Watchlist</h1>
+        <ScanNow />
+      </div>
       <AddProduct />
       {rows === undefined && <p className="mt-6 text-ink-muted">Loading…</p>}
       {rows?.length === 0 && <p className="mt-6 text-ink-muted">{EMPTY}</p>}
