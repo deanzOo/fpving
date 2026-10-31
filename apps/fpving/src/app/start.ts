@@ -136,16 +136,17 @@ export const isOpenToOthers = (mode: number, platform: NodeJS.Platform): boolean
   platform !== "win32" && (mode & GROUP_OR_WORLD) !== 0;
 
 const prepareDataDir = async (
-  dataDir: string,
+  env: Env,
   platform: NodeJS.Platform,
-): Promise<Result<{ readonly openToOthers: boolean }, StartupError>> => {
+): Promise<Result<{ readonly logger: ClosableLogger; readonly openToOthers: boolean }, StartupError>> => {
+  const dataDir = env.DATA_DIR;
   try {
     const created = await mkdir(dataDir, { recursive: true, mode: OWNER_ONLY_DIR });
     if (created !== undefined) {
       await chmod(dataDir, OWNER_ONLY_DIR);
-      return ok({ openToOthers: false });
     }
-    return ok({ openToOthers: isOpenToOthers((await stat(dataDir)).mode, platform) });
+    const openToOthers = created === undefined && isOpenToOthers((await stat(dataDir)).mode, platform);
+    return ok({ logger: createPinoLogger({ level: env.LOG_LEVEL, file: join(dataDir, LOG_FILE) }), openToOthers });
   } catch (error) {
     return failed(StartupErrorKind.DataDirFailed, `Cannot prepare DATA_DIR: ${String(error)}`);
   }
@@ -173,8 +174,9 @@ const judgeFor = (env: Env, logger: ClosableLogger): LlmJudge => {
 
 /**
  * Starts the app: parses the environment, creates `DATA_DIR` owner-only (an existing one keeps its mode, with a
- * warning when others can open it) and opens the log. Then it binds the server to `127.0.0.1:PORT`, which is the
- * single-instance lock: a second instance fails there, before it touches the database, loads a plugin or scans.
+ * warning when others can open it) and opens the log; a failure there is `data_dir_failed`. Then it binds the server
+ * to `127.0.0.1:PORT`, which is the single-instance lock: a second instance fails there, before it touches the
+ * database, loads a plugin or scans.
  * While starting, only the health route answers; every other route answers 503. Then it migrates and opens the
  * database, starts the plugin host with the saved ship-to country and display currency, wires every adapter into
  * core and starts the scan schedule. Any failure after the log opened, and a shutdown requested through `signal`
@@ -198,11 +200,11 @@ export const startApp = async (
   const env = parsed.value;
   const dataDir = env.DATA_DIR;
   const platform = overrides.platform ?? process.platform;
-  const prepared = await prepareDataDir(dataDir, platform);
+  const prepared = await prepareDataDir(env, platform);
   if (!prepared.ok) {
     return prepared;
   }
-  const logger = createPinoLogger({ level: env.LOG_LEVEL, file: join(dataDir, LOG_FILE) });
+  const { logger } = prepared.value;
   if (prepared.value.openToOthers) {
     logger.warn("DATA_DIR is open to other users; consider chmod 700", { dataDir });
   }

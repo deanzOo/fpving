@@ -233,6 +233,14 @@ describe("App startup failures", () => {
     expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.DataDirFailed } });
   });
 
+  it("refuses a DATA_DIR whose log cannot be opened, with a one-line data dir failure", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, "logs"), "");
+    const result = await startApp(env(), fakes().ports);
+    expect(result).toMatchObject({ ok: false, error: { kind: StartupErrorKind.DataDirFailed } });
+    expect(result.ok ? "" : result.error.message).toMatch(/^Cannot prepare DATA_DIR: Error: E\w+:[^\n]*$/u);
+  });
+
   it("refuses to start when the database cannot be migrated, and logs the detail", async () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, DB_FILE), "not a database, just text that is long enough to have a header page");
