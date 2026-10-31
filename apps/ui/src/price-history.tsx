@@ -1,3 +1,4 @@
+import { ListingStatus } from "@fpving/core";
 import type { Money } from "@fpving/plugin-sdk";
 import { useId } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -31,7 +32,8 @@ const midnight = (at: Date, offset = 0): Date => new Date(at.getFullYear(), at.g
 /**
  * The landed cost of each listing once a day, one line per listing in a fixed series colour, from the first day with
  * a price to today. Days are the viewer's local calendar days, and a day's value is the listing's latest snapshot by
- * the end of that day, carried forward like the watchlist trend. A day without a landed cost leaves a gap and a
+ * the end of that day, carried forward until the next snapshot; a listing that is no longer active is not carried past
+ * the day of its last snapshot. A day without a landed cost leaves a gap and a
  * priced day with no priced neighbour is a dot. The chart's name sums each listing's range up, and hovering, or
  * focusing it and pressing the arrow keys, shows every listing's cost that day. Only listings with a landed cost are
  * charted, and the palette has eight series, so at most the eight most recently priced are; a note counts the others,
@@ -51,9 +53,11 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     allDays.push(day);
   }
   const pricedListings = listings.flatMap(({ listing, history }) => {
+    const lastSeen = history.reduce((_older, snapshot) => snapshot).observedAt;
     const values = allDays.map((day): Money | null => {
       const end = midnight(day, 1);
-      return history.findLast(({ observedAt }) => observedAt < end)?.landedCost ?? null;
+      const carried = listing.status === ListingStatus.Active || day <= lastSeen;
+      return carried ? history.findLast(({ observedAt }) => observedAt < end)?.landedCost ?? null : null;
     });
     const costs = values.flatMap((cost, day) => (cost === null ? [] : [{ day, cost }]));
     const last = costs.at(-1);

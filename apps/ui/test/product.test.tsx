@@ -373,6 +373,18 @@ describe("Price history chart", () => {
     expect(curveSegments(chartOf(screen).element())).toEqual([1]);
   });
 
+  it("ends a listing that is no longer active at its last snapshot instead of carrying it to today", async () => {
+    const active = { listing: listing("l1"), history: daily("l1", [LOWER_MINOR, LOWER_MINOR, LOWER_MINOR]) };
+    const gone = {
+      listing: listing("l2", { status: ListingStatus.Gone }),
+      history: [snapshot("l2", TWO_DAYS, { landedCost: usd(LANDED_MINOR) })],
+    };
+    const screen = await open(scripted({ product: product(ID, "Acme X5 frame"), listings: [active, gone] }));
+    await expect.element(chartOf(screen)).toBeVisible();
+    expect(curveSegments(chartOf(screen).element())).toEqual([1, 1]);
+    expect(chartOf(screen).element().querySelectorAll(".history-dot")).toHaveLength(1);
+  });
+
   it("buckets days in the viewer's time zone, so scans either side of local midnight are two days", async () => {
     const now = new Date();
     const lateYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, LATE_HOUR, LATE_MINUTE);
