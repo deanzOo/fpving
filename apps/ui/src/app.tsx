@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import type { RouterHistory } from "@tanstack/react-router";
 import { useState } from "react";
+import { Alerts } from "./alerts.tsx";
 import { ClientContext } from "./client.ts";
 import type { Client } from "./client.ts";
 import { ErrorView } from "./error-view.tsx";
@@ -19,7 +20,7 @@ const routeTree = rootRoute.addChildren([
   createRoute({ getParentRoute: () => rootRoute, path: "/", component: Watchlist }),
   placeholder("/products/$id", "Product"),
   placeholder("/matches", "Matches"),
-  placeholder("/alerts", "Alerts"),
+  createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts }),
   placeholder("/settings", "Settings"),
   placeholder("/plugins", "Plugins"),
 ]);

@@ -3,6 +3,7 @@ export const QueryKey = {
   Watchlist: ["watchlist"],
   UnreadAlerts: ["alerts", "unread"],
   Alerts: ["alerts"],
+  AllAlerts: ["alerts", "all"],
   Scan: ["scan"],
   Product: ["product"],
   Candidates: ["candidates"],
