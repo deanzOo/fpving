@@ -6,6 +6,7 @@ import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { ErrorView } from "../src/error-view.tsx";
 import { ClientErrorKind } from "../src/client.ts";
+import { takeLogged } from "./support/console-guard.ts";
 import { failWith, fakeApi, reply, unreadAlert, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 
@@ -84,6 +85,9 @@ describe("App shell", () => {
     api.on(apiRoutes.listProducts, reply(wire.watchlist, []));
     await screen.getByRole("button", { name: "Try again" }).click();
     await expect.element(screen.getByText("Nothing is watched yet", { exact: false })).toBeVisible();
+    const logged = takeLogged().flat();
+    expect(logged).toContainEqual(expect.objectContaining({ kind: ApiErrorKind.Starting }));
+    expect(logged).toContain("Warning: Error in route match: //");
   });
 });
 

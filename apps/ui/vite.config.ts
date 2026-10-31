@@ -14,6 +14,7 @@ export default defineConfig({
   test: {
     name: "ui",
     include: ["test/**/*.test.{ts,tsx}"],
+    setupFiles: ["test/support/console-guard.ts"],
     browser: {
       enabled: true,
       headless: true,
