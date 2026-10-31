@@ -115,7 +115,7 @@ describe("Alerts", () => {
     const screen = await renderApp(api.client, "/alerts");
     const button = screen.getByRole("button", { name: /^Mark read: Price drop on Acme X5 frame/u });
     await button.click();
-    await expect.element(screen.getByRole("alert").getByText("no alert has this id", { exact: true })).toBeVisible();
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("This alert no longer exists.");
     await expect.element(button).toHaveFocus();
   });
 

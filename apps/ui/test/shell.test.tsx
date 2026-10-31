@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { ErrorView } from "../src/error-view.tsx";
-import { ClientErrorKind } from "../src/client.ts";
+import { ApiFailure, ClientErrorKind } from "../src/client.ts";
 import { takeLogged } from "./support/console-guard.ts";
 import { at, failWith, fakeApi, product, reply, unreadAlert, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
@@ -105,6 +105,12 @@ describe("App shell", () => {
 });
 
 describe("Error view", () => {
+  it("explains a failure the way the screens do", async () => {
+    const restarting = new ApiFailure(ApiErrorKind.Restarting, "restarting");
+    const screen = await render(<ErrorView error={restarting} reset={() => undefined} />);
+    await expect.element(screen.getByText("fpving is restarting its plugins", { exact: false })).toBeVisible();
+  });
+
   it("names an error that did not come from the API unexpected", async () => {
     const screen = await render(<ErrorView error={new Error("boom")} reset={() => undefined} />);
     await expect.element(screen.getByText(ClientErrorKind.Unexpected, { exact: true })).toBeVisible();

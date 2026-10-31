@@ -42,6 +42,8 @@ export const explain = (failure: ApiFailure): ReactNode => {
       return "Another search saved candidates for this product meanwhile. Search again.";
     case ApiErrorKind.NoSourceListing:
       return "This product has no listing added by URL to search from. Add one first.";
+    case ApiErrorKind.AlertNotFound:
+      return "This alert no longer exists.";
     case ApiErrorKind.SettingsNotApplied:
       return "The settings were not applied and the old ones still hold. See the log, then try again.";
     default:

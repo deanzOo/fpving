@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toFailure, useClient } from "./client.ts";
 import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
+import { explain } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
 import { unlessPending } from "./pending.ts";
 
@@ -86,7 +87,7 @@ export const Alerts = () => {
           {markAll.isSuccess ? `Marked ${String(markAll.data.marked)} alerts read.` : ""}
         </p>
       </div>
-      {failed !== null && <p role="alert" className="mt-4 text-critical">{toFailure(failed).message}</p>}
+      {failed !== null && <p role="alert" className="mt-4 text-critical">{explain(toFailure(failed))}</p>}
       {alerts === undefined && <p className="mt-6 text-ink-muted">Loading…</p>}
       {alerts?.length === 0 && (
         <p className="mt-6 text-ink-muted">{unreadOnly ? "No unread alerts." : "No alerts yet."}</p>
