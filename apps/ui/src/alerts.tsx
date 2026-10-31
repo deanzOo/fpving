@@ -1,9 +1,9 @@
 import { AlertKind } from "@fpving/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { toFailure, useClient } from "./client.ts";
-import { focusAfterRemoval } from "./focus.ts";
+import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
 import { fromNow } from "./time.ts";
 
@@ -41,23 +41,17 @@ export const Alerts = () => {
     queryClient.invalidateQueries({ queryKey: QueryKey.Alerts }),
     queryClient.invalidateQueries({ queryKey: QueryKey.Watchlist }),
   ]);
-  const list = useRef<HTMLUListElement>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const [refocus, setRefocus] = useState<{ readonly id: string; readonly index: number } | null>(null);
-  useEffect(() => {
-    if (refocus !== null && !alerts?.some(({ id, readAt }) => id === refocus.id && readAt === null)) {
-      focusAfterRemoval(list.current, refocus.index, heading.current);
-      setRefocus(null);
-    }
-  }, [refocus, alerts]);
+  const { list, heading, track } = useFocusAfterRemoval(
+    (alertId) => alerts?.some(({ id, readAt }) => id === alertId && readAt === null) === true,
+  );
   const markOne = useMutation({
     mutationFn: async ({ alertId }: { readonly alertId: string; readonly index: number }) =>
       client.markAlertRead({ alertId }),
     onMutate: ({ alertId, index }) => {
-      setRefocus({ id: alertId, index });
+      track({ id: alertId, index });
     },
     onError: () => {
-      setRefocus(null);
+      track(null);
     },
     onSuccess: changed,
   });

@@ -61,6 +61,13 @@ const scripted = (frame: MatchCandidate[], kit: MatchCandidate[] = []) => {
   return api;
 };
 
+const rejectedLeaving = (api: ReturnType<typeof scripted>, candidateId: string) => {
+  api.on(at(apiRoutes.rejectCandidate, { candidateId }), () => {
+    api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, []));
+    return noContent();
+  });
+};
+
 const group = (screen: Awaited<ReturnType<typeof renderApp>>, name: string) =>
   screen.getByRole("region", { name });
 
@@ -115,10 +122,7 @@ describe("Match review", () => {
       api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, [candidate("c2", FRAME)]));
       return reply(wire.addedListing, accepted, HttpStatus.Created)();
     });
-    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c2" }), () => {
-      api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, []));
-      return noContent();
-    });
+    rejectedLeaving(api, "c2");
     const screen = await renderApp(api.client, "/matches");
     const frame = group(screen, "Acme X5 frame");
     await frame.getByRole("button", { name: "Accept Acme X5 c1" }).click();
@@ -130,10 +134,7 @@ describe("Match review", () => {
 
   it("rejects a candidate and drops it from the queue", async () => {
     const api = scripted([candidate("c1", FRAME)]);
-    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), () => {
-      api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, []));
-      return noContent();
-    });
+    rejectedLeaving(api, "c1");
     const screen = await renderApp(api.client, "/matches");
     await screen.getByRole("button", { name: "Reject Acme X5 c1" }).click();
     await expect.element(screen.getByRole("link", { name: "Acme X5 c1" })).not.toBeInTheDocument();

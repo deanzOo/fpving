@@ -1,9 +1,9 @@
 import { LlmVerdict } from "@fpving/core";
 import type { MatchCandidate, Product } from "@fpving/core";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { toFailure, useClient } from "./client.ts";
-import { focusAfterRemoval } from "./focus.ts";
+import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
 
@@ -113,15 +113,9 @@ const Group = ({ product, candidates }: GroupProps) => {
   const headingId = useId();
   const queryClient = useQueryClient();
   const [said, announce] = useState("");
-  const list = useRef<HTMLUListElement>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const [refocus, setRefocus] = useState<{ readonly id: string; readonly index: number } | null>(null);
-  useEffect(() => {
-    if (refocus !== null && !candidates.some(({ id }) => id === refocus.id)) {
-      focusAfterRemoval(list.current, refocus.index, heading.current);
-      setRefocus(null);
-    }
-  }, [refocus, candidates]);
+  const { list, heading, track } = useFocusAfterRemoval(
+    (candidateId) => candidates.some(({ id }) => id === candidateId),
+  );
   const find = useMutation({
     mutationFn: client.findMatches,
     onSuccess: async (found) => {
@@ -160,7 +154,7 @@ const Group = ({ product, candidates }: GroupProps) => {
                   product={product}
                   announce={announce}
                   reviewing={(underway) => {
-                    setRefocus(underway ? { id: candidate.id, index } : null);
+                    track(underway ? { id: candidate.id, index } : null);
                   }}
                 />
               ))}
