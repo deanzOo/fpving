@@ -143,7 +143,7 @@ export const createServer = (options: ServerOptions) => {
   });
   const indexBuilt = uiRoot !== undefined && existsSync(join(uiRoot, INDEX_PAGE));
   if (uiRoot !== undefined) {
-    void server.register(fastifyStatic, { root: uiRoot });
+    void server.register(fastifyStatic, { root: uiRoot, dotfiles: "ignore" });
   }
   server.setNotFoundHandler(async (request, reply) => {
     if (uiRoot === undefined || !PAGE_METHODS.includes(request.method) || isApiRequest(request.url)) {

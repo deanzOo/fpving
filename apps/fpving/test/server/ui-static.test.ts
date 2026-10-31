@@ -13,8 +13,11 @@ const HOST = { host: `127.0.0.1:${String(PORT)}` };
 const INDEX = "<!doctype html><title>fpving</title><script type=\"module\" src=\"/assets/app.js\"></script>";
 const SCRIPT = "export {};";
 const API_ROUTE = "/api/test/data";
+const SECRET = "secret outside the ui";
+const POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
 
 describe("Serving the UI", () => {
+  let base: string;
   let root: string;
   let ready = true;
   let server: AppServer;
@@ -31,8 +34,11 @@ describe("Serving the UI", () => {
 
   beforeEach(async () => {
     ready = true;
-    root = mkdtempSync(join(tmpdir(), "fpving-ui-"));
-    mkdirSync(join(root, "assets"));
+    base = mkdtempSync(join(tmpdir(), "fpving-ui-"));
+    root = join(base, "web");
+    mkdirSync(join(root, "assets"), { recursive: true });
+    writeFileSync(join(base, "secret.txt"), SECRET);
+    writeFileSync(join(root, ".env"), SECRET);
     writeFileSync(join(root, "index.html"), INDEX);
     writeFileSync(join(root, "assets", "app.js"), SCRIPT);
     await start(root);
@@ -40,7 +46,7 @@ describe("Serving the UI", () => {
 
   afterEach(async () => {
     await server.close();
-    rmSync(root, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true });
   });
 
   it("serves the built index page at the root", async () => {
@@ -98,6 +104,17 @@ describe("Serving the UI", () => {
     expect((await get("/api/nope")).statusCode).toBe(HttpStatus.ServiceUnavailable);
   });
 
+  it.each([
+    "/../secret.txt",
+    "/%2e%2e/secret.txt",
+    "/assets/..%2f..%2f..%2fsecret.txt",
+    "/assets/%2e%2e/%2e%2e/secret.txt",
+    "/.env",
+  ])("never serves a file outside the UI folder or a dotfile, probed with %s", async (url) => {
+    const response = await get(url);
+    expect(response.body).not.toContain(SECRET);
+  });
+
   it("keeps the readiness gate on an API path whose letters are percent-encoded", async () => {
     ready = false;
     expect((await get("/%61pi/test/data")).statusCode).toBe(HttpStatus.ServiceUnavailable);
@@ -112,12 +129,12 @@ describe("Serving the UI", () => {
 
   it("sends a strict content security policy and no-sniff and no-referrer headers on every answer", async () => {
     for (const response of [await get("/"), await get("/assets/app.js"), await get(API_ROUTE), await get("/api/x")]) {
-      expect(response.headers["content-security-policy"]).toBe(CONTENT_SECURITY_POLICY);
+      expect(response.headers["content-security-policy"]).toBe(POLICY);
       expect(response.headers["x-content-type-options"]).toBe("nosniff");
       expect(response.headers["referrer-policy"]).toBe("no-referrer");
     }
-    expect(CONTENT_SECURITY_POLICY).toContain("default-src 'self'");
-    expect(CONTENT_SECURITY_POLICY).not.toContain("unsafe-inline");
+    expect(CONTENT_SECURITY_POLICY).toBe(POLICY);
+    expect(CONTENT_SECURITY_POLICY).not.toMatch(/unsafe-(?:inline|eval)/u);
   });
 
   it("says the UI is not built when its folder has no index page", async () => {
