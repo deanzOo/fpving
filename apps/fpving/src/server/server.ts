@@ -49,7 +49,14 @@ const SECURITY_HEADERS = {
 
 const INDEX_PAGE = "index.html";
 
-const isApiPath = (url: string): boolean => /^\/api(?:[/?]|$)/u.test(url);
+const HEX_RADIX = 16;
+const PERCENT_ESCAPE = /%([0-9a-f]{2})/giu;
+
+// The router matches the percent-decoded path, so an API request is classified on that too.
+const isApiRequest = (url: string): boolean => {
+  const decoded = url.replace(PERCENT_ESCAPE, (_escape, hex: string) => String.fromCharCode(parseInt(hex, HEX_RADIX)));
+  return /^\/api(?:[/?]|$)/u.test(decoded);
+};
 
 const LOCAL_HOSTNAMES = [LOOPBACK_HOST, "localhost"] as const;
 const READ_METHODS: readonly string[] = ["GET", "HEAD", "OPTIONS"];
@@ -114,7 +121,7 @@ export const createServer = (options: ServerOptions) => {
     if (!READ_METHODS.includes(request.method) && foreign) {
       return reply.status(HttpStatus.Forbidden).send(apiError(ApiErrorKind.CrossOrigin, GuardRefusal.Origin));
     }
-    if (!isReady() && isApiPath(request.url) && !openWhileStarting.includes(request.routeOptions.url ?? "")) {
+    if (!isReady() && isApiRequest(request.url) && !openWhileStarting.includes(request.routeOptions.url ?? "")) {
       return reply.status(HttpStatus.ServiceUnavailable).send(apiError(ApiErrorKind.Starting, STARTING));
     }
     return undefined;
@@ -136,7 +143,7 @@ export const createServer = (options: ServerOptions) => {
     void server.register(fastifyStatic, { root: uiRoot });
   }
   server.setNotFoundHandler(async (request, reply) => {
-    if (uiRoot === undefined || request.method !== "GET" || isApiPath(request.url)) {
+    if (uiRoot === undefined || request.method !== "GET" || isApiRequest(request.url)) {
       return reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, NO_ROUTE));
     }
     if (!existsSync(join(uiRoot, INDEX_PAGE))) {

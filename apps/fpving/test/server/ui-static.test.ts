@@ -92,6 +92,18 @@ describe("Serving the UI", () => {
     expect((await get("/api/nope")).statusCode).toBe(HttpStatus.ServiceUnavailable);
   });
 
+  it("keeps the readiness gate on an API path whose letters are percent-encoded", async () => {
+    ready = false;
+    expect((await get("/%61pi/test/data")).statusCode).toBe(HttpStatus.ServiceUnavailable);
+    expect((await get("/%61pi/nope")).statusCode).toBe(HttpStatus.ServiceUnavailable);
+  });
+
+  it("answers an unknown percent-encoded API path with the 404 envelope, not the index page", async () => {
+    const response = await get("/%61pi/nope");
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
+    expect(response.json()).toEqual(apiError(ApiErrorKind.NotFound, NO_ROUTE));
+  });
+
   it("sends a strict content security policy and no-sniff and no-referrer headers on every answer", async () => {
     for (const response of [await get("/"), await get("/assets/app.js"), await get(API_ROUTE), await get("/api/x")]) {
       expect(response.headers["content-security-policy"]).toBe(CONTENT_SECURITY_POLICY);
