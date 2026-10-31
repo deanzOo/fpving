@@ -23,9 +23,10 @@ import type {
 } from "@fpving/core";
 import { StoreErrorKind } from "@fpving/plugin-sdk";
 import { GatewayRefusal } from "../plugins/store-gateway.js";
-import { apiRoutes, RouteStatus } from "./api-routes.js";
+import { apiRoutes } from "./api-routes.js";
 import type { PluginRow, ScanStatus } from "./api-routes.js";
 import { apiError, ApiErrorKind } from "./errors.js";
+import { HttpStatus } from "./server.js";
 import type { AppServer } from "./server.js";
 
 /** What the domain routes read on each request, once startup completed. */
@@ -58,7 +59,7 @@ const Message = {
   Restarting: "the plugins and the scan schedule are restarting for a settings change; try again shortly",
 } as const;
 
-const failure = <S extends (typeof RouteStatus)[keyof typeof RouteStatus]>(
+const failure = <S extends (typeof HttpStatus)[keyof typeof HttpStatus]>(
   status: S,
   kind: ApiErrorKind,
   message: string,
@@ -67,18 +68,18 @@ const failure = <S extends (typeof RouteStatus)[keyof typeof RouteStatus]>(
 const addFailure = (error: AddProductError) => {
   switch (error.kind) {
     case AddErrorKind.InvalidUrl:
-      return failure(RouteStatus.UnprocessableContent, error.kind, Message.InvalidUrl);
+      return failure(HttpStatus.UnprocessableContent, error.kind, Message.InvalidUrl);
     case AddErrorKind.NoPluginForDomain:
-      return failure(RouteStatus.UnprocessableContent, error.kind, `no plugin handles ${error.host}`);
+      return failure(HttpStatus.UnprocessableContent, error.kind, `no plugin handles ${error.host}`);
     case AddErrorKind.AlreadyTracked: {
       const { id, name } = error.product;
-      return failure(RouteStatus.Conflict, error.kind, `already tracked by product ${id} "${name}"`);
+      return failure(HttpStatus.Conflict, error.kind, `already tracked by product ${id} "${name}"`);
     }
     case AddErrorKind.FetchFailed: {
       const { kind, detail } = error.error;
       return kind === StoreErrorKind.Network && detail === GatewayRefusal.Unavailable
-        ? failure(RouteStatus.UnprocessableContent, ApiErrorKind.PluginUnavailable, Message.PluginUnavailable)
-        : failure(RouteStatus.BadGateway, error.kind, `the store could not fetch the page: ${kind}`);
+        ? failure(HttpStatus.UnprocessableContent, ApiErrorKind.PluginUnavailable, Message.PluginUnavailable)
+        : failure(HttpStatus.BadGateway, error.kind, `the store could not fetch the page: ${kind}`);
     }
   }
 };
@@ -86,18 +87,18 @@ const addFailure = (error: AddProductError) => {
 const matchFailure = (error: FindMatchesError) => {
   switch (error.kind) {
     case AddErrorKind.ProductNotFound:
-      return failure(RouteStatus.NotFound, error.kind, Message.ProductNotFound);
+      return failure(HttpStatus.NotFound, error.kind, Message.ProductNotFound);
     case MatchErrorKind.NoSourceListing:
-      return failure(RouteStatus.Conflict, error.kind, Message.NoSourceListing);
+      return failure(HttpStatus.Conflict, error.kind, Message.NoSourceListing);
     case MatchErrorKind.AlreadySuggested:
-      return failure(RouteStatus.Conflict, error.kind, Message.AlreadySuggested);
+      return failure(HttpStatus.Conflict, error.kind, Message.AlreadySuggested);
   }
 };
 
-const productNotFound = failure(RouteStatus.NotFound, AddErrorKind.ProductNotFound, Message.ProductNotFound);
-const listingNotFound = failure(RouteStatus.NotFound, ApiErrorKind.ListingNotFound, Message.ListingNotFound);
-const notPending = failure(RouteStatus.NotFound, MatchErrorKind.NotPending, Message.NotPending);
-const restarting = failure(RouteStatus.ServiceUnavailable, ApiErrorKind.Restarting, Message.Restarting);
+const productNotFound = failure(HttpStatus.NotFound, AddErrorKind.ProductNotFound, Message.ProductNotFound);
+const listingNotFound = failure(HttpStatus.NotFound, ApiErrorKind.ListingNotFound, Message.ListingNotFound);
+const notPending = failure(HttpStatus.NotFound, MatchErrorKind.NotPending, Message.NotPending);
+const restarting = failure(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, Message.Restarting);
 
 /**
  * Registers every route of {@link apiRoutes}. Fastify takes routes only before `listen`, while the runtime exists
@@ -143,7 +144,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
 
   server.route({
     ...apiRoutes.listProducts,
-    handler: async (_request, reply) => reply.code(RouteStatus.Ok).send(await watchlist(deps())),
+    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send(await watchlist(deps())),
   });
 
   server.route({
@@ -151,7 +152,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     handler: async ({ params: { productId } }, reply) => {
       const detail = await productDetail(deps(), productId);
       return detail.ok
-        ? reply.code(RouteStatus.Ok).send(detail.value)
+        ? reply.code(HttpStatus.Ok).send(detail.value)
         : reply.code(productNotFound.status).send(productNotFound.body);
     },
   });
@@ -161,7 +162,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     handler: async ({ params: { productId }, body: { name } }, reply) => {
       const renamed = await deps().repository.products.rename(productId, name);
       return renamed.ok
-        ? reply.code(RouteStatus.NoContent).send(null)
+        ? reply.code(HttpStatus.NoContent).send(null)
         : reply.code(productNotFound.status).send(productNotFound.body);
     },
   });
@@ -172,7 +173,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       const { repository, clock } = deps();
       const archived = await repository.products.archive(productId, clock.now());
       return archived.ok
-        ? reply.code(RouteStatus.NoContent).send(null)
+        ? reply.code(HttpStatus.NoContent).send(null)
         : reply.code(productNotFound.status).send(productNotFound.body);
     },
   });
@@ -188,7 +189,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
         const { status, body: refusal } = addFailure(added.error);
         return reply.code(status).send(refusal);
       }
-      return reply.code(RouteStatus.Created).send(added.value);
+      return reply.code(HttpStatus.Created).send(added.value);
     },
   });
 
@@ -200,7 +201,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       }
       const added = await addListing(deps(), params.productId, body.url);
       if (added.ok) {
-        return reply.code(RouteStatus.Created).send(added.value);
+        return reply.code(HttpStatus.Created).send(added.value);
       }
       if (added.error.kind === AddErrorKind.ProductNotFound) {
         return reply.code(productNotFound.status).send(productNotFound.body);
@@ -215,7 +216,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     handler: async ({ params: { productId, listingId } }, reply) => {
       const removed = await removeListing(deps(), productId, listingId);
       if (removed.ok) {
-        return reply.code(RouteStatus.NoContent).send(null);
+        return reply.code(HttpStatus.NoContent).send(null);
       }
       const { status, body } = removed.error.kind === AddErrorKind.ProductNotFound ? productNotFound : listingNotFound;
       return reply.code(status).send(body);
@@ -227,7 +228,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     handler: async ({ params: { productId } }, reply) => {
       const pending = await pendingCandidates(deps(), productId);
       return pending.ok
-        ? reply.code(RouteStatus.Ok).send(pending.value)
+        ? reply.code(HttpStatus.Ok).send(pending.value)
         : reply.code(productNotFound.status).send(productNotFound.body);
     },
   });
@@ -243,7 +244,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
         const { status, body } = matchFailure(found.error);
         return reply.code(status).send(body);
       }
-      return reply.code(RouteStatus.Ok).send(found.value);
+      return reply.code(HttpStatus.Ok).send(found.value);
     },
   });
 
@@ -261,7 +262,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
           : error.kind === AddErrorKind.ProductNotFound ? productNotFound : addFailure(error);
         return reply.code(refusal.status).send(refusal.body);
       }
-      return reply.code(RouteStatus.Created).send(accepted.value);
+      return reply.code(HttpStatus.Created).send(accepted.value);
     },
   });
 
@@ -272,7 +273,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       if (!rejected.ok) {
         return reply.code(notPending.status).send(notPending.body);
       }
-      return reply.code(RouteStatus.NoContent).send(null);
+      return reply.code(HttpStatus.NoContent).send(null);
     },
   });
 
@@ -280,7 +281,7 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
     ...apiRoutes.listAlerts,
     handler: async ({ query }, reply) => {
       const alerts = await deps().repository.alerts.list({ unreadOnly: query.unread === true });
-      return reply.code(RouteStatus.Ok).send(alerts);
+      return reply.code(HttpStatus.Ok).send(alerts);
     },
   });
 
@@ -290,34 +291,34 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
       const { repository, clock } = deps();
       const marked = await repository.alerts.markRead(alertId, clock.now());
       if (!marked.ok) {
-        const { status, body } = failure(RouteStatus.NotFound, ApiErrorKind.AlertNotFound, Message.AlertNotFound);
+        const { status, body } = failure(HttpStatus.NotFound, ApiErrorKind.AlertNotFound, Message.AlertNotFound);
         return reply.code(status).send(body);
       }
-      return reply.code(RouteStatus.NoContent).send(null);
+      return reply.code(HttpStatus.NoContent).send(null);
     },
   });
 
   server.route({
     ...apiRoutes.markAllAlertsRead,
-    handler: async (_request, reply) => reply.code(RouteStatus.Ok).send({ marked: await markAllAlertsRead(deps()) }),
+    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send({ marked: await markAllAlertsRead(deps()) }),
   });
 
   server.route({
     ...apiRoutes.getSettings,
-    handler: async (_request, reply) => reply.code(RouteStatus.Ok).send(await deps().repository.settings.get()),
+    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send(await deps().repository.settings.get()),
   });
 
   server.route({
     ...apiRoutes.putSettings,
     handler: async ({ body }, reply) => {
       await runtime().applySettings(body);
-      return reply.code(RouteStatus.Ok).send(body);
+      return reply.code(HttpStatus.Ok).send(body);
     },
   });
 
   server.route({
     ...apiRoutes.listPlugins,
-    handler: async (_request, reply) => reply.code(RouteStatus.Ok).send([...runtime().plugins()]),
+    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send([...runtime().plugins()]),
   });
 
   server.route({
@@ -327,17 +328,17 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
         return reply.code(restarting.status).send(restarting.body);
       }
       if (runtime().scans().scanning()) {
-        const { status, body } = failure(RouteStatus.Conflict, ApiErrorKind.ScanRunning, Message.ScanRunning);
+        const { status, body } = failure(HttpStatus.Conflict, ApiErrorKind.ScanRunning, Message.ScanRunning);
         return reply.code(status).send(body);
       }
       void runScan();
-      return reply.code(RouteStatus.Accepted).send(await scanStatus());
+      return reply.code(HttpStatus.Accepted).send(await scanStatus());
     },
   });
 
   server.route({
     ...apiRoutes.getScan,
-    handler: async (_request, reply) => reply.code(RouteStatus.Ok).send(await scanStatus()),
+    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send(await scanStatus()),
   });
 
   return {

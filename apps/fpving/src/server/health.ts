@@ -1,12 +1,12 @@
 import { z } from "zod";
 import type { PluginState } from "../plugins/runtime/host.js";
 import { PluginStatusKind } from "../plugins/status.js";
+import { HttpStatus } from "./server.js";
 import type { AppServer } from "./server.js";
 
 /** Where the health route answers. */
 export const HEALTH_PATH = "/api/health";
 
-const HTTP_OK = 200;
 const countSchema = z.int().nonnegative();
 
 /**
@@ -38,7 +38,7 @@ export interface HealthSource {
  * @param source - The version and the plugin states.
  */
 export const registerHealthRoute = (server: AppServer, source: HealthSource): void => {
-  server.get(HEALTH_PATH, { schema: { response: { [HTTP_OK]: healthSchema } } }, () => {
+  server.get(HEALTH_PATH, { schema: { response: { [HttpStatus.Ok]: healthSchema } } }, () => {
     const states = source.plugins();
     const loaded = states.filter(({ status }) => status.kind === PluginStatusKind.Loaded).length;
     return {

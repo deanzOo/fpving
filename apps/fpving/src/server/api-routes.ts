@@ -16,20 +16,7 @@ import { manifestSchema, moneySchema, storeErrorSchema } from "@fpving/plugin-sd
 import { z } from "zod";
 import { PluginIssueKind, PluginStatusKind } from "../plugins/status.js";
 import { apiErrorSchema } from "./errors.js";
-
-/** The statuses the API routes answer with. */
-export const RouteStatus = {
-  Ok: 200,
-  Created: 201,
-  Accepted: 202,
-  NoContent: 204,
-  BadRequest: 400,
-  NotFound: 404,
-  Conflict: 409,
-  UnprocessableContent: 422,
-  BadGateway: 502,
-  ServiceUnavailable: 503,
-} as const;
+import { HttpStatus } from "./server.js";
 
 const countSchema = z.int().nonnegative();
 const urlBodySchema = z.object({ url: z.string().min(1) });
@@ -77,9 +64,9 @@ const scanStatusSchema = z.object({
 export type ScanStatus = z.infer<typeof scanStatusSchema>;
 
 const { Ok, Created, Accepted, NoContent, NotFound, Conflict, UnprocessableContent, BadGateway, ServiceUnavailable }
-  = RouteStatus;
+  = HttpStatus;
 const addErrors = {
-  [RouteStatus.BadRequest]: apiErrorSchema,
+  [HttpStatus.BadRequest]: apiErrorSchema,
   [UnprocessableContent]: apiErrorSchema,
   [Conflict]: apiErrorSchema,
   [BadGateway]: apiErrorSchema,

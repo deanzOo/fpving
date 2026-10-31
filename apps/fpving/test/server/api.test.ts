@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { GatewayRefusal } from "../../src/plugins/store-gateway.ts";
 import { NOT_ATTACHED, registerApiRoutes } from "../../src/server/api.ts";
-import { apiRoutes, RouteStatus } from "../../src/server/api-routes.ts";
+import { apiRoutes } from "../../src/server/api-routes.ts";
 import { ApiErrorKind, apiErrorSchema } from "../../src/server/errors.ts";
 import { createServer, HttpStatus } from "../../src/server/server.ts";
 import {
@@ -72,7 +72,7 @@ const searchFinds = (url: string) => {
 describe("Products API", () => {
   it("adds the product behind a pasted URL, answering 201 with the product, listing and first snapshot", async () => {
     const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.Created);
+    expect(response.statusCode).toBe(HttpStatus.Created);
     expect(response.json()).toMatchObject({
       product: { name: LISTING.title, archivedAt: null },
       listing: { url: PAGE, pluginId: SHOP, origin: ListingOrigin.Manual },
@@ -82,7 +82,7 @@ describe("Products API", () => {
 
   it("refuses a body without a url with 400 in the error envelope", async () => {
     const response = await api.request("POST", apiRoutes.addProduct.url, { link: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.BadRequest);
+    expect(response.statusCode).toBe(HttpStatus.BadRequest);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.InvalidRequest);
   });
 
@@ -91,7 +91,7 @@ describe("Products API", () => {
     ["a domain no plugin declares", "https://unknown.example/p", ApiErrorKind.NoPluginForDomain, "unknown.example"],
   ])("answers 422 for %s, naming the reason", async (_label, url, kind, message) => {
     const response = await api.request("POST", apiRoutes.addProduct.url, { url });
-    expect(response.statusCode).toBe(RouteStatus.UnprocessableContent);
+    expect(response.statusCode).toBe(HttpStatus.UnprocessableContent);
     const error = errorOf(response.json());
     expect(error.kind).toBe(kind);
     expect(error.message).toContain(message);
@@ -100,14 +100,14 @@ describe("Products API", () => {
   it("answers 422 plugin_unavailable when the plugin for the domain is not loaded", async () => {
     api.stores.answers.set(PAGE, networkError(GatewayRefusal.Unavailable));
     const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.UnprocessableContent);
+    expect(response.statusCode).toBe(HttpStatus.UnprocessableContent);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.PluginUnavailable);
   });
 
   it("answers 502 fetch_failed with the store's error kind when the store could not fetch the page", async () => {
     api.stores.answers.set(PAGE, { ok: false, error: { kind: StoreErrorKind.Blocked, detail: "captcha" } });
     const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.BadGateway);
+    expect(response.statusCode).toBe(HttpStatus.BadGateway);
     expect(errorOf(response.json())).toEqual({
       kind: ApiErrorKind.FetchFailed,
       message: "the store could not fetch the page: blocked",
@@ -117,7 +117,7 @@ describe("Products API", () => {
   it("answers 409 already_tracked naming the product that tracks the URL", async () => {
     const first = await addProduct();
     const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.Conflict);
+    expect(response.statusCode).toBe(HttpStatus.Conflict);
     const error = errorOf(response.json());
     expect(error.kind).toBe(ApiErrorKind.AlreadyTracked);
     expect(error.message).toBe(`already tracked by product ${first.product.id} "${LISTING.title}"`);
@@ -128,7 +128,7 @@ describe("Products API", () => {
     const [first] = await api.repository.snapshots.latestPerListing(product.id);
     await api.scans.current.scanNow();
     const response = await api.request("GET", `/api/products/${product.id}`);
-    expect(response.statusCode).toBe(RouteStatus.Ok);
+    expect(response.statusCode).toBe(HttpStatus.Ok);
     const detail = detailWire.parse(response.json());
     expect(detail.product.id).toBe(product.id);
     expect(detail.listings.map((row) => ({ id: row.listing.id, history: row.history.length }))).toEqual([
@@ -139,7 +139,7 @@ describe("Products API", () => {
 
   it("answers 404 product_not_found for an unknown product", async () => {
     const response = await api.request("GET", "/api/products/nope");
-    expect(response.statusCode).toBe(RouteStatus.NotFound);
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ProductNotFound);
   });
 });
@@ -165,7 +165,7 @@ describe("Watchlist API", () => {
   it("renames a product, answering 204", async () => {
     const { product } = await addProduct();
     const response = await api.request("PATCH", `/api/products/${product.id}`, { name: "Quad frame" });
-    expect(response.statusCode).toBe(RouteStatus.NoContent);
+    expect(response.statusCode).toBe(HttpStatus.NoContent);
     expect((await api.request("GET", `/api/products/${product.id}`)).json()).toMatchObject({
       product: { name: "Quad frame" },
     });
@@ -174,14 +174,14 @@ describe("Watchlist API", () => {
   it("refuses an empty name with 400", async () => {
     const { product } = await addProduct();
     const response = await api.request("PATCH", `/api/products/${product.id}`, { name: "" });
-    expect(response.statusCode).toBe(RouteStatus.BadRequest);
+    expect(response.statusCode).toBe(HttpStatus.BadRequest);
   });
 
   it("restores a deleted product when its URL is added again, answering 201 with it back in the list", async () => {
     const { product, listing } = await addProduct();
     await api.request("DELETE", `/api/products/${product.id}`);
     const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.Created);
+    expect(response.statusCode).toBe(HttpStatus.Created);
     expect(response.json())
       .toMatchObject({ product: { id: product.id, archivedAt: null }, listing: { id: listing.id } });
     expect((await watchlist()).map((entry) => entry.product.id)).toEqual([product.id]);
@@ -190,7 +190,7 @@ describe("Watchlist API", () => {
   it("deletes a product by archiving it: gone from the list, its detail and its candidates", async () => {
     const { product } = await addProduct();
     const response = await api.request("DELETE", `/api/products/${product.id}`);
-    expect(response.statusCode).toBe(RouteStatus.NoContent);
+    expect(response.statusCode).toBe(HttpStatus.NoContent);
     expect(await watchlist()).toEqual([]);
     for (const [method, url] of [
       ["GET", `/api/products/${product.id}`],
@@ -200,7 +200,7 @@ describe("Watchlist API", () => {
     ] as const) {
       const refused = await api.request(method, url, method === "PATCH" ? { name: "x" } : undefined);
       expect({ url, status: refused.statusCode, kind: errorOf(refused.json()).kind })
-        .toEqual({ url, status: RouteStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
+        .toEqual({ url, status: HttpStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
     }
   });
 });
@@ -209,13 +209,13 @@ describe("Listings API", () => {
   it("adds a pasted URL to a product as a manual listing, answering 201", async () => {
     const { product } = await addProduct();
     const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: OTHER_PAGE });
-    expect(response.statusCode).toBe(RouteStatus.Created);
+    expect(response.statusCode).toBe(HttpStatus.Created);
     expect(response.json()).toMatchObject({ listing: { productId: product.id, url: OTHER_PAGE } });
   });
 
   it("answers 404 product_not_found when the product does not exist", async () => {
     const response = await api.request("POST", "/api/products/nope/listings", { url: OTHER_PAGE });
-    expect(response.statusCode).toBe(RouteStatus.NotFound);
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ProductNotFound);
   });
 
@@ -224,7 +224,7 @@ describe("Listings API", () => {
     const second = await api.request("POST", `/api/products/${product.id}/listings`, { url: OTHER_PAGE });
     const kept = z.object({ listing: wire }).parse(second.json()).listing.id;
     const response = await api.request("DELETE", `/api/products/${product.id}/listings/${listing.id}`);
-    expect(response.statusCode).toBe(RouteStatus.NoContent);
+    expect(response.statusCode).toBe(HttpStatus.NoContent);
     const detail = detailWire.parse((await api.request("GET", `/api/products/${product.id}`)).json());
     expect(detail.listings.map((row) => row.listing.id)).toEqual([kept]);
   });
@@ -235,7 +235,7 @@ describe("Listings API", () => {
     for (const id of [listing.id, "nope"]) {
       const response = await api.request("DELETE", `/api/products/${product.id}/listings/${id}`);
       expect({ status: response.statusCode, kind: errorOf(response.json()).kind })
-        .toEqual({ status: RouteStatus.NotFound, kind: ApiErrorKind.ListingNotFound });
+        .toEqual({ status: HttpStatus.NotFound, kind: ApiErrorKind.ListingNotFound });
     }
   });
 
@@ -251,14 +251,14 @@ describe("Listings API", () => {
     await api.request("DELETE", `/api/products/${product.id}`);
     const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: OTHER_PAGE });
     expect({ status: response.statusCode, kind: errorOf(response.json()).kind })
-      .toEqual({ status: RouteStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
+      .toEqual({ status: HttpStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
   it("answers 409 already_tracked naming the product for a URL another listing tracks", async () => {
     const { product } = await addProduct();
     const other = await addProduct(OTHER_PAGE);
     const response = await api.request("POST", `/api/products/${other.product.id}/listings`, { url: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.Conflict);
+    expect(response.statusCode).toBe(HttpStatus.Conflict);
     expect(errorOf(response.json()).message).toContain(product.id);
   });
 
@@ -266,7 +266,7 @@ describe("Listings API", () => {
     const { product, listing } = await addProduct();
     await api.request("DELETE", `/api/products/${product.id}/listings/${listing.id}`);
     const response = await api.request("POST", `/api/products/${product.id}/listings`, { url: PAGE });
-    expect(response.statusCode).toBe(RouteStatus.Created);
+    expect(response.statusCode).toBe(HttpStatus.Created);
     const detail = detailWire.parse((await api.request("GET", `/api/products/${product.id}`)).json());
     expect(detail.listings.map((row) => row.listing.id)).toEqual([listing.id]);
   });
@@ -279,7 +279,7 @@ describe("Match candidates API", () => {
     const { product } = await addProduct();
     searchFinds(MATCH);
     const response = await findMatches(product.id);
-    expect(response.statusCode).toBe(RouteStatus.Ok);
+    expect(response.statusCode).toBe(HttpStatus.Ok);
     expect(response.json()).toMatchObject({
       candidates: [{ url: MATCH, pluginId: OTHER, llmVerdict: "unjudged" }],
       failedSearches: [],
@@ -301,7 +301,7 @@ describe("Match candidates API", () => {
     searchFinds(MATCH);
     await findMatches(product.id);
     const response = await api.request("GET", `/api/products/${product.id}/candidates`);
-    expect(response.statusCode).toBe(RouteStatus.Ok);
+    expect(response.statusCode).toBe(HttpStatus.Ok);
     expect(candidates.parse(response.json()).map(({ url }) => url)).toEqual([MATCH]);
   });
 
@@ -318,7 +318,7 @@ describe("Match candidates API", () => {
     ["searching", "POST", "/api/products/nope/candidates/search"],
   ] as const)("answers 404 product_not_found when %s candidates of an unknown product", async (_label, method, url) => {
     const response = await api.request(method, url);
-    expect(response.statusCode).toBe(RouteStatus.NotFound);
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ProductNotFound);
   });
 
@@ -354,7 +354,7 @@ describe("Match candidates API", () => {
     });
     await api.repository.products.add(product, listing, snapshot);
     const response = await findMatches(product.id);
-    expect(response.statusCode).toBe(RouteStatus.Conflict);
+    expect(response.statusCode).toBe(HttpStatus.Conflict);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.NoSourceListing);
   });
 
@@ -362,8 +362,8 @@ describe("Match candidates API", () => {
     const { product } = await addProduct();
     searchFinds(MATCH);
     const [first, second] = await Promise.all([findMatches(product.id), findMatches(product.id)]);
-    expect([first.statusCode, second.statusCode].toSorted()).toEqual([RouteStatus.Ok, RouteStatus.Conflict]);
-    const refused = first.statusCode === RouteStatus.Conflict ? first : second;
+    expect([first.statusCode, second.statusCode].toSorted()).toEqual([HttpStatus.Ok, HttpStatus.Conflict]);
+    const refused = first.statusCode === HttpStatus.Conflict ? first : second;
     expect(errorOf(refused.json()).kind).toBe(ApiErrorKind.AlreadySuggested);
   });
 
@@ -377,21 +377,21 @@ describe("Match candidates API", () => {
   it("accepts a pending candidate as a matched listing, answering 201", async () => {
     const id = await pendingId();
     const response = await api.request("POST", `/api/candidates/${id}/accept`);
-    expect(response.statusCode).toBe(RouteStatus.Created);
+    expect(response.statusCode).toBe(HttpStatus.Created);
     expect(response.json()).toMatchObject({ listing: { url: MATCH, origin: ListingOrigin.Matched } });
   });
 
   it("rejects a pending candidate, answering 204, so it is no longer pending", async () => {
     const id = await pendingId();
     const response = await api.request("POST", `/api/candidates/${id}/reject`);
-    expect(response.statusCode).toBe(RouteStatus.NoContent);
+    expect(response.statusCode).toBe(HttpStatus.NoContent);
     expect(response.body).toBe("");
-    expect((await api.request("POST", `/api/candidates/${id}/accept`)).statusCode).toBe(RouteStatus.NotFound);
+    expect((await api.request("POST", `/api/candidates/${id}/accept`)).statusCode).toBe(HttpStatus.NotFound);
   });
 
   it.each(["accept", "reject"])("answers 404 not_pending when asked to %s an unknown candidate", async (action) => {
     const response = await api.request("POST", `/api/candidates/nope/${action}`);
-    expect(response.statusCode).toBe(RouteStatus.NotFound);
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.NotPending);
   });
 
@@ -399,8 +399,8 @@ describe("Match candidates API", () => {
     const id = await pendingId();
     api.stores.answers.set(MATCH, { ok: false, error: { kind: StoreErrorKind.Timeout, detail: "slow" } });
     const response = await api.request("POST", `/api/candidates/${id}/accept`);
-    expect(response.statusCode).toBe(RouteStatus.BadGateway);
-    expect((await api.request("POST", `/api/candidates/${id}/reject`)).statusCode).toBe(RouteStatus.NoContent);
+    expect(response.statusCode).toBe(HttpStatus.BadGateway);
+    expect((await api.request("POST", `/api/candidates/${id}/reject`)).statusCode).toBe(HttpStatus.NoContent);
   });
 
   it("answers 422 plugin_unavailable when the candidate's plugin is not loaded", async () => {
@@ -416,14 +416,14 @@ describe("Match candidates API", () => {
     await api.request("DELETE", `/api/products/${pending?.productId ?? ""}`);
     const response = await api.request("POST", `/api/candidates/${id}/accept`);
     expect({ status: response.statusCode, kind: errorOf(response.json()).kind })
-      .toEqual({ status: RouteStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
+      .toEqual({ status: HttpStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
   it("answers 409 already_tracked when a listing started tracking the candidate's URL", async () => {
     const id = await pendingId();
     await addProduct(MATCH);
     const response = await api.request("POST", `/api/candidates/${id}/accept`);
-    expect(response.statusCode).toBe(RouteStatus.Conflict);
+    expect(response.statusCode).toBe(HttpStatus.Conflict);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.AlreadyTracked);
   });
 });
@@ -457,20 +457,20 @@ describe("Alerts API", () => {
   it("lists every alert newest first", async () => {
     await seedAlerts();
     const response = await api.request("GET", apiRoutes.listAlerts.url);
-    expect(response.statusCode).toBe(RouteStatus.Ok);
+    expect(response.statusCode).toBe(HttpStatus.Ok);
     expect(ids(response.json())).toEqual(["a-2", "a-1"]);
   });
 
   it("marks one alert read, answering 204, and lists only unread ones with unread=true", async () => {
     await seedAlerts();
-    expect((await api.request("POST", "/api/alerts/a-2/read")).statusCode).toBe(RouteStatus.NoContent);
+    expect((await api.request("POST", "/api/alerts/a-2/read")).statusCode).toBe(HttpStatus.NoContent);
     expect(ids((await api.request("GET", "/api/alerts?unread=true")).json())).toEqual(["a-1"]);
     expect(ids((await api.request("GET", "/api/alerts?unread=false")).json())).toEqual(["a-2", "a-1"]);
   });
 
   it("answers 404 alert_not_found when marking an unknown alert read, unlike an unknown path", async () => {
     const response = await api.request("POST", "/api/alerts/nope/read");
-    expect(response.statusCode).toBe(RouteStatus.NotFound);
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.AlertNotFound);
     expect(errorOf((await api.request("POST", "/api/alerts/nope/unread")).json()).kind).toBe(ApiErrorKind.NotFound);
   });
@@ -484,7 +484,7 @@ describe("Alerts API", () => {
   });
 
   it("refuses an unread filter that is not a boolean with 400", async () => {
-    expect((await api.request("GET", "/api/alerts?unread=maybe")).statusCode).toBe(RouteStatus.BadRequest);
+    expect((await api.request("GET", "/api/alerts?unread=maybe")).statusCode).toBe(HttpStatus.BadRequest);
   });
 });
 
@@ -499,7 +499,7 @@ describe("Settings API", () => {
     const current = z.record(z.string(), z.unknown()).parse(saved.json());
     const next = { ...current, displayCurrency: "USD", scanIntervalHours: 6 };
     const response = await api.request("PUT", apiRoutes.putSettings.url, next);
-    expect(response.statusCode).toBe(RouteStatus.Ok);
+    expect(response.statusCode).toBe(HttpStatus.Ok);
     expect(response.json()).toEqual(next);
     expect(api.applySettings).toHaveBeenCalledTimes(1);
     expect((await api.request("GET", apiRoutes.getSettings.url)).json()).toEqual(next);
@@ -507,7 +507,7 @@ describe("Settings API", () => {
 
   it("refuses settings that fail the schema with 400 and changes nothing", async () => {
     const response = await api.request("PUT", apiRoutes.putSettings.url, { displayCurrency: "XXX" });
-    expect(response.statusCode).toBe(RouteStatus.BadRequest);
+    expect(response.statusCode).toBe(HttpStatus.BadRequest);
     expect(api.applySettings).not.toHaveBeenCalled();
   });
 });
@@ -526,7 +526,7 @@ describe("Scan API", () => {
   it("starts a scan in the background, answering 202 while it runs, then reports its result", async () => {
     await addProduct();
     const response = await api.request("POST", apiRoutes.startScan.url);
-    expect(response.statusCode).toBe(RouteStatus.Accepted);
+    expect(response.statusCode).toBe(HttpStatus.Accepted);
     expect(statusWire.parse(response.json()).running).toBe(true);
     await vi.waitFor(async () => {
       expect((await status()).running).toBe(false);
@@ -545,7 +545,7 @@ describe("Scan API", () => {
     });
     await api.request("POST", apiRoutes.startScan.url);
     const response = await api.request("POST", apiRoutes.startScan.url);
-    expect(response.statusCode).toBe(RouteStatus.Conflict);
+    expect(response.statusCode).toBe(HttpStatus.Conflict);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ScanRunning);
     release();
     await vi.waitFor(async () => {
@@ -562,7 +562,7 @@ describe("Scan API", () => {
     const scheduled = api.scans.current.scanNow();
     expect((await status()).running).toBe(true);
     const response = await api.request("POST", apiRoutes.startScan.url);
-    expect(response.statusCode).toBe(RouteStatus.Conflict);
+    expect(response.statusCode).toBe(HttpStatus.Conflict);
     release();
     await scheduled;
     expect(await status()).toMatchObject({ running: false, lastResult: { plugins: [{ succeeded: 1 }] } });
