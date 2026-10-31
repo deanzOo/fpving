@@ -137,7 +137,8 @@ const Group = ({ product, candidates }: GroupProps) => {
 
 /**
  * The match review screen: every watched product with its pending candidates, each with the judge's verdict and
- * reason, its similarity and a link to its page, to accept or reject, and a search for more.
+ * reason, its similarity and a link to its page, to accept or reject, and a search for more. Candidates judged
+ * different are hidden unless the toggle shows them.
  *
  * @returns The screen.
  */
@@ -155,11 +156,25 @@ export const Matches = () => {
       throwOnError: true,
     })),
   });
-  const groups = pending.map(({ data }) => data).filter((group) => group !== undefined);
+  const [showDifferent, setShowDifferent] = useState(false);
+  const groups = pending.map(({ data }) => data).filter((group) => group !== undefined).map((group) => ({
+    ...group,
+    candidates: group.candidates.filter(({ llmVerdict }) => showDifferent || llmVerdict !== LlmVerdict.Different),
+  }));
   const loaded = groups.length === products?.length;
   return (
     <section>
       <h1 className="text-2xl font-semibold">Matches</h1>
+      <label className="mt-4 flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={showDifferent}
+          onChange={(event) => {
+            setShowDifferent(event.target.checked);
+          }}
+        />
+        Show candidates judged different
+      </label>
       {!loaded && <p className="mt-6 text-ink-muted">Loading…</p>}
       {products?.length === 0 && (
         <p className="mt-6 text-ink-muted">Nothing is watched yet. Add a product on the Watchlist first.</p>

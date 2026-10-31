@@ -77,6 +77,26 @@ describe("Match review", () => {
     await expect.element(group(screen, "Acme X5 kit").getByText("Not judged yet")).toBeVisible();
   });
 
+  it("hides candidates judged different until asked to show them", async () => {
+    const different = candidate("c2", FRAME, { llmVerdict: LlmVerdict.Different, llmReason: "another frame size" });
+    const screen = await renderApp(scripted([candidate("c1", FRAME), different]).client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    await expect.element(frame.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
+    await expect.element(frame.getByRole("link", { name: "Acme X5 c2" })).not.toBeInTheDocument();
+    const toggle = screen.getByRole("checkbox", { name: "Show candidates judged different" });
+    await expect.element(toggle).not.toBeChecked();
+    await toggle.click();
+    await expect.element(frame.getByText("Different product: another frame size")).toBeVisible();
+    await toggle.click();
+    await expect.element(frame.getByRole("link", { name: "Acme X5 c2" })).not.toBeInTheDocument();
+  });
+
+  it("says nothing waits for review when every pending candidate was judged different", async () => {
+    const different = candidate("c2", FRAME, { llmVerdict: LlmVerdict.Different, llmReason: "another frame size" });
+    const screen = await renderApp(scripted([different]).client, "/matches");
+    await expect.element(screen.getByText("No match candidates are waiting for review.")).toBeVisible();
+  });
+
   it("accepts a candidate as a listing of its product and drops it from the queue", async () => {
     const api = scripted([candidate("c1", FRAME)]);
     api.on(at(apiRoutes.acceptCandidate, { candidateId: "c1" }), () => {
