@@ -16,9 +16,14 @@ import { recordingLogger } from "../support/recording-logger.ts";
 
 const US: Settings = { ...settingsSchema.parse(DEFAULT_SETTINGS), shipToCountry: "US" };
 
+const DRAIN_DEADLINE_MS = 5000;
+
 const notApplied = err({ kind: ApiErrorKind.SettingsNotApplied });
 
-afterEach(cleanUpTemp);
+afterEach(() => {
+  vi.useRealTimers();
+  cleanUpTemp();
+});
 
 const held = () => {
   let release = (): void => undefined;
@@ -184,6 +189,23 @@ describe("Settings applier", () => {
     await searching;
     expect((await call).ok).toBe(true);
     expect(events).toEqual(["call finished", "search finished", "host 0 shut down"]);
+  });
+
+  it("shuts the old host down after five seconds when a call through the old gateway never finishes", async () => {
+    vi.useFakeTimers();
+    const { applier, live, hosts, events, old, logger } = await applierHarness();
+    old.script.fetching = new Promise(() => undefined);
+    void live.deps.stores.fetchListing(pluginIdSchema.parse("shop"), "https://shop.example/p");
+    const applying = applier.apply(US);
+    await vi.advanceTimersByTimeAsync(DRAIN_DEADLINE_MS);
+    expect(await applying).toEqual(ok(undefined));
+    expect({ live: live.host === hosts[1], events }).toEqual({ live: true, events: ["host 0 shut down"] });
+    const warned = logger.events.filter(({ level }) => level === "warn" || level === "error");
+    expect(warned).toEqual([{
+      level: "warn",
+      message: "calls on the old plugin host did not finish",
+      fields: { deadlineMs: DRAIN_DEADLINE_MS },
+    }]);
   });
 
   it("applies the change and logs a warning when the old host fails to shut down", async () => {

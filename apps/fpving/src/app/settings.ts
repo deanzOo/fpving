@@ -4,7 +4,7 @@ import type { MatchDeps, Result, SchedulerDeps, SchedulerHandle, Settings, Store
 import type { PluginHost } from "../plugins/runtime/host.js";
 import type { SettingsChangeError } from "../server/api.js";
 import { ApiErrorKind } from "../server/errors.js";
-import { withinDeadline } from "./lifecycle.js";
+import { raceDeadline } from "./lifecycle.js";
 
 /** Every port core's use cases take. */
 export type AppDeps = MatchDeps & SchedulerDeps;
@@ -42,6 +42,7 @@ export interface SettingsApplier {
 const OLD_HOST_STUCK = "the old plugin host did not shut down";
 const NEW_HOST_STUCK = "the new plugin host did not shut down";
 const NOT_APPLIED = "settings change not applied";
+const DRAIN_MISSED = "calls on the old plugin host did not finish";
 
 const DRAIN_DEADLINE_MS = 5000;
 
@@ -124,7 +125,10 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
         gateway = drainable(gatewayFor(host));
         live.host = host;
         live.deps = { ...live.deps, stores: gateway };
-        await withinDeadline(draining.drained(), DRAIN_DEADLINE_MS, live.deps.logger);
+        const { logger } = live.deps;
+        await raceDeadline(draining.drained(), DRAIN_DEADLINE_MS, () => {
+          logger.warn(DRAIN_MISSED, { deadlineMs: DRAIN_DEADLINE_MS });
+        });
         await old.shutdown().catch((error: unknown) => {
           live.deps.logger.warn(OLD_HOST_STUCK, { detail: inspect(error) });
         });

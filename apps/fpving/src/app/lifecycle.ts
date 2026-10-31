@@ -47,18 +47,22 @@ export const sequenceShutdown = (steps: readonly ShutdownStep[], logger: Logger)
 };
 
 /**
- * Waits for a shutdown, but no longer than the deadline.
+ * Waits for some work, but no longer than the deadline.
  *
- * @param work - The running shutdown.
+ * @param work - The running work.
  * @param deadlineMs - How long to wait.
- * @param logger - Where a missed deadline is logged.
- * @returns The shutdown's result, or false when the deadline passed first.
+ * @param missed - Called once when the deadline passes first.
+ * @returns The work's result, or false when the deadline passed first.
  */
-export const withinDeadline = async (work: Promise<boolean>, deadlineMs: number, logger: Logger): Promise<boolean> => {
+export const raceDeadline = async (
+  work: Promise<boolean>,
+  deadlineMs: number,
+  missed: () => void,
+): Promise<boolean> => {
   let timer: NodeJS.Timeout | undefined;
   const deadline = new Promise<false>((resolve) => {
     timer = setTimeout(() => {
-      logger.error("shutdown missed its deadline", { deadlineMs });
+      missed();
       resolve(false);
     }, deadlineMs);
   });
@@ -68,6 +72,19 @@ export const withinDeadline = async (work: Promise<boolean>, deadlineMs: number,
     clearTimeout(timer);
   }
 };
+
+/**
+ * Waits for a shutdown, but no longer than the deadline.
+ *
+ * @param work - The running shutdown.
+ * @param deadlineMs - How long to wait.
+ * @param logger - Where a missed deadline is logged.
+ * @returns The shutdown's result, or false when the deadline passed first.
+ */
+export const withinDeadline = async (work: Promise<boolean>, deadlineMs: number, logger: Logger): Promise<boolean> =>
+  raceDeadline(work, deadlineMs, () => {
+    logger.error("shutdown missed its deadline", { deadlineMs });
+  });
 
 /** Where shutdown requests come from: `process`, or an emitter in tests. */
 export interface ShutdownSource {
