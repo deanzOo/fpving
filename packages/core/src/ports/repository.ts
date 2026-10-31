@@ -109,8 +109,9 @@ export interface SnapshotRepository {
   latestPerListing(productId: ProductId): Promise<PriceSnapshot[]>;
   /**
    * Every snapshot of an active or stale listing of a product that is not archived observed at or after `since`, plus
-   * each such listing's newest snapshot before `since`, ordered by listing id by code point, then oldest first. Of
-   * snapshots before `since` observed at the same instant, the one with the greater id by code point is the newest.
+   * each such listing's newest snapshot before `since`, ordered by listing id by code point, then oldest first, then
+   * by id in code point order. Of snapshots before `since` observed at the same instant, the one with the greater id
+   * by code point is the newest.
    */
   listForTrend(since: Date): Promise<PriceSnapshot[]>;
 }

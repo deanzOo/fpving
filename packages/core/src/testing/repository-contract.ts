@@ -491,6 +491,19 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([s1, ofStale]);
       });
 
+      it("orders snapshots from the instant on that share an observed instant by id in code point order", async () => {
+        await seed();
+        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
+          await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
+        }
+        expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([
+          s1,
+          snapshot(ASTRAL_ID_LOW, l1.id, JAN_2),
+          snapshot(ASTRAL_ID_HIGH, l1.id, JAN_2),
+          s2,
+        ]);
+      });
+
       it("picks the earlier snapshot with the greater id by code point on an observed instant tie", async () => {
         await seed();
         for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
