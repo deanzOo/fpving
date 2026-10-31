@@ -1,3 +1,4 @@
+import { ApiErrorKind } from "@fpving/app/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { toFailure, useClient } from "./client.ts";
@@ -10,7 +11,8 @@ const POLL_MS = 1000;
 /**
  * The scan now control and the scan status: running, or when the last scan finished with how many listings it
  * fetched, how many failed and how many alerts it raised. While a scan runs the status is polled, and when a scan
- * seen running finishes the watchlist and the alerts are read again.
+ * seen running finishes the watchlist and the alerts are read again. A refusal because a scan is already running
+ * reads the status again, so that scan shows.
  *
  * @returns The control.
  */
@@ -26,6 +28,11 @@ export const ScanNow = () => {
     mutationFn: async () => client.startScan(),
     onSuccess: (next) => {
       queryClient.setQueryData(QueryKey.Scan, next);
+    },
+    onError: async (error) => {
+      if (toFailure(error).kind === ApiErrorKind.ScanRunning) {
+        await queryClient.invalidateQueries({ queryKey: QueryKey.Scan });
+      }
     },
   });
   const running = status?.running === true;

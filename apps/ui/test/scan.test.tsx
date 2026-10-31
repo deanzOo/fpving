@@ -86,6 +86,19 @@ describe("Scan now", () => {
     await expect.element(screen.getByRole("link", { name: "Acme X5 frame" })).toBeVisible();
   });
 
+  it("reads the scan status again when a scan it did not start is running", async () => {
+    const api = scripted(finished(FIVE));
+    api.on(apiRoutes.startScan, () => {
+      api.on(apiRoutes.getScan, reply(wire.scan, { ...finished(FIVE), running: true }));
+      return failWith(HttpStatus.Conflict, ApiErrorKind.ScanRunning, "a scan is already running")();
+    });
+    const screen = await renderApp(api.client);
+    await expect.element(screen.getByText(/^Last scan finished/u)).toBeVisible();
+    await screen.getByRole("button", { name: "Scan now" }).click();
+    await expect.element(screen.getByText("Scanning every listing…")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Scan now" })).toBeDisabled();
+  });
+
   it.each([
     [HttpStatus.Conflict, ApiErrorKind.ScanRunning, "A scan is already running."],
     [HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting,
