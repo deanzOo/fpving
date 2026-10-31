@@ -1,3 +1,4 @@
+import "./zod-config.ts";
 import { createBrowserHistory } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { StrictMode } from "react";
