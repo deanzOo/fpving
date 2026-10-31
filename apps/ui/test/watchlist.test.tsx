@@ -156,6 +156,19 @@ describe("Adding a product by URL", () => {
     expect(api.sent).toContainEqual({ method: "POST", path: apiRoutes.addProduct.url, body: { url: PAGE } });
   });
 
+  it("keeps its status region in place before an add, so the result is announced as it changes", async () => {
+    const api = scripted([]);
+    api.on(apiRoutes.addProduct, reply(wire.added, added("Acme X5 kit"), HttpStatus.Created));
+    const screen = await renderApp(api.client);
+    const field = screen.getByLabelText("Store URL");
+    await expect.element(field).toBeVisible();
+    const region = field.element().closest("form")?.querySelector("[role=status]");
+    expect(region).toBeInstanceOf(HTMLElement);
+    await field.fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expect.poll(() => region?.textContent).toBe("Now watching Acme X5 kit");
+  });
+
   it("disables the button while the store page is being fetched", async () => {
     const api = scripted([]);
     const fetched = gate();

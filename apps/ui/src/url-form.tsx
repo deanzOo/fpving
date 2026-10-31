@@ -60,7 +60,7 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
         {added.isPending ? pendingLabel : submitLabel}
       </button>
       {error !== null && <p id={errorId} role="alert" className="w-full text-critical">{error}</p>}
-      {added.isSuccess && <p role="status" className="w-full text-ink-muted">{said(added.data)}</p>}
+      <p role="status" className="w-full text-ink-muted">{added.isSuccess ? said(added.data) : ""}</p>
     </form>
   );
 };
