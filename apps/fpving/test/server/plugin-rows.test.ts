@@ -12,6 +12,7 @@ const LATER = new Date("2026-10-31T01:00:00Z");
 const quiet: PluginActivity = { health: [], scanned: [], now: NOW };
 const SHOP = pluginIdSchema.parse(MANIFEST.id);
 const OTHER = pluginIdSchema.parse("other-shop");
+const OWN_STALE = 2;
 
 const scanned = (id: string, pluginId: typeof SHOP, status: Listing["status"]): Listing => ({
   id: listingIdSchema.parse(id),
@@ -75,9 +76,8 @@ describe("Plugins screen rows", () => {
       { pluginId: OTHER, consecutiveBlocks: 1, backoffUntil: NOW },
       { pluginId: SHOP, consecutiveBlocks: 1, backoffUntil: LATER },
     ];
-    const ownStale = listings.filter((row) => row.pluginId === SHOP && row.status === ListingStatus.Stale).length;
     expect(pluginRows([state], [], null, { health, scanned: listings, now: NOW })).toMatchObject([
-      { backoffUntil: LATER, staleListings: ownStale },
+      { backoffUntil: LATER, staleListings: OWN_STALE },
     ]);
   });
 
