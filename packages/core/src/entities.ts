@@ -24,9 +24,9 @@ const countSchema = z.int().nonnegative();
 
 /**
  * How a listing is doing. `stale` after repeated failed fetches, shown with its last good price; `gone` once the
- * store reported the page missing twice.
+ * store reported the page missing twice; `removed` once the user removed it from its product, which keeps its history.
  */
-export const ListingStatus = { Active: "active", Stale: "stale", Gone: "gone" } as const;
+export const ListingStatus = { Active: "active", Stale: "stale", Gone: "gone", Removed: "removed" } as const;
 
 /** One of the {@link ListingStatus} values. */
 export type ListingStatus = (typeof ListingStatus)[keyof typeof ListingStatus];

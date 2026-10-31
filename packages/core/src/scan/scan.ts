@@ -184,14 +184,19 @@ const evaluateProduct = async (
   settings: Settings,
   rates: FxTable | null,
   productId: ProductId,
-  rows: readonly Fetched[],
+  fetchedRows: readonly Fetched[],
 ): Promise<Alert[]> => {
   const { repository, clock, ids, notifier, logger } = deps;
   const product = await repository.products.get(productId);
   if (product === null) {
     throw new Error(`the scanned product ${productId} is missing`);
   }
+  if (product.archivedAt !== null) {
+    return [];
+  }
   const listings = await repository.listings.listByProduct(productId);
+  const removed = new Set(listings.filter((row) => row.status === ListingStatus.Removed).map((row) => row.id));
+  const rows = fetchedRows.filter((row) => !removed.has(row.listing.id));
   const latest = await repository.snapshots.latestPerListing(productId);
   const productListings = listings.flatMap((listing) =>
     latest.filter((row) => row.listingId === listing.id).map((row) => ({ listing, latest: row })),
@@ -252,7 +257,8 @@ const evaluateProduct = async (
  *   stored on the product when it changed. A product with a listing that went stale or gone but no successful fetch
  *   has only its cheapest recomputed; a gone cheapest is cleared when no other listing qualifies. Without stored
  *   rates no new cheapest is computed. Each alert gets an id and is stored before it is notified; an alert the
- *   notifier cannot show stays stored and is logged.
+ *   notifier cannot show stays stored and is logged. A listing removed or a product archived while the scan runs
+ *   counts for none of its alerts or its cheapest listing.
  * - A listing or product that goes missing while the scan runs is a bug: the scan rejects, but only after every
  *   plugin's scan has settled, so nothing is still writing when the caller sees the rejection.
  *

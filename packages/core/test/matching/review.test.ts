@@ -13,6 +13,8 @@ import {
   matchCandidateIdSchema,
   MatchErrorKind,
   ok,
+  pendingCandidates,
+  productIdSchema,
   rejectCandidate,
   snapshotIdSchema,
 } from "../../src/index.ts";
@@ -99,8 +101,17 @@ describe("Accepting a match candidate", () => {
     const { deps, repository, productId, exact, older } = await withCandidates();
     const added = await addListing(deps, productId, EXACT_URL);
     const tracking = added.ok ? added.value.listing : undefined;
-    const alreadyTracked = err({ kind: AddErrorKind.AlreadyTracked, listing: tracking });
+    const product = await repository.products.get(productId);
+    const alreadyTracked = err({ kind: AddErrorKind.AlreadyTracked, listing: tracking, product });
     expect(await acceptCandidate(deps, exact.id)).toEqual(alreadyTracked);
+    expect(await pendingIds(repository)).toEqual([exact.id, older.id]);
+  });
+
+  it("answers product_not_found for a candidate of an archived product, leaving it pending", async () => {
+    const { deps, repository, productId, exact, older } = await withCandidates();
+    await repository.products.archive(productId, NOW);
+    expect(await acceptCandidate(deps, exact.id)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+    expect(await repository.listings.findByUrl(EXACT_URL)).toBeNull();
     expect(await pendingIds(repository)).toEqual([exact.id, older.id]);
   });
 
@@ -131,5 +142,25 @@ describe("Rejecting a match candidate", () => {
     await rejectCandidate(deps, exact.id);
     expect(await rejectCandidate(deps, exact.id)).toEqual(notPending);
     expect(await rejectCandidate(deps, missing)).toEqual(notPending);
+  });
+});
+
+describe("Listing a product's pending candidates", () => {
+  it("lists the product's pending candidates, highest similarity first", async () => {
+    const { deps, productId, exact, older } = await withCandidates();
+    await rejectCandidate(deps, older.id);
+    expect(await pendingCandidates(deps, productId)).toEqual(ok([exact]));
+  });
+
+  it("answers product_not_found for an archived product", async () => {
+    const { deps, repository, productId } = await withCandidates();
+    await repository.products.archive(productId, NOW);
+    expect(await pendingCandidates(deps, productId)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+  });
+
+  it("answers product_not_found for a product that does not exist", async () => {
+    const { deps } = await withCandidates();
+    const result = await pendingCandidates(deps, productIdSchema.parse("missing"));
+    expect(result).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
   });
 });

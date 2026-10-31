@@ -8,8 +8,10 @@ import {
   ANTHROPIC_BASE_URL,
   anthropicMessages,
   createAnthropicLlmJudge,
+  keylessLlmJudge,
   MATCHER_MODEL,
   MAX_IN_FLIGHT,
+  NO_API_KEY,
 } from "../../../src/adapters/anthropic/llm-judge.ts";
 import type { CreateMessage, MessageReply } from "../../../src/adapters/anthropic/llm-judge.ts";
 
@@ -191,5 +193,18 @@ describe("Anthropic LLM judge", () => {
     expect(sentHeaders.join()).toContain(FAKE_KEY);
     expect(logged).toHaveLength(1);
     expect(JSON.stringify(logged)).not.toContain(FAKE_KEY);
+  });
+});
+
+describe("LLM judge without an API key", () => {
+  it("answers every call unavailable without sending a request, and logs each at debug level", async () => {
+    const { logger, logged } = recordingLogger();
+    const debug = vi.spyOn(logger, "debug");
+    const judge = keylessLlmJudge(logger);
+    const unavailable = { ok: false, error: { kind: LlmErrorKind.Unavailable, detail: NO_API_KEY } };
+    expect(await judge.extractIdentity(SOURCE)).toEqual(unavailable);
+    expect(await judge.compare(SOURCE, CANDIDATE)).toEqual(unavailable);
+    expect(debug).toHaveBeenCalledTimes(logged.length);
+    expect(logged).toEqual([{ method: "extractIdentity" }, { method: "compare" }]);
   });
 });

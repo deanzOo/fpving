@@ -15,7 +15,7 @@ import {
   productIdSchema,
   snapshotIdSchema,
 } from "../../src/index.ts";
-import type { CoreDeps, Repository } from "../../src/index.ts";
+import type { CoreDeps, Listing, Repository } from "../../src/index.ts";
 import { fakeClock } from "../fakes/fake-clock.ts";
 import { fakeIdGenerator } from "../fakes/fake-id-generator.ts";
 import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
@@ -69,6 +69,17 @@ const expectedSnapshot = (id: string, listingId: string) => ({
   inStock: true,
 });
 
+const expectedProduct = (id: string) => ({
+  id: productIdSchema.parse(id),
+  name: fetched.title,
+  createdAt: NOW,
+  archivedAt: null,
+  cheapestListingId: null,
+});
+
+const trackedBy = (listing: Listing, product = expectedProduct(listing.productId)) =>
+  err({ kind: AddErrorKind.AlreadyTracked, listing, product });
+
 const forgetfulAboutUrls = (repository: Repository): Repository => ({
   ...repository,
   listings: { ...repository.listings, findByUrl: async () => Promise.resolve(null) },
@@ -104,7 +115,7 @@ describe("Adding a product", () => {
     await addProduct(deps, PASTED);
     const again = await addProduct(deps, `${CANONICAL}&utm_medium=email`);
     const existing = expectedListing("id-2", "id-1", CANONICAL);
-    expect(again).toEqual(err({ kind: AddErrorKind.AlreadyTracked, listing: existing }));
+    expect(again).toEqual(trackedBy(existing));
     expect(stores.fetched).toEqual([CANONICAL]);
   });
 
@@ -136,9 +147,58 @@ describe("Adding a product", () => {
         await addProduct(racing.deps, CANONICAL);
       }
     });
-    expect(await addProduct(racing.deps, PASTED)).toEqual(
-      err({ kind: AddErrorKind.AlreadyTracked, listing: expectedListing("id-2", "id-1", CANONICAL) }),
-    );
+    expect(await addProduct(racing.deps, PASTED)).toEqual(trackedBy(expectedListing("id-2", "id-1", CANONICAL)));
+  });
+
+  it("restores an archived product when its URL is added again, with a new snapshot and its history", async () => {
+    const { deps, repository, stores } = setup();
+    await addProduct(deps, PASTED);
+    const id = productIdSchema.parse("id-1");
+    await repository.listings.updateStatus(listingIdSchema.parse("id-2"), {
+      status: ListingStatus.Stale,
+      failureStreak: 3,
+      notFoundStreak: 1,
+    });
+    await repository.products.archive(id, NOW);
+    const listing = expectedListing("id-2", "id-1", CANONICAL);
+    const snapshot = expectedSnapshot("id-4", "id-2");
+    expect(await addProduct(deps, PASTED)).toEqual(ok({ product: expectedProduct("id-1"), listing, snapshot }));
+    expect(stores.fetched).toEqual([CANONICAL, CANONICAL]);
+    expect(await repository.products.list()).toEqual([expectedProduct("id-1")]);
+    expect(await repository.listings.findByUrl(CANONICAL)).toEqual(listing);
+    expect(await repository.snapshots.listSince(listing.id, NOW)).toEqual([expectedSnapshot("id-3", "id-2"), snapshot]);
+  });
+
+  it("keeps an archived product archived and passes the store error through when the fetch fails", async () => {
+    const { deps, repository } = setup();
+    await addProduct(deps, PASTED);
+    await repository.products.archive(productIdSchema.parse("id-1"), NOW);
+    const stores = fakeStoreGateway([{ id: SHOP, domains: ["shop.example"], listing: err(blocked) }]);
+    const failing = { ...deps, stores };
+    expect(await addProduct(failing, PASTED)).toEqual(err({ kind: AddErrorKind.FetchFailed, error: blocked }));
+    expect(await repository.products.list()).toEqual([]);
+  });
+
+  it("answers already_tracked when another add restored the archived product during the fetch", async () => {
+    let armed = false;
+    const racing = setup(ok(fetched), async () => {
+      if (armed) {
+        armed = false;
+        await addProduct(racing.deps, PASTED);
+      }
+    });
+    await addProduct(racing.deps, PASTED);
+    await racing.repository.products.archive(productIdSchema.parse("id-1"), NOW);
+    armed = true;
+    expect(await addProduct(racing.deps, PASTED)).toEqual(trackedBy(expectedListing("id-2", "id-1", CANONICAL)));
+  });
+
+  it("rejects as a bug when the product of a tracked URL is missing", async () => {
+    const { deps } = setup();
+    await addProduct(deps, PASTED);
+    const products = { ...deps.repository.products, get: async () => Promise.resolve(null) };
+    const productless = { ...deps, repository: { ...deps.repository, products } };
+    await expect(addProduct(productless, PASTED)).rejects.toThrow();
   });
 
   it("rejects as a bug when the repository reports a tracked URL it cannot find", async () => {
@@ -173,9 +233,7 @@ describe("Adding a listing to a product", () => {
 
   it("returns the existing listing when the URL is already tracked, without fetching", async () => {
     const { deps, stores } = await withProduct();
-    expect(await addListing(deps, productId, PASTED)).toEqual(
-      err({ kind: AddErrorKind.AlreadyTracked, listing: expectedListing("id-2", "id-1", CANONICAL) }),
-    );
+    expect(await addListing(deps, productId, PASTED)).toEqual(trackedBy(expectedListing("id-2", "id-1", CANONICAL)));
     expect(stores.fetched).toEqual([]);
   });
 
@@ -204,6 +262,64 @@ describe("Adding a listing to a product", () => {
     expect(await repository.listings.findByUrl(OTHER_CANONICAL)).toBeNull();
   });
 
+  it("makes a removed listing of the product active again when its URL is added to it, keeping history", async () => {
+    const { deps, repository, stores } = await withProduct();
+    await repository.listings.remove(productId, listingIdSchema.parse("id-2"));
+    const listing = expectedListing("id-2", "id-1", CANONICAL);
+    const snapshot = expectedSnapshot("id-4", "id-2");
+    expect(await addListing(deps, productId, PASTED)).toEqual(ok({ listing, snapshot }));
+    expect(stores.fetched).toEqual([CANONICAL]);
+    expect(await repository.listings.listByProduct(productId)).toEqual([listing]);
+    expect(await repository.snapshots.listSince(listing.id, NOW)).toEqual([expectedSnapshot("id-3", "id-2"), snapshot]);
+  });
+
+  it("keeps a removed listing removed and passes the store error through when the fetch fails", async () => {
+    const { deps, repository } = await withProduct(err(blocked));
+    await repository.listings.remove(productId, listingIdSchema.parse("id-2"));
+    expect(await addListing(deps, productId, PASTED)).toEqual(err({ kind: AddErrorKind.FetchFailed, error: blocked }));
+    expect((await repository.listings.findByUrl(CANONICAL))?.status).toBe(ListingStatus.Removed);
+  });
+
+  it("answers already_tracked naming the other product for a removed listing of another product", async () => {
+    const { deps, repository, stores } = await withProduct();
+    await addProduct(deps, OTHER);
+    await repository.listings.remove(productId, listingIdSchema.parse("id-2"));
+    const removed = { ...expectedListing("id-2", "id-1", CANONICAL), status: ListingStatus.Removed };
+    expect(await addListing(deps, productIdSchema.parse("id-4"), PASTED)).toEqual(trackedBy(removed));
+    expect(stores.fetched).toEqual([OTHER_CANONICAL]);
+  });
+
+  it("reports product_not_found for a removed listing's URL added to its archived product", async () => {
+    const { deps, repository } = await withProduct();
+    await repository.listings.remove(productId, listingIdSchema.parse("id-2"));
+    await repository.products.archive(productId, NOW);
+    expect(await addListing(deps, productId, PASTED)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+    expect((await repository.listings.findByUrl(CANONICAL))?.status).toBe(ListingStatus.Removed);
+  });
+
+  it("answers already_tracked when another add restored the removed listing during the fetch", async () => {
+    let armed = false;
+    const racing = setup(ok(fetched), async () => {
+      if (armed) {
+        armed = false;
+        await addListing(racing.deps, productId, PASTED);
+      }
+    });
+    await addProduct(racing.deps, PASTED);
+    await racing.repository.listings.remove(productId, listingIdSchema.parse("id-2"));
+    armed = true;
+    expect(await addListing(racing.deps, productId, PASTED)).toEqual(
+      trackedBy(expectedListing("id-2", "id-1", CANONICAL)),
+    );
+  });
+
+  it("reports product_not_found and stores nothing when the product is archived", async () => {
+    const { deps, repository } = await withProduct();
+    await repository.products.archive(productId, NOW);
+    expect(await addListing(deps, productId, OTHER)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+    expect(await repository.listings.findByUrl(OTHER_CANONICAL)).toBeNull();
+  });
+
   it("returns the listing that tracked the URL first when another add wins the race during the fetch", async () => {
     let armed = false;
     const racing = setup(ok(fetched), async () => {
@@ -215,7 +331,7 @@ describe("Adding a listing to a product", () => {
     await addProduct(racing.deps, PASTED);
     armed = true;
     expect(await addListing(racing.deps, productId, OTHER)).toEqual(
-      err({ kind: AddErrorKind.AlreadyTracked, listing: expectedListing("id-5", "id-4", OTHER_CANONICAL) }),
+      trackedBy(expectedListing("id-5", "id-4", OTHER_CANONICAL)),
     );
   });
 });

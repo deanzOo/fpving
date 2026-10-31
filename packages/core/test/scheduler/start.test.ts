@@ -336,6 +336,28 @@ describe("The scan schedule never overlapping scans", () => {
     expect(stores.fetched).toHaveLength(1);
   });
 
+  it("says a scan is running from a scan on demand until it finished, then has its report", async () => {
+    const { handle, open } = await gated();
+    expect({ scanning: handle.scanning(), last: handle.lastReport() }).toEqual({ scanning: false, last: null });
+    const running = handle.scanNow();
+    expect(handle.scanning()).toBe(true);
+    open();
+    const report = await running;
+    expect(handle.scanning()).toBe(false);
+    expect(handle.lastReport()).toEqual({ report: report.ok ? report.value : null, finishedAt: NOW });
+  });
+
+  it("says a scheduled scan is running too, and keeps its report", async () => {
+    const { handle, scheduler, open } = await gated();
+    const tick = scheduler.tick();
+    await drain();
+    expect(handle.scanning()).toBe(true);
+    open();
+    await tick;
+    expect(handle.scanning()).toBe(false);
+    expect(handle.lastReport()?.report.plugins).toHaveLength(1);
+  });
+
   it("starts a new scan once the running one finished", async () => {
     const { handle, stores, scheduler, open } = await gated();
     const first = handle.scanNow();
@@ -407,5 +429,14 @@ describe("The scan schedule surviving a failing scan", () => {
     const { deps } = await setup({ lastScanAgo: 0, wrap: failingOnce });
     const handle = await startScheduler(deps);
     await expect(handle.scanNow()).rejects.toThrow("database is locked");
+  });
+
+  it("is no longer scanning after a scan that threw, and keeps the earlier report", async () => {
+    const { deps } = await setup({ lastScanAgo: 0, wrap: failingOnce });
+    const handle = await startScheduler(deps);
+    await expect(handle.scanNow()).rejects.toThrow();
+    expect({ scanning: handle.scanning(), last: handle.lastReport() }).toEqual({ scanning: false, last: null });
+    await handle.scanNow();
+    expect(handle.lastReport()).not.toBeNull();
   });
 });

@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -8,6 +9,14 @@ import { z } from "zod";
 
 const MIGRATIONS_FOLDER = fileURLToPath(new URL("../../../drizzle", import.meta.url));
 const MIGRATIONS_TABLE = "__drizzle_migrations";
+const BACKUP_SUFFIX = ".bak";
+const OWNER_ONLY_FILE = 0o600;
+const DATABASE_FILES = ["", "-wal", "-shm"] as const;
+
+type Chmod = (path: string, mode: number) => void;
+
+/** How many migration backups of a database file are kept; older ones are deleted after a successful migration. */
+export const KEPT_BACKUPS = 5;
 
 const lastAppliedMillis = (client: Database.Database): number | null => {
   const tracked = client.prepare("select 1 from sqlite_master where type = 'table' and name = ?").get(MIGRATIONS_TABLE);
@@ -21,9 +30,34 @@ const danglingKeys = (client: Database.Database): string | null => {
   return rows.length === 0 ? null : `${String(rows.length)} dangling foreign key(s) (${tables})`;
 };
 
-const backUp = (client: Database.Database, path: string): string => {
-  const backupPath = `${path}.${new Date().toISOString().replaceAll(/[:.]/g, "-")}.bak`;
+const BACKUP_STAMP = /^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/u;
+
+const backupTime = (prefix: string, name: string): number | null => {
+  const stamp = name.slice(prefix.length, -BACKUP_SUFFIX.length);
+  return name.startsWith(prefix) && name.endsWith(BACKUP_SUFFIX) && BACKUP_STAMP.test(stamp)
+    ? Date.parse(stamp.replace(BACKUP_STAMP, "$1:$2:$3.$4Z"))
+    : null;
+};
+
+const pruneBackups = (path: string, fresh: string | null): void => {
+  const dir = dirname(path);
+  const prefix = `${basename(path)}.`;
+  const freshName = fresh === null ? null : basename(fresh);
+  const older = readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => {
+      const time = entry.name === freshName ? null : backupTime(prefix, entry.name);
+      return time === null || !entry.isFile() ? [] : [{ name: entry.name, time }];
+    })
+    .toSorted((a, b) => b.time - a.time);
+  for (const { name } of older.slice(fresh === null ? KEPT_BACKUPS : KEPT_BACKUPS - 1)) {
+    rmSync(join(dir, name));
+  }
+};
+
+const backUp = (client: Database.Database, path: string, chmod: Chmod): string => {
+  const backupPath = `${path}.${new Date().toISOString().replaceAll(/[:.]/g, "-")}${BACKUP_SUFFIX}`;
   client.prepare("VACUUM INTO ?").run(backupPath);
+  chmod(backupPath, OWNER_ONLY_FILE);
   return backupPath;
 };
 
@@ -33,19 +67,31 @@ const backUp = (client: Database.Database, path: string): string => {
  * which is consistent in any journal mode. All pending migrations run in one transaction, so a failure leaves the
  * database as it was and throws, naming the backup. Foreign keys are off while migrating, so a migration may rebuild a
  * referenced table; afterwards `foreign_key_check` must come back empty, or it throws, naming the backup, since those
- * migrations are already committed. Run it before opening any repository connection to the file.
+ * migrations are already committed. After a successful run only the newest {@link KEPT_BACKUPS} backups of the file
+ * are kept, by the time in their names, always including the one just made; only regular files named exactly as this
+ * function names backups are ever deleted. The file, its write-ahead log files that exist and the backup are made
+ * owner-only; SQLite gives log files created later the file's mode. Run it before opening any repository connection
+ * to the file.
  *
  * @param path - The database file.
  * @param migrationsFolder - The drizzle-kit migrations; the app's own by default.
+ * @param chmod - Sets the owner-only mode; `chmodSync` by default.
  * @returns The backup's path, or null when none was needed.
  */
-export const migrate = (path: string, migrationsFolder = MIGRATIONS_FOLDER): { backupPath: string | null } => {
+export const migrate = (
+  path: string,
+  migrationsFolder = MIGRATIONS_FOLDER,
+  chmod: Chmod = chmodSync,
+): { backupPath: string | null } => {
   const existed = existsSync(path);
   const client = new Database(path);
   try {
+    for (const file of DATABASE_FILES.map((suffix) => `${path}${suffix}`).filter((name) => existsSync(name))) {
+      chmod(file, OWNER_ONLY_FILE);
+    }
     const last = lastAppliedMillis(client);
     const pending = readMigrationFiles({ migrationsFolder }).some((row) => last === null || row.folderMillis > last);
-    const backupPath = existed && pending ? backUp(client, path) : null;
+    const backupPath = existed && pending ? backUp(client, path, chmod) : null;
     const backupNote = `backup: ${backupPath ?? "none"}`;
     client.pragma("foreign_keys = OFF");
     try {
@@ -57,6 +103,7 @@ export const migrate = (path: string, migrationsFolder = MIGRATIONS_FOLDER): { b
     if (dangling !== null) {
       throw new Error(`Migrating ${path} left ${dangling}; ${backupNote}`);
     }
+    pruneBackups(path, backupPath);
     return { backupPath };
   } finally {
     client.close();

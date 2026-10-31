@@ -1,0 +1,100 @@
+import { err, ok } from "@fpving/plugin-sdk";
+import type { Money, Result } from "@fpving/plugin-sdk";
+import type { ListingWithLatest } from "../alerts/draft.js";
+import { ListingStatus } from "../entities.js";
+import type { Listing, PriceSnapshot, Product } from "../entities.js";
+import type { ListingId, ProductId } from "../ids.js";
+import { cheapestBy } from "../alerts/new-cheapest.js";
+import { landedCostExact } from "../pricing/landed-cost.js";
+import { roundMinor } from "../pricing/money.js";
+import { liveProduct } from "./add.js";
+import type { CoreDeps, ProductNotFound } from "./add.js";
+import { AddErrorKind } from "./errors.js";
+
+const EPOCH = new Date(0);
+
+/** A product's cheapest listing and its landed cost in the display currency. */
+export interface CheapestPrice {
+  readonly listingId: ListingId;
+  readonly landedCost: Money;
+}
+
+/** One watched product and its cheapest landed price, or null when no listing can be priced. */
+export interface WatchlistEntry {
+  readonly product: Product;
+  readonly cheapest: CheapestPrice | null;
+}
+
+/** A listing with every snapshot of it, oldest first. */
+export interface ListingHistory {
+  readonly listing: Listing;
+  readonly history: PriceSnapshot[];
+}
+
+/** A product with its listings and their price histories. */
+export interface ProductDetail {
+  readonly product: Product;
+  readonly listings: ListingHistory[];
+}
+
+/**
+ * The watched products, newest first, each with its cheapest landed price: the landed cost in the display currency
+ * of the latest snapshot of each listing, over the latest stored exchange rates, among the listings a new cheapest
+ * alert compares (active, in stock, quoted for the saved ship-to country, with known shipping). Listings are ranked
+ * on the exact cost, as alerts rank them, and only the cost shown is rounded to a minor unit. A listing
+ * whose cost cannot be computed is left out; without stored rates no product has a cheapest price.
+ *
+ * @param deps - The repository.
+ * @returns One entry per product that is not archived.
+ */
+export const watchlist = async ({ repository }: Pick<CoreDeps, "repository">): Promise<WatchlistEntry[]> => {
+  const settings = await repository.settings.get();
+  const rates = await repository.fxRates.latest();
+  return Promise.all((await repository.products.list()).map(async (product): Promise<WatchlistEntry> => {
+    if (rates === null) {
+      return { product, cheapest: null };
+    }
+    const listings = await repository.listings.listByProduct(product.id);
+    const latest = await repository.snapshots.latestPerListing(product.id);
+    const entries = listings.flatMap((listing): ListingWithLatest[] =>
+      latest.filter((row) => row.listingId === listing.id).map((row) => ({ listing, latest: row })));
+    const cheapest = cheapestBy(entries, settings.shipToCountry, (row) => {
+      const cost = landedCostExact(row, settings, rates);
+      return cost.ok ? cost.value : null;
+    });
+    return {
+      product,
+      cheapest: cheapest === undefined
+        ? null
+        : {
+            listingId: cheapest.entry.listing.id,
+            landedCost: { amountMinor: roundMinor(cheapest.landedMinor), currency: settings.displayCurrency },
+          },
+    };
+  }));
+};
+
+/**
+ * A product with its listings that are not removed, oldest first, and each listing's snapshots, oldest first.
+ *
+ * @param deps - The repository.
+ * @param productId - The product.
+ * @returns The detail, or `product_not_found` for a product that is missing or archived.
+ */
+export const productDetail = async (
+  { repository }: Pick<CoreDeps, "repository">,
+  productId: ProductId,
+): Promise<Result<ProductDetail, ProductNotFound>> => {
+  const product = await liveProduct(repository, productId);
+  if (product === null) {
+    return err({ kind: AddErrorKind.ProductNotFound });
+  }
+  const kept = (await repository.listings.listByProduct(productId)).filter(
+    ({ status }) => status !== ListingStatus.Removed,
+  );
+  const listings = await Promise.all(kept.map(async (listing) => ({
+    listing,
+    history: await repository.snapshots.listSince(listing.id, EPOCH),
+  })));
+  return ok({ product, listings });
+};

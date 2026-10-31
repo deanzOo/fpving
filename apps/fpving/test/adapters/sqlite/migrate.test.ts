@@ -1,11 +1,11 @@
-import { cpSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { generateSQLiteDrizzleJson } from "drizzle-kit/api";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { migrate } from "../../../src/adapters/sqlite/migrate.ts";
+import { KEPT_BACKUPS, migrate } from "../../../src/adapters/sqlite/migrate.ts";
 import * as schema from "../../../src/adapters/sqlite/schema.ts";
 import { cleanUpTemp, tempDir } from "./temp-db.ts";
 
@@ -37,6 +37,15 @@ const migrationsWith = (extraSql: string): string => {
   return folder;
 };
 
+const migrationsUpTo = (tag: string): string => {
+  const folder = join(tempDir(), "drizzle");
+  cpSync(APP_MIGRATIONS, folder, { recursive: true });
+  const journal = journalSchema.parse(JSON.parse(readFileSync(join(folder, JOURNAL), "utf8")));
+  const end = journal.entries.findIndex((entry) => entry.tag === tag) + 1;
+  writeFileSync(join(folder, JOURNAL), JSON.stringify({ ...journal, entries: journal.entries.slice(0, end) }));
+  return folder;
+};
+
 const tables = (path: string): string[] => {
   const client = new Database(path, { readonly: true });
   const names = z.array(z.string()).parse(
@@ -65,6 +74,16 @@ const seeded = (path: string): Record<string, unknown[]> => {
 
 const snapshotSchema = z.looseObject({ tables: z.record(z.string(), z.unknown()) });
 
+const OWNER_ONLY_FILE = 0o600;
+
+const recordedModes = () => {
+  const calls: [string, number][] = [];
+  const chmod = (file: string, mode: number): void => {
+    calls.push([basename(file), mode]);
+  };
+  return { calls, chmod };
+};
+
 const backups = (dir: string): string[] => readdirSync(dir).filter((name) => name.endsWith(".bak"));
 
 describe("SQLite migrations", () => {
@@ -82,6 +101,30 @@ describe("SQLite migrations", () => {
     expect(migrate(path)).toEqual({ backupPath: null });
     expect(tables(path)).toEqual(expect.arrayContaining(["products", "listings", "price_snapshots", "settings"]));
     expect(backups(dir)).toEqual([]);
+  });
+
+  it("makes a new database file owner-only before its write-ahead log exists", () => {
+    const { calls, chmod } = recordedModes();
+    migrate(join(tempDir(), "fpving.db"), APP_MIGRATIONS, chmod);
+    expect(calls).toEqual([["fpving.db", OWNER_ONLY_FILE]]);
+  });
+
+  it("makes the database, its open write-ahead log files and its backup owner-only", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const holder = new Database(path);
+    holder.pragma("journal_mode = WAL");
+    holder.prepare("select 1 from fx_tables").all();
+    const { calls, chmod } = recordedModes();
+    const { backupPath } = migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"), chmod);
+    holder.close();
+    expect(calls).toEqual([
+      ["fpving.db", OWNER_ONLY_FILE],
+      ["fpving.db-wal", OWNER_ONLY_FILE],
+      ["fpving.db-shm", OWNER_ONLY_FILE],
+      [basename(backupPath ?? ""), OWNER_ONLY_FILE],
+    ]);
   });
 
   it("leaves an up-to-date database alone and makes no backup", () => {
@@ -103,6 +146,59 @@ describe("SQLite migrations", () => {
     expect(backups(dir)).toHaveLength(1);
     expect(contents(join(dir, backups(dir)[0] ?? ""))).toEqual(before);
     expect(tables(path)).toContain("extra");
+  });
+
+  it("keeps only the newest backups of its own file after migrating, leaving other files alone", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const stamps = Array.from({ length: KEPT_BACKUPS + LATER }, (_, day) => `2026-01-0${String(day + LATER)}`);
+    for (const stamp of stamps) {
+      writeFileSync(`${path}.${stamp}T00-00-00-000Z.bak`, "");
+    }
+    writeFileSync(join(dir, "other.db.2026-01-01T00-00-00-000Z.bak"), "");
+    const { backupPath } = migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"));
+    const kept = backups(dir).filter((name) => name.startsWith("fpving.db."));
+    expect(kept).toHaveLength(KEPT_BACKUPS);
+    expect(kept).toContain(basename(backupPath ?? ""));
+    expect(kept).not.toContain(`fpving.db.${stamps[0] ?? ""}T00-00-00-000Z.bak`);
+    expect(kept).not.toContain(`fpving.db.${stamps[1] ?? ""}T00-00-00-000Z.bak`);
+    expect(backups(dir)).toContain("other.db.2026-01-01T00-00-00-000Z.bak");
+  });
+
+  it("prunes only regular files named like its own backups, so a user's .bak or a folder survives", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const stamped = (day: number): string => `fpving.db.2026-01-0${String(day)}T00-00-00-000Z.bak`;
+    for (let day = 1; day <= KEPT_BACKUPS + LATER; day += 1) {
+      writeFileSync(join(dir, stamped(day)), "");
+    }
+    writeFileSync(join(dir, "fpving.db.0-mine.bak"), "mine");
+    writeFileSync(join(dir, "fpving.db.manual.bak"), "mine");
+    mkdirSync(join(dir, "fpving.db.2025-01-01T00-00-00-000Z.bak"));
+    migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"));
+    const names = readdirSync(dir);
+    expect(names).toEqual(expect.arrayContaining(["fpving.db.0-mine.bak", "fpving.db.manual.bak"]));
+    expect(names).toContain("fpving.db.2025-01-01T00-00-00-000Z.bak");
+    expect(names).not.toContain(stamped(1));
+    expect(names).not.toContain(stamped(LATER + 1));
+  });
+
+  it("never prunes the backup it just made, even when the clock went backwards", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const future = (year: number): string => `fpving.db.${String(year)}-01-01T00-00-00-000Z.bak`;
+    const FUTURE_YEAR = 2990;
+    for (let offset = 0; offset < KEPT_BACKUPS; offset += 1) {
+      writeFileSync(join(dir, future(FUTURE_YEAR + offset)), "");
+    }
+    const { backupPath } = migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"));
+    const kept = backups(dir);
+    expect(kept).toHaveLength(KEPT_BACKUPS);
+    expect(kept).toContain(basename(backupPath ?? ""));
+    expect(kept).not.toContain(future(FUTURE_YEAR));
   });
 
   it("rolls back a failing migration, keeps the backup intact and names it in the error", () => {
@@ -141,6 +237,30 @@ describe("SQLite migrations", () => {
     expect(migrate(path, migrationsWith(rebuild)).backupPath).not.toBeNull();
     expect(contents(path)["listings"]).toHaveLength(1);
     expect(contents(path)["products"]).toEqual([expect.objectContaining({ id: "p1" })]);
+  });
+
+  it("lets an existing database's listings be removed, keeping every row and still refusing an unknown status", () => {
+    const path = join(tempDir(), "fpving.db");
+    migrate(path, migrationsUpTo("0000_init"));
+    const client = new Database(path);
+    client.prepare("insert into products (id, name, created_at) values ('p1', 'Goggles', 1)").run();
+    const insertListing = client.prepare(
+      "insert into listings (id, product_id, plugin_id, url, title, status, origin, added_at, failure_streak, "
+      + "not_found_streak) values (?, 'p1', 'shop', ?, 'Goggles', ?, 'manual', 1, 0, 0)",
+    );
+    insertListing.run("l1", "https://shop.example/1", "active");
+    expect(() => insertListing.run("l2", "https://shop.example/2", "removed")).toThrow(/CHECK/u);
+    client.close();
+    migrate(path);
+    const after = new Database(path);
+    after.pragma("foreign_keys = ON");
+    after.prepare("update listings set status = 'removed' where id = 'l1'").run();
+    expect(() => after.prepare("update listings set status = 'deleted' where id = 'l1'").run()).toThrow(/CHECK/u);
+    after
+      .prepare("insert into price_snapshots values ('s1', 'l1', 1, 'IL', 100, 'USD', 'unknown', null, null, 1)")
+      .run();
+    after.close();
+    expect(contents(path)["listings"]).toEqual([expect.objectContaining({ id: "l1", status: "removed" })]);
   });
 
   it("refuses a migration that leaves a dangling foreign key, naming the backup it kept", () => {

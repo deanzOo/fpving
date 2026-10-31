@@ -21,6 +21,8 @@ const notFound = err({ kind: RepositoryErrorKind.NotFound });
 const duplicateUrl = err({ kind: RepositoryErrorKind.DuplicateUrl });
 const done = ok(undefined);
 const copy = structuredClone;
+const SCANNED: readonly string[] = [ListingStatus.Active, ListingStatus.Stale];
+const ACTIVE = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 0 };
 
 const bug = async (message: string): Promise<never> => Promise.reject(new Error(message));
 
@@ -46,6 +48,22 @@ export const inMemoryRepository = (): Repository => {
   const suggested = (row: Pick<MatchCandidate, "productId" | "url">, pool: Iterable<MatchCandidate>): boolean =>
     [...pool].some((other) => other.productId === row.productId && other.url === row.url);
 
+  const updateLive = (id: string, change: Partial<Product>): Result<void, NotFound> => {
+    const row = products.get(id);
+    if (row?.archivedAt !== null) {
+      return notFound;
+    }
+    products.set(id, { ...row, ...change });
+    return done;
+  };
+
+  const pending = (): MatchCandidate[] =>
+    copy(
+      [...candidates.values()]
+        .filter((row) => row.status === CandidateStatus.Pending)
+        .toSorted((a, b) => b.similarityScore - a.similarityScore || byCodePoint(a.id, b.id)),
+    );
+
   const insertListing = async (
     listing: Listing,
     firstSnapshot: PriceSnapshot,
@@ -53,7 +71,7 @@ export const inMemoryRepository = (): Repository => {
     if (listings.has(listing.id) || snapshots.has(firstSnapshot.id)) {
       return bug("duplicate id");
     }
-    if (!products.has(listing.productId)) {
+    if (products.get(listing.productId)?.archivedAt !== null) {
       return Promise.resolve(notFound);
     }
     if (urlTracked(listing.url)) {
@@ -85,6 +103,27 @@ export const inMemoryRepository = (): Repository => {
         return Promise.resolve(done);
       },
       get: async (id) => Promise.resolve(copy(products.get(id) ?? null)),
+      list: async () =>
+        Promise.resolve(copy(newestFirst(products.values(), (row) => row.createdAt).filter((row) => !row.archivedAt))),
+      rename: async (id, name) => Promise.resolve(updateLive(id, { name })),
+      archive: async (id, at) => Promise.resolve(updateLive(id, { archivedAt: copy(at) })),
+      restore: async (id, snapshot) => {
+        const row = products.get(id);
+        if (row?.archivedAt === null || row === undefined) {
+          return Promise.resolve(notFound);
+        }
+        const listing = listings.get(snapshot.listingId);
+        if (listing?.productId !== id) {
+          return bug("restoring with a snapshot of another product's listing");
+        }
+        if (snapshots.has(snapshot.id)) {
+          return bug("duplicate snapshot id");
+        }
+        products.set(id, { ...row, archivedAt: null });
+        listings.set(listing.id, { ...listing, ...ACTIVE });
+        snapshots.set(snapshot.id, copy(snapshot));
+        return Promise.resolve(done);
+      },
       setCheapest: async (id, cheapestListingId) => {
         const row = products.get(id);
         if (row === undefined) {
@@ -115,7 +154,7 @@ export const inMemoryRepository = (): Repository => {
         Promise.resolve(
           copy(
             [...listings.values()]
-              .filter((row) => row.status !== ListingStatus.Gone && products.get(row.productId)?.archivedAt === null)
+              .filter((row) => SCANNED.includes(row.status) && products.get(row.productId)?.archivedAt === null)
               .toSorted(
                 (a, b) =>
                   byCodePoint(a.pluginId, b.pluginId)
@@ -124,12 +163,38 @@ export const inMemoryRepository = (): Repository => {
               ),
           ),
         ),
+      remove: async (productId, id) => {
+        const row = listings.get(id);
+        if (row?.productId !== productId || row.status === ListingStatus.Removed) {
+          return Promise.resolve(notFound);
+        }
+        listings.set(id, { ...row, status: ListingStatus.Removed });
+        const owner = products.get(productId);
+        if (owner?.cheapestListingId === id) {
+          products.set(productId, { ...owner, cheapestListingId: null });
+        }
+        return Promise.resolve(done);
+      },
+      restore: async (productId, snapshot) => {
+        const row = listings.get(snapshot.listingId);
+        if (row?.productId !== productId || row.status !== ListingStatus.Removed
+          || products.get(productId)?.archivedAt !== null) {
+          return Promise.resolve(notFound);
+        }
+        if (snapshots.has(snapshot.id)) {
+          return bug("duplicate snapshot id");
+        }
+        listings.set(row.id, { ...row, ...ACTIVE });
+        snapshots.set(snapshot.id, copy(snapshot));
+        return Promise.resolve(done);
+      },
       updateStatus: async (id, update) => {
         const row = listings.get(id);
         if (row === undefined) {
           return Promise.resolve(notFound);
         }
-        listings.set(id, { ...row, ...update });
+        const status = row.status === ListingStatus.Removed ? row.status : update.status;
+        listings.set(id, { ...row, ...update, status });
         return Promise.resolve(done);
       },
     },
@@ -182,14 +247,8 @@ export const inMemoryRepository = (): Repository => {
         }
         return Promise.resolve(done);
       },
-      listPending: async () =>
-        Promise.resolve(
-          copy(
-            [...candidates.values()]
-              .filter((row) => row.status === CandidateStatus.Pending)
-              .toSorted((a, b) => b.similarityScore - a.similarityScore || byCodePoint(a.id, b.id)),
-          ),
-        ),
+      listPending: async () => Promise.resolve(pending()),
+      listPendingFor: async (productId) => Promise.resolve(pending().filter((row) => row.productId === productId)),
       accept: async (id, listing, firstSnapshot) => {
         const row = candidates.get(id);
         if (row?.status !== CandidateStatus.Pending) {
@@ -258,6 +317,13 @@ export const inMemoryRepository = (): Repository => {
         }
         alerts.set(id, { ...row, readAt: copy(at) });
         return Promise.resolve(done);
+      },
+      markAllRead: async (at) => {
+        const unread = [...alerts.values()].filter((row) => row.readAt === null);
+        for (const row of unread) {
+          alerts.set(row.id, { ...row, readAt: copy(at) });
+        }
+        return Promise.resolve(unread.length);
       },
     },
     scanRuns: {

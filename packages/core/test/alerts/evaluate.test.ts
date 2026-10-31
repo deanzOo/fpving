@@ -378,8 +378,12 @@ describe("New cheapest alert", () => {
     expect(evaluate(input)).toEqual({ alerts: [], cheapestListingId: listingB });
   });
 
-  it("excludes stale and gone listings", () => {
-    const result = run([entry("b", 1, {}, ListingStatus.Stale), entry("c", 1, {}, ListingStatus.Gone)], listingA);
+  it("excludes stale, gone and removed listings", () => {
+    const result = run([
+      entry("b", 1, {}, ListingStatus.Stale),
+      entry("c", 1, {}, ListingStatus.Gone),
+      entry("d", 1, {}, ListingStatus.Removed),
+    ], listingA);
     expect(result.cheapestListingId).toBe(listingA);
     expect(result.alerts).toEqual([]);
   });
@@ -398,6 +402,12 @@ describe("New cheapest alert", () => {
   it("clears a previous cheapest that is gone when no listing qualifies, raising nothing", () => {
     const incoming = arriving("in", HIGHER, { inStock: false });
     const result = run([entry("b", HUNDRED, {}, ListingStatus.Gone)], listingB, incoming);
+    expect(result).toEqual({ alerts: [], cheapestListingId: null });
+  });
+
+  it("clears a previous cheapest that was removed when no listing qualifies, raising nothing", () => {
+    const incoming = arriving("in", HIGHER, { inStock: false });
+    const result = run([entry("b", HUNDRED, {}, ListingStatus.Removed)], listingB, incoming);
     expect(result).toEqual({ alerts: [], cheapestListingId: null });
   });
 

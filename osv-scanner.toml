@@ -1,0 +1,4 @@
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-12-31
+reason = "minimatch 10 reaches only dev tooling (eslint, typedoc, license checker); no 10.x fix and typedoc breaks on 11. Tracked in deanzOo/fpving#15."

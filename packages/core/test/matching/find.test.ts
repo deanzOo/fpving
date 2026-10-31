@@ -240,6 +240,13 @@ describe("Finding matches for a product", () => {
     );
   });
 
+  it("refuses an archived product as one that does not exist, searching nothing", async () => {
+    const { deps, repository, stores, productId } = await setup();
+    await repository.products.archive(productId, NOW);
+    expect(await findMatches(deps, productId)).toEqual(err({ kind: AddErrorKind.ProductNotFound }));
+    expect(stores.searched).toEqual([]);
+  });
+
   it("refuses a product without a manual listing", async () => {
     const { deps, productId } = await setup();
     expect(await findMatches({ ...deps, repository: withoutManualListing(deps.repository) }, productId)).toEqual(

@@ -2,11 +2,18 @@ import { err, ok } from "@fpving/plugin-sdk";
 import type { Result } from "@fpving/plugin-sdk";
 import { ListingOrigin } from "../entities.js";
 import type { MatchCandidate } from "../entities.js";
-import type { MatchCandidateId } from "../ids.js";
+import type { MatchCandidateId, ProductId } from "../ids.js";
 import type { Repository } from "../ports/repository.js";
 import { RepositoryErrorKind } from "../ports/repository.js";
-import { alreadyTracked, newListing } from "../products/add.js";
-import type { CoreDeps, AddedListing, AlreadyTracked, FetchFailed, Target } from "../products/add.js";
+import { alreadyTracked, liveProduct, newListing } from "../products/add.js";
+import type {
+  CoreDeps,
+  AddedListing,
+  AlreadyTracked,
+  FetchFailed,
+  ProductNotFound,
+  Target,
+} from "../products/add.js";
 import { AddErrorKind } from "../products/errors.js";
 import { MatchErrorKind } from "./errors.js";
 
@@ -16,10 +23,10 @@ export interface NotPending {
 }
 
 /**
- * Why {@link acceptCandidate} stored nothing: the candidate is not pending, the store could not fetch it, or a
- * listing already tracks its url.
+ * Why {@link acceptCandidate} stored nothing: the candidate is not pending, its product is archived, the store could
+ * not fetch it, or a listing already tracks its url.
  */
-export type AcceptCandidateError = NotPending | FetchFailed | AlreadyTracked;
+export type AcceptCandidateError = NotPending | ProductNotFound | FetchFailed | AlreadyTracked;
 
 const notPending = err({ kind: MatchErrorKind.NotPending });
 
@@ -37,7 +44,8 @@ const pendingCandidate = async (
  *
  * @remarks
  * The listing and snapshot are built exactly like {@link addListing} builds them. A candidate that is not pending
- * is never fetched, and one decided during the fetch yields `not_pending` and stores nothing. When the fetch fails,
+ * is never fetched, and one decided during the fetch yields `not_pending` and stores nothing. A candidate whose
+ * product is archived, before or during the fetch, yields `product_not_found` and stays pending. When the fetch fails,
  * or a listing started tracking the url meanwhile, the candidate stays pending.
  *
  * @param deps - The ports to use.
@@ -63,7 +71,12 @@ export const acceptCandidate = async (
   if (stored.ok) {
     return ok(added);
   }
-  return stored.error.kind === RepositoryErrorKind.NotFound ? notPending : alreadyTracked(deps.repository, url);
+  if (stored.error.kind === RepositoryErrorKind.DuplicateUrl) {
+    return alreadyTracked(deps.repository, url);
+  }
+  return (await liveProduct(deps.repository, productId)) === null
+    ? err({ kind: AddErrorKind.ProductNotFound })
+    : notPending;
 };
 
 /**
@@ -80,3 +93,18 @@ export const rejectCandidate = async (
   const rejected = await repository.matchCandidates.reject(id);
   return rejected.ok ? rejected : notPending;
 };
+
+/**
+ * A product's pending match candidates, highest similarity first. An archived product counts as gone.
+ *
+ * @param deps - The repository.
+ * @param productId - The product.
+ * @returns The candidates, or `product_not_found` for an unknown product.
+ */
+export const pendingCandidates = async (
+  { repository }: Pick<CoreDeps, "repository">,
+  productId: ProductId,
+): Promise<Result<MatchCandidate[], ProductNotFound>> =>
+  (await liveProduct(repository, productId)) === null
+    ? err({ kind: AddErrorKind.ProductNotFound })
+    : ok(await repository.matchCandidates.listPendingFor(productId));

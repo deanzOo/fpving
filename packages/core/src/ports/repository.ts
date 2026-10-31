@@ -38,8 +38,23 @@ export interface ProductRepository {
    * names a cheapest listing: a new product's `cheapestListingId` must be null.
    */
   add(product: Product, firstListing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, DuplicateUrl>>;
-  /** The product with id `id`, or null. */
+  /** The product with id `id`, archived or not, or null. */
   get(id: ProductId): Promise<Product | null>;
+  /**
+   * The products that are not archived, newest first. Of products created at the same instant, the one with the
+   * greater id by code point comes first.
+   */
+  list(): Promise<Product[]>;
+  /** Replaces the name of a product that is not archived. */
+  rename(id: ProductId, name: string): Promise<Result<void, NotFound>>;
+  /** Archives a product that is not archived yet at `at`; it then counts as gone everywhere but {@link get}. */
+  archive(id: ProductId, at: Date): Promise<Result<void, NotFound>>;
+  /**
+   * Un-archives the archived product `id`, makes the listing of `snapshot` active again with no failures and appends
+   * the snapshot, in one step, keeping every earlier snapshot. `not_found` when the product is missing or not
+   * archived. Rejects when the snapshot's listing is not the product's.
+   */
+  restore(id: ProductId, snapshot: PriceSnapshot): Promise<Result<void, NotFound>>;
   /**
    * Replaces a product's cheapest listing, or clears it with null. Rejects when the listing does not exist or is
    * another product's.
@@ -53,8 +68,8 @@ export type ListingStatusUpdate = Pick<Listing, "status" | "failureStreak" | "no
 /** Stores listings. Urls are compared exactly, so callers pass them normalized. */
 export interface ListingRepository {
   /**
-   * Adds a listing to an existing product together with its first snapshot, or neither of them. Rejects when the
-   * snapshot is not the listing's.
+   * Adds a listing to an existing product that is not archived together with its first snapshot, or neither of
+   * them: a missing or archived product is `not_found`. Rejects when the snapshot is not the listing's.
    */
   addWithSnapshot(listing: Listing, firstSnapshot: PriceSnapshot): Promise<Result<void, NotFound | DuplicateUrl>>;
   /** The listing tracking `url`, or null. */
@@ -66,8 +81,19 @@ export interface ListingRepository {
    * then product id, then oldest first. Ids compare by code point.
    */
   listToScan(): Promise<Listing[]>;
-  /** Replaces a listing's status and streaks. */
+  /** Replaces a listing's status and streaks; a removed listing stays removed, so a running scan cannot revive it. */
   updateStatus(id: ListingId, update: ListingStatusUpdate): Promise<Result<void, NotFound>>;
+  /**
+   * Marks a listing of the product `productId` that is not removed yet removed, keeping its snapshots and alerts,
+   * and clears the product's cheapest listing when it was this one, in one step.
+   */
+  remove(productId: ProductId, id: ListingId): Promise<Result<void, NotFound>>;
+  /**
+   * Makes the removed listing of `snapshot`, of the product `productId` that is not archived, active again with no
+   * failures and appends the snapshot, in one step, keeping every earlier snapshot. `not_found` when the listing is
+   * missing, another product's or not removed, or the product is archived.
+   */
+  restore(productId: ProductId, snapshot: PriceSnapshot): Promise<Result<void, NotFound>>;
 }
 
 /** Stores price snapshots, append-only. */
@@ -92,9 +118,12 @@ export interface MatchCandidateRepository {
   save(candidates: readonly MatchCandidate[]): Promise<Result<void, DuplicateUrl>>;
   /** Every pending candidate, highest similarity first, equal similarities by id in code point order. */
   listPending(): Promise<MatchCandidate[]>;
+  /** A product's pending candidates, in the order of {@link MatchCandidateRepository.listPending}. */
+  listPendingFor(productId: ProductId): Promise<MatchCandidate[]>;
   /**
    * Marks a pending candidate accepted and adds its listing with the listing's first snapshot in one step, or does
-   * none of it. Rejects when the listing is not for the candidate's product or the snapshot not the listing's.
+   * none of it: a candidate that is not pending, or whose product is archived, is `not_found`. Rejects when the
+   * listing is not for the candidate's product or the snapshot not the listing's.
    */
   accept(
     id: MatchCandidateId,
@@ -121,10 +150,15 @@ export interface VerdictCacheRepository {
 export interface AlertRepository {
   /** Stores a new alert. */
   save(alert: Alert): Promise<void>;
-  /** Alerts newest first; only unread ones when `unreadOnly`. */
+  /**
+   * Alerts newest first; only unread ones when `unreadOnly`. Of alerts created at the same instant, the one with the
+   * greater id by code point comes first.
+   */
   list(filter: { readonly unreadOnly: boolean }): Promise<Alert[]>;
   /** Marks an alert read at `at`. */
   markRead(id: AlertId, at: Date): Promise<Result<void, NotFound>>;
+  /** Marks every unread alert read at `at` in one step and resolves to how many there were. */
+  markAllRead(at: Date): Promise<number>;
 }
 
 /** Stores scan runs. */

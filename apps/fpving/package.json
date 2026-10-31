@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "exports": { ".": "./dist/index.js" },
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "types": "./dist/index.d.ts",
   "scripts": {
+    "start": "tsc -b && node --env-file-if-exists=../../.env dist/main.js",
     "db:generate": "node --conditions=@fpving/source node_modules/drizzle-kit/bin.cjs generate"
   },
   "dependencies": {
@@ -15,6 +18,8 @@
     "@fpving/plugin-sdk": "workspace:*",
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.4",
+    "fastify": "5.12.7",
+    "fastify-type-provider-zod": "7.0.0",
     "node-notifier": "11.0.0",
     "pino": "10.4.0",
     "playwright": "1.64.1",
