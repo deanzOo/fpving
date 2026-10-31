@@ -16,7 +16,6 @@ const SUCCEEDED = 3;
 const FAILED = 1;
 const ALERTS = 2;
 const SCAN_DONE_MS = 4000;
-const SETTLE_MS = 300;
 
 const idle: Status = { running: false, latestRun: null, lastResult: null };
 
@@ -53,11 +52,11 @@ describe("Scan now", () => {
 
   it("reads the watchlist once on first load, not again for a scan that finished before", async () => {
     const api = scripted(finished(FIVE));
+    api.on(apiRoutes.startScan, failWith(HttpStatus.Conflict, ApiErrorKind.ScanRunning, "refused"));
     const screen = await renderApp(api.client);
     await expect.element(screen.getByText(/^Last scan finished/u)).toBeVisible();
-    await new Promise((resolve) => {
-      setTimeout(resolve, SETTLE_MS);
-    });
+    await screen.getByRole("button", { name: "Scan now" }).click();
+    await expect.element(screen.getByRole("alert")).toBeVisible();
     expect(api.sent.filter(({ path }) => path === apiRoutes.listProducts.url)).toHaveLength(1);
   });
 
