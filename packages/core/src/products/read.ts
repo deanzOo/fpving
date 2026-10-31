@@ -76,6 +76,7 @@ export const watchlist = async (
   ]);
   const listingsOf = Map.groupBy(listings, ({ productId }) => productId);
   const snapshotsOf = Map.groupBy(snapshots, ({ listingId }) => listingId);
+  const unreadOf = Map.groupBy(unread, ({ productId }) => productId);
   const cost = (row: PriceSnapshot): number | null => {
     if (rates === null) {
       return null;
@@ -98,7 +99,7 @@ export const watchlist = async (
       product,
       cheapest: cheapest === undefined ? null : { listingId: cheapest.entry.listing.id, landedCost: shown(cheapest) },
       trend: ranked.map((day) => (day === undefined ? null : shown(day))),
-      unreadAlerts: unread.filter(({ productId }) => productId === product.id).length,
+      unreadAlerts: unreadOf.get(product.id)?.length ?? 0,
     };
   });
 };
