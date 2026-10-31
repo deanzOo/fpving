@@ -21,6 +21,7 @@ describe("Core public API", () => {
       "RepositoryErrorKind",
       "ScanOutcome",
       "SchedulerErrorKind",
+      "TREND_DAYS",
       "ThresholdBasis",
       "acceptCandidate",
       "addListing",

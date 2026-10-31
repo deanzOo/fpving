@@ -42,7 +42,7 @@ export type {
   ProductNotFound,
 } from "./products/add.js";
 export { AddErrorKind } from "./products/errors.js";
-export { productDetail, watchlist } from "./products/read.js";
+export { productDetail, TREND_DAYS, watchlist } from "./products/read.js";
 export { removeListing } from "./products/remove.js";
 export type { CheapestPrice, ListingHistory, ProductDetail, WatchlistEntry } from "./products/read.js";
 export { normalizeListingUrl } from "./products/normalize-url.js";

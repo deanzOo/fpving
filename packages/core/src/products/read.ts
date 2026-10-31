@@ -5,6 +5,7 @@ import { ListingStatus } from "../entities.js";
 import type { Listing, PriceSnapshot, Product } from "../entities.js";
 import type { ListingId, ProductId } from "../ids.js";
 import { cheapestBy } from "../alerts/new-cheapest.js";
+import type { Ranked } from "../alerts/new-cheapest.js";
 import { landedCostExact } from "../pricing/landed-cost.js";
 import { roundMinor } from "../pricing/money.js";
 import { liveProduct } from "./add.js";
@@ -12,6 +13,10 @@ import type { CoreDeps, ProductNotFound } from "./add.js";
 import { AddErrorKind } from "./errors.js";
 
 const EPOCH = new Date(0);
+const MS_PER_DAY = 86_400_000;
+
+/** How many daily points a watchlist trend holds, the last one at now. */
+export const TREND_DAYS = 30;
 
 /** A product's cheapest listing and its landed cost in the display currency. */
 export interface CheapestPrice {
@@ -19,10 +24,16 @@ export interface CheapestPrice {
   readonly landedCost: Money;
 }
 
-/** One watched product and its cheapest landed price, or null when no listing can be priced. */
+/**
+ * One watched product: its cheapest landed price, or null when no listing can be priced, the cheapest landed price
+ * once a day over the last {@link TREND_DAYS} days, oldest first, with null on a day none could be priced, and how
+ * many of its alerts are unread.
+ */
 export interface WatchlistEntry {
   readonly product: Product;
   readonly cheapest: CheapestPrice | null;
+  readonly trend: (Money | null)[];
+  readonly unreadAlerts: number;
 }
 
 /** A listing with every snapshot of it, oldest first. */
@@ -42,36 +53,54 @@ export interface ProductDetail {
  * of the latest snapshot of each listing, over the latest stored exchange rates, among the listings a new cheapest
  * alert compares (active, in stock, quoted for the saved ship-to country, with known shipping). Listings are ranked
  * on the exact cost, as alerts rank them, and only the cost shown is rounded to a minor unit. A listing
- * whose cost cannot be computed is left out; without stored rates no product has a cheapest price.
+ * whose cost cannot be computed is left out; without stored rates no product has a cheapest price. The trend applies
+ * the same rule at now and at each whole day before it, to each listing's latest snapshot observed by then, so its
+ * last point is the cheapest price. Each product also counts its unread alerts.
  *
- * @param deps - The repository.
+ * @param deps - The repository and the clock the trend ends at.
  * @returns One entry per product that is not archived.
  */
-export const watchlist = async ({ repository }: Pick<CoreDeps, "repository">): Promise<WatchlistEntry[]> => {
-  const settings = await repository.settings.get();
-  const rates = await repository.fxRates.latest();
-  return Promise.all((await repository.products.list()).map(async (product): Promise<WatchlistEntry> => {
+export const watchlist = async (
+  { repository, clock }: Pick<CoreDeps, "repository" | "clock">,
+): Promise<WatchlistEntry[]> => {
+  const now = clock.now().getTime();
+  const dayAt = (index: number): Date => new Date(now - (TREND_DAYS - 1 - index) * MS_PER_DAY);
+  const days = Array.from({ length: TREND_DAYS }, (_, index) => dayAt(index));
+  const [settings, rates, products, listings, snapshots, unread] = await Promise.all([
+    repository.settings.get(),
+    repository.fxRates.latest(),
+    repository.products.list(),
+    repository.listings.listToScan(),
+    repository.snapshots.listForTrend(dayAt(0)),
+    repository.alerts.list({ unreadOnly: true }),
+  ]);
+  const listingsOf = Map.groupBy(listings, ({ productId }) => productId);
+  const snapshotsOf = Map.groupBy(snapshots, ({ listingId }) => listingId);
+  const cost = (row: PriceSnapshot): number | null => {
     if (rates === null) {
-      return { product, cheapest: null };
+      return null;
     }
-    const listings = await repository.listings.listByProduct(product.id);
-    const latest = await repository.snapshots.latestPerListing(product.id);
-    const entries = listings.flatMap((listing): ListingWithLatest[] =>
-      latest.filter((row) => row.listingId === listing.id).map((row) => ({ listing, latest: row })));
-    const cheapest = cheapestBy(entries, settings.shipToCountry, (row) => {
-      const cost = landedCostExact(row, settings, rates);
-      return cost.ok ? cost.value : null;
-    });
+    const exact = landedCostExact(row, settings, rates);
+    return exact.ok ? exact.value : null;
+  };
+  const shown = ({ landedMinor }: Ranked): Money => ({
+    amountMinor: roundMinor(landedMinor),
+    currency: settings.displayCurrency,
+  });
+  return products.map((product): WatchlistEntry => {
+    const own = listingsOf.get(product.id) ?? [];
+    const ranked = days.map((at) => cheapestBy(own.flatMap((listing): ListingWithLatest[] => {
+      const latest = snapshotsOf.get(listing.id)?.findLast(({ observedAt }) => observedAt <= at);
+      return latest === undefined ? [] : [{ listing, latest }];
+    }), settings.shipToCountry, cost));
+    const cheapest = ranked.at(-1);
     return {
       product,
-      cheapest: cheapest === undefined
-        ? null
-        : {
-            listingId: cheapest.entry.listing.id,
-            landedCost: { amountMinor: roundMinor(cheapest.landedMinor), currency: settings.displayCurrency },
-          },
+      cheapest: cheapest === undefined ? null : { listingId: cheapest.entry.listing.id, landedCost: shown(cheapest) },
+      trend: ranked.map((day) => (day === undefined ? null : shown(day))),
+      unreadAlerts: unread.filter(({ productId }) => productId === product.id).length,
     };
-  }));
+  });
 };
 
 /**
