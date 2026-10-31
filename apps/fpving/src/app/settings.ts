@@ -40,6 +40,7 @@ export interface SettingsApplier {
 }
 
 const OLD_HOST_STUCK = "the old plugin host did not shut down";
+const NEW_HOST_STUCK = "the new plugin host did not shut down";
 const NOT_APPLIED = "settings change not applied";
 
 const DRAIN_DEADLINE_MS = 5000;
@@ -77,8 +78,9 @@ const pluginsChanged = (before: Settings, after: Settings): boolean =>
  * it is up the settings are saved, the gateway moves over to it, the calls still running through the old gateway get
  * up to five seconds to finish, then the old host is shut down. A host that fails to start, or settings that fail to
  * save, which also shuts the new host down, leave the old host running and the old settings saved, so the same change
- * can be retried. An old host that fails to shut down is logged as a warning; the change still succeeds. That or a new
- * scan interval, which the schedule reads when it starts, restarts the schedule. The schedule is stopped first, which
+ * can be retried. An old host that fails to shut down is logged as a warning and the change still succeeds; so is a new
+ * host that fails to shut down after a failed save. That or a new scan interval, which the schedule reads when it
+ * starts, restarts the schedule. The schedule is stopped first, which
  * waits for a running scan, so no scan loses its plugins halfway; it is started again whether or not the change
  * succeeded. A change that needs no restart is only saved. A change whose host failed to start or whose settings failed
  * to save is logged and resolves `settings_not_applied`, and one made after `close` resolves `shutting_down`; any other
@@ -110,7 +112,9 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
         await repository.settings.save(next);
       } catch (error) {
         if (host !== old) {
-          await host.shutdown();
+          await host.shutdown().catch((cleanup: unknown) => {
+            live.deps.logger.warn(NEW_HOST_STUCK, { detail: inspect(cleanup) });
+          });
         }
         return notApplied(error);
       }

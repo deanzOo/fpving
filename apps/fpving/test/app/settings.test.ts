@@ -146,6 +146,21 @@ describe("Settings applier", () => {
     ]);
   });
 
+  it("logs the new host failing to shut down after a failed save, keeping the save error as the cause", async () => {
+    const { applier, saving, spies, logger } = await applierHarness();
+    saving.mockImplementationOnce(async () => {
+      spies[1]?.mockRejectedValueOnce(new Error("worker stuck"));
+      return Promise.reject(new Error("disk full"));
+    });
+    expect(await applier.apply(US)).toEqual(notApplied);
+    const logged = logger.events.filter(({ level }) => level !== "info" && level !== "debug");
+    expect(logged.map(({ level, message, fields }) => [level, message, String(fields?.["detail"]).split("\n")[0]]))
+      .toEqual([
+        ["warn", "the new plugin host did not shut down", "Error: worker stuck"],
+        ["error", "settings change not applied", "Error: disk full"],
+      ]);
+  });
+
   it("lets a call through the old gateway finish before it shuts the old host down", async () => {
     const { applier, live, hosts, events, old, repository } = await applierHarness();
     const { gate, release } = held();
