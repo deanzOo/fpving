@@ -88,17 +88,18 @@ const clientErrorSchema = z.object({
 
 /**
  * Creates the Fastify server with the Zod type provider, the localhost guards and a readiness gate, without routes.
- * Until `isReady()` is true every `/api` path but those in `openWhileStarting`, unknown ones included, answers 503 with
- * {@link STARTING}, after the guards; the UI is served meanwhile. With `uiRoot`, a GET or HEAD outside `/api` serves
- * the file it names from that folder, or the index page when none matches, or {@link UI_NOT_BUILT} when the folder
- * has no index page. Every answer carries {@link CONTENT_SECURITY_POLICY}, `nosniff` and `no-referrer`. A request whose
- * Host header is not `127.0.0.1:<port>` or `localhost:<port>` is refused with 421, which defeats DNS rebinding. A
- * request with a method other than GET, HEAD or OPTIONS that carries an `Origin` other than its own is refused with
- * 403, and so is one without `Origin` whose `Sec-Fetch-Site` is `cross-site` or `same-site`; one with neither, such as
- * from curl, is served. No CORS header is ever sent. Bodies over {@link MAX_REQUEST_BODY_BYTES} get 413. A 4xx error
- * Fastify raised (validation, body limit, content type) answers its message; another 4xx keeps its status, answers
- * {@link CLIENT_ERROR} and logs its message; any other error answers 500 with {@link INTERNAL_ERROR} and logs it. An
- * unknown path answers 404. Every refusal is an {@link apiError} envelope.
+ * Until `isReady()` is true every `/api` path but those in `openWhileStarting`, unknown ones included, answers 503
+ * with {@link STARTING}, after the guards; the UI is served meanwhile. With `uiRoot`, a GET or HEAD outside `/api`
+ * serves the file it names from that folder, or the index page when none matches, or {@link UI_NOT_BUILT} when the
+ * folder had no index page when the server was created. Every answer carries {@link CONTENT_SECURITY_POLICY},
+ * `nosniff` and `no-referrer`. A request whose Host header is not `127.0.0.1:<port>` or `localhost:<port>` is refused
+ * with 421, which defeats DNS rebinding. A request with a method other than GET, HEAD or OPTIONS that carries an
+ * `Origin` other than its own is refused with 403, and so is one without `Origin` whose `Sec-Fetch-Site` is
+ * `cross-site` or `same-site`; one with neither, such as from curl, is served. No CORS header is ever sent. Bodies
+ * over {@link MAX_REQUEST_BODY_BYTES} get 413. A 4xx error Fastify raised (validation, body limit, content type)
+ * answers its message; another 4xx keeps its status, answers {@link CLIENT_ERROR} and logs its message; any other
+ * error answers 500 with {@link INTERNAL_ERROR} and logs it. An unknown path answers 404. Every refusal is an
+ * {@link apiError} envelope.
  *
  * @param options - The port, the logger, the readiness check and the UI folder.
  * @returns The server, not yet listening.
@@ -140,6 +141,7 @@ export const createServer = (options: ServerOptions) => {
     logger.error("request failed", { method: request.method, url: request.url, detail: inspect(error) });
     return reply.status(HttpStatus.InternalServerError).send(apiError(ApiErrorKind.Internal, INTERNAL_ERROR));
   });
+  const indexBuilt = uiRoot !== undefined && existsSync(join(uiRoot, INDEX_PAGE));
   if (uiRoot !== undefined) {
     void server.register(fastifyStatic, { root: uiRoot });
   }
@@ -147,7 +149,7 @@ export const createServer = (options: ServerOptions) => {
     if (uiRoot === undefined || !PAGE_METHODS.includes(request.method) || isApiRequest(request.url)) {
       return reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, NO_ROUTE));
     }
-    if (!existsSync(join(uiRoot, INDEX_PAGE))) {
+    if (!indexBuilt) {
       return reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, UI_NOT_BUILT));
     }
     return reply.sendFile(INDEX_PAGE);

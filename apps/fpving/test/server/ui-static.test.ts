@@ -130,4 +130,14 @@ describe("Serving the UI", () => {
       expect(response.json()).toEqual(apiError(ApiErrorKind.NotFound, UI_NOT_BUILT));
     }
   });
+
+  it("decides whether the UI is built once, when the server is created, not on every request", async () => {
+    await server.close();
+    rmSync(join(root, "index.html"));
+    await start(root);
+    writeFileSync(join(root, "index.html"), INDEX);
+    const response = await get("/products/abc");
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
+    expect(response.json()).toEqual(apiError(ApiErrorKind.NotFound, UI_NOT_BUILT));
+  });
 });
