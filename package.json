@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -b && pnpm --filter @fpving/ui build",
-    "dev": "tsc -b && pnpm --filter @fpving/ui dev",
+    "dev": "tsc -b && node tools/dev-cli.ts",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
@@ -47,6 +47,7 @@
     "license-checker-rseidelsohn": "5.0.1",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
+    "vite": "8.3.5",
     "vitest": "5.0.4",
     "yaml": "2.9.1"
   },
