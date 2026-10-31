@@ -2,10 +2,11 @@ import { err, ok } from "@fpving/plugin-sdk";
 import type { Money, Result } from "@fpving/plugin-sdk";
 import type { ListingWithLatest } from "../alerts/draft.js";
 import { ListingStatus } from "../entities.js";
-import type { Listing, PriceSnapshot, Product } from "../entities.js";
+import type { Listing, PriceSnapshot, Product, Settings } from "../entities.js";
 import type { ListingId, ProductId } from "../ids.js";
 import { cheapestBy } from "../alerts/new-cheapest.js";
 import type { Ranked } from "../alerts/new-cheapest.js";
+import type { FxTable } from "../pricing/fx.js";
 import { landedCostExact } from "../pricing/landed-cost.js";
 import { roundMinor } from "../pricing/money.js";
 import { liveProduct } from "./add.js";
@@ -14,6 +15,17 @@ import { AddErrorKind } from "./errors.js";
 
 const EPOCH = new Date(0);
 const MS_PER_DAY = 86_400_000;
+
+const displayPricer = (settings: Settings, rates: FxTable | null) => ({
+  exact: (snapshot: PriceSnapshot): number | null => {
+    if (rates === null || snapshot.shipTo !== settings.shipToCountry) {
+      return null;
+    }
+    const cost = landedCostExact(snapshot, settings, rates);
+    return cost.ok ? cost.value : null;
+  },
+  shown: (landedMinor: number): Money => ({ amountMinor: roundMinor(landedMinor), currency: settings.displayCurrency }),
+});
 
 /** How many daily points a watchlist trend holds, the last one at now. */
 export const TREND_DAYS = 30;
@@ -84,23 +96,14 @@ export const watchlist = async (
   const listingsOf = Map.groupBy(listings, ({ productId }) => productId);
   const snapshotsOf = Map.groupBy(snapshots, ({ listingId }) => listingId);
   const unreadOf = Map.groupBy(unread, ({ productId }) => productId);
-  const cost = (row: PriceSnapshot): number | null => {
-    if (rates === null) {
-      return null;
-    }
-    const exact = landedCostExact(row, settings, rates);
-    return exact.ok ? exact.value : null;
-  };
-  const shown = ({ landedMinor }: Ranked): Money => ({
-    amountMinor: roundMinor(landedMinor),
-    currency: settings.displayCurrency,
-  });
+  const pricer = displayPricer(settings, rates);
+  const shown = ({ landedMinor }: Ranked): Money => pricer.shown(landedMinor);
   return products.map((product): WatchlistEntry => {
     const own = listingsOf.get(product.id) ?? [];
     const ranked = days.map((at) => cheapestBy(own.flatMap((listing): ListingWithLatest[] => {
       const latest = snapshotsOf.get(listing.id)?.findLast(({ observedAt }) => observedAt <= at);
       return latest === undefined ? [] : [{ listing, latest }];
-    }), settings.shipToCountry, cost));
+    }), settings.shipToCountry, pricer.exact));
     const cheapest = ranked.at(-1);
     return {
       product,
@@ -132,14 +135,10 @@ export const productDetail = async (
     ({ status }) => status !== ListingStatus.Removed,
   );
   const [settings, rates] = await Promise.all([repository.settings.get(), repository.fxRates.latest()]);
+  const pricer = displayPricer(settings, rates);
   const priced = (snapshot: PriceSnapshot): PricedSnapshot => {
-    const exact = rates === null || snapshot.shipTo !== settings.shipToCountry
-      ? null
-      : landedCostExact(snapshot, settings, rates);
-    const landedCost = exact?.ok === true
-      ? { amountMinor: roundMinor(exact.value), currency: settings.displayCurrency }
-      : null;
-    return { ...snapshot, landedCost };
+    const exact = pricer.exact(snapshot);
+    return { ...snapshot, landedCost: exact === null ? null : pricer.shown(exact) };
   };
   const listings = await Promise.all(kept.map(async (listing) => ({
     listing,
