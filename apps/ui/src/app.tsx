@@ -3,7 +3,6 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import type { RouterHistory } from "@tanstack/react-router";
 import { useState } from "react";
-import { z } from "zod";
 import { Alerts } from "./alerts.tsx";
 import { ClientContext } from "./client.ts";
 import type { Client } from "./client.ts";
@@ -18,21 +17,23 @@ import { Watchlist } from "./watchlist.tsx";
 
 const rootRoute = createRootRoute({ component: Layout, notFoundComponent: NotFound });
 
-const productParams = z.object({ id: z.string().min(1) });
+const ProductPage = () => <ProductDetail id={productRoute.useParams().id} />;
 
-const productRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/products/$id",
-  component: () => <ProductDetail id={productParams.parse(productRoute.useParams()).id} />,
-});
+const productRoute = createRoute({ getParentRoute: () => rootRoute, path: "/products/$id", component: ProductPage });
+
+const watchlistRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Watchlist });
+const matchesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/matches", component: Matches });
+const alertsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts });
+const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsScreen });
+const pluginsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/plugins", component: Plugins });
 
 const routeTree = rootRoute.addChildren([
-  createRoute({ getParentRoute: () => rootRoute, path: "/", component: Watchlist }),
+  watchlistRoute,
   productRoute,
-  createRoute({ getParentRoute: () => rootRoute, path: "/matches", component: Matches }),
-  createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts }),
-  createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsScreen }),
-  createRoute({ getParentRoute: () => rootRoute, path: "/plugins", component: Plugins }),
+  matchesRoute,
+  alertsRoute,
+  settingsRoute,
+  pluginsRoute,
 ]);
 
 const createAppRouter = (history: RouterHistory) =>
