@@ -41,6 +41,8 @@ export interface ApiRuntime {
   applySettings(settings: Settings): Promise<void>;
   /** Whether a settings change is restarting the schedule or the plugins right now. */
   restarting(): boolean;
+  /** Whether the app started shutting down. */
+  stopping(): boolean;
 }
 
 /** What a route answers when it is reached before the runtime is attached; the readiness gate prevents that. */
@@ -57,6 +59,7 @@ const Message = {
   PluginUnavailable: "the plugin for this store is not loaded; see the plugins screen",
   ScanRunning: "a scan is already running",
   Restarting: "the plugins and the scan schedule are restarting for a settings change; try again shortly",
+  ShuttingDown: "fpving is shutting down",
 } as const;
 
 const failure = <S extends (typeof HttpStatus)[keyof typeof HttpStatus]>(
@@ -99,12 +102,14 @@ const productNotFound = failure(HttpStatus.NotFound, AddErrorKind.ProductNotFoun
 const listingNotFound = failure(HttpStatus.NotFound, ApiErrorKind.ListingNotFound, Message.ListingNotFound);
 const notPending = failure(HttpStatus.NotFound, MatchErrorKind.NotPending, Message.NotPending);
 const restarting = failure(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, Message.Restarting);
+const shuttingDown = failure(HttpStatus.ServiceUnavailable, ApiErrorKind.ShuttingDown, Message.ShuttingDown);
 
 /**
  * Registers every route of {@link apiRoutes}. Fastify takes routes only before `listen`, while the runtime exists
  * only once startup completed, so the handlers read it through the returned `attach`; the readiness gate keeps
  * requests away until then. Handlers call core's use cases or the repository and map each `Result` to a typed reply.
- * Scan now answers 409 while any scan runs, scheduled or not, and the scan status covers every scan.
+ * Scan now answers 409 while any scan runs, scheduled or not, and 503 once shutdown started; the scan status covers
+ * every scan.
  *
  * @param server - The server, before `listen`.
  * @returns `attach`, which hands the routes the runtime.
@@ -324,6 +329,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.startScan,
     handler: async (_request, reply) => {
+      if (runtime().stopping()) {
+        return reply.code(shuttingDown.status).send(shuttingDown.body);
+      }
       if (runtime().restarting()) {
         return reply.code(restarting.status).send(restarting.body);
       }

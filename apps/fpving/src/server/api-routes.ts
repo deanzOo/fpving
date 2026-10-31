@@ -210,7 +210,7 @@ export const apiRoutes = {
   startScan: {
     method: "POST",
     url: "/api/scan",
-    summary: "Starts a scan of every listing in the background; 409 while any scan runs.",
+    summary: "Starts a scan of every listing in the background; 409 while any scan runs, 503 once shutdown started.",
     schema: {
       response: { [Accepted]: scanStatusSchema, [Conflict]: apiErrorSchema, [ServiceUnavailable]: apiErrorSchema },
     },

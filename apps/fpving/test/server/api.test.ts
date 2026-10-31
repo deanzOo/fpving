@@ -619,6 +619,19 @@ describe("API during a settings restart", () => {
   });
 });
 
+describe("API during shutdown", () => {
+  it("answers 503 shutting_down to starting a scan and starts none", async () => {
+    const { current } = api.scans;
+    const scanNow = vi.fn(async () => current.scanNow());
+    api.scans.current = { ...current, scanNow };
+    api.stopping.current = true;
+    const response = await api.request("POST", apiRoutes.startScan.url);
+    expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.ShuttingDown);
+    expect(scanNow).not.toHaveBeenCalled();
+  });
+});
+
 const routeList = Object.values(apiRoutes).map(({ method, url }) => ({ method, url: url.replaceAll(/:\w+/gu, "x") }));
 const mutating = routeList.filter(({ method }) => method !== "GET");
 

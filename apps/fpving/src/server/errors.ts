@@ -20,6 +20,7 @@ export const ApiErrorKind = {
   PluginUnavailable: "plugin_unavailable",
   ScanRunning: "scan_running",
   Restarting: "restarting",
+  ShuttingDown: "shutting_down",
 } as const;
 
 /** One of the {@link ApiErrorKind} values. */

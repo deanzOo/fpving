@@ -15,6 +15,7 @@ import { PLUGINS_FILE } from "../../src/plugins/config.ts";
 import type { SpawnWorker } from "../../src/plugins/runtime/connection.ts";
 import { HEALTH_PATH } from "../../src/server/health.ts";
 import { apiRoutes } from "../../src/server/api-routes.ts";
+import { ApiErrorKind } from "../../src/server/errors.ts";
 import { PluginIssueKind, PluginStatusKind } from "../../src/plugins/status.ts";
 import { fakeWorker } from "../plugins/runtime/fake-worker.ts";
 import { fakePorts, freePort, FX, occupy } from "../support/app-fixtures.ts";
@@ -447,6 +448,39 @@ describe("App settings changes", () => {
     expect(await shuttingDown).toBe(true);
     expect(stopped).toEqual([true, true]);
     expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
+  });
+
+  it("answers 503 shutting_down to scan now once shutdown started", async () => {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
+    const shipTo: string[] = [];
+    let readyUs = (): void => undefined;
+    const spawn: SpawnWorker = (data) => {
+      shipTo.push(data.shipTo);
+      const worker = fakeWorker(data);
+      const ready = (): void => {
+        worker.ready();
+      };
+      if (data.shipTo === "US") {
+        readyUs = ready;
+      } else {
+        queueMicrotask(ready);
+      }
+      return worker.handle;
+    };
+    const running = await started(env(), { ...fakes().ports, spawn });
+    const payload = { ...(await running.deps.repository.settings.get()), shipToCountry: "US" };
+    const putting = running.server.inject({ method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload });
+    await vi.waitFor(() => {
+      expect(shipTo).toEqual(["IL", "US"]);
+    });
+    const shuttingDown = running.shutdown();
+    const scan = await running.server.inject({ method: "POST", url: apiRoutes.startScan.url, headers: host() });
+    readyUs();
+    await putting;
+    await shuttingDown;
+    expect(scan.statusCode).toBe(UNAVAILABLE);
+    expect(scan.json()).toMatchObject({ error: { kind: ApiErrorKind.ShuttingDown } });
   });
 
   it("restarts nothing when only the drop threshold changes", async () => {

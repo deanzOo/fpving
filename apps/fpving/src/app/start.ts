@@ -288,9 +288,11 @@ export const startApp = async (
     };
     const parts: LiveParts = { host, deps, scans: await startScheduler(deps) };
     const settingsApplier = createSettingsApplier({ live: parts, applied: settings, startHost, gatewayFor });
+    let stopping = false;
     opened({
       name: ShutdownStepName.Scans,
       run: async () => {
+        stopping = true;
         await settingsApplier.close();
         await parts.scans.stop();
       },
@@ -302,6 +304,7 @@ export const startApp = async (
       plugins: () => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue),
       applySettings: async (next) => settingsApplier.apply(next),
       restarting: () => settingsApplier.restarting(),
+      stopping: () => stopping,
     });
     ready = true;
     logger.info("fpving started", { version, address, plugins: plugins.entries.length });

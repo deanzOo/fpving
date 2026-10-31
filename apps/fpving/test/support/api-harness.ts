@@ -100,6 +100,7 @@ export const startApiHarness = async () => {
   const scans: { current: SchedulerHandle } = { current: await startScheduler(deps) };
   const rows: { current: readonly PluginRow[] } = { current: [] };
   const restarting = { current: false };
+  const stopping = { current: false };
   const applySettings = vi.fn<ApiRuntime["applySettings"]>(async (settings) => repository.settings.save(settings));
   const runtime: ApiRuntime = {
     deps: () => deps,
@@ -107,6 +108,7 @@ export const startApiHarness = async () => {
     plugins: () => rows.current,
     applySettings,
     restarting: () => restarting.current,
+    stopping: () => stopping.current,
   };
   const server = createServer({ port: API_PORT, logger, isReady: () => true, openWhileStarting: [] });
   registerApiRoutes(server).attach(runtime);
@@ -122,6 +124,7 @@ export const startApiHarness = async () => {
     scans,
     rows,
     restarting,
+    stopping,
     applySettings,
     close: async () => {
       await scans.current.stop();
