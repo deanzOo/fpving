@@ -14,6 +14,7 @@ const INDEX = "<!doctype html><title>fpving</title><script type=\"module\" src=\
 const SCRIPT = "export {};";
 const API_ROUTE = "/api/test/data";
 const SECRET = "secret outside the ui";
+const DOTTED = ["/.env", "/%2eenv", "/%2Eenv", "/%252eenv", "/assets/.x", "/assets/%2ex", "/.hidden/f.txt"] as const;
 const POLICY = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
 
 describe("Serving the UI", () => {
@@ -39,6 +40,9 @@ describe("Serving the UI", () => {
     mkdirSync(join(root, "assets"), { recursive: true });
     writeFileSync(join(base, "secret.txt"), SECRET);
     writeFileSync(join(root, ".env"), SECRET);
+    writeFileSync(join(root, "assets", ".x"), SECRET);
+    mkdirSync(join(root, ".hidden"));
+    writeFileSync(join(root, ".hidden", "f.txt"), SECRET);
     writeFileSync(join(root, "index.html"), INDEX);
     writeFileSync(join(root, "assets", "app.js"), SCRIPT);
     await start(root);
@@ -109,10 +113,17 @@ describe("Serving the UI", () => {
     "/%2e%2e/secret.txt",
     "/assets/..%2f..%2f..%2fsecret.txt",
     "/assets/%2e%2e/%2e%2e/secret.txt",
-    "/.env",
-  ])("never serves a file outside the UI folder or a dotfile, probed with %s", async (url) => {
+  ])("never serves a file outside the UI folder, probed with %s", async (url) => {
     const response = await get(url);
     expect(response.body).not.toContain(SECRET);
+  });
+
+  it.each(["GET", "HEAD"] as const)("never answers a %s for a dotfile or a dotted folder with it", async (method) => {
+    for (const url of DOTTED) {
+      const response = await server.inject({ method, url, headers: HOST });
+      expect(response.body).not.toContain(SECRET);
+      expect(response.headers["content-length"]).not.toBe(String(SECRET.length));
+    }
   });
 
   it("keeps the readiness gate on an API path whose letters are percent-encoded", async () => {
