@@ -7,7 +7,7 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { z } from "zod";
-import { alreadyTracked, emptyTrend, failWith, fakeApi, product, reply, wire } from "./support/fake-api.ts";
+import { alreadyTracked, at, emptyTrend, failWith, fakeApi, product, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 
 type Row = z.output<typeof wire.watchlist>[number];
@@ -49,6 +49,7 @@ const added = (name: string) => wire.added.parse({
 
 const scripted = (rows: Row[]) => {
   const api = fakeApi();
+  api.on(at(apiRoutes.getProduct, { productId: "p1" }), reply(wire.detail, { product: row().product, listings: [] }));
   api.on(apiRoutes.listProducts, reply(wire.watchlist, rows));
   api.on(apiRoutes.listAlerts, reply(wire.alerts, []), "?unread=true");
   return api;
@@ -64,7 +65,7 @@ describe("Watchlist", () => {
     await expect.element(line.getByRole("cell", { name: "$123.45" })).toBeVisible();
     await expect.element(line.getByText("3 unread")).toBeVisible();
     await line.getByRole("link", { name: "Acme X5 frame" }).click();
-    await expect.element(screen.getByRole("heading", { level: 1, name: "Product" })).toBeVisible();
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Acme X5 frame" })).toBeVisible();
   });
 
   it("says when a product has no price yet and shows no unread count when none is unread", async () => {

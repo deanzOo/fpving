@@ -8,7 +8,7 @@ import { render } from "vitest-browser-react";
 import { ErrorView } from "../src/error-view.tsx";
 import { ClientErrorKind } from "../src/client.ts";
 import { takeLogged } from "./support/console-guard.ts";
-import { failWith, fakeApi, reply, unreadAlert, wire } from "./support/fake-api.ts";
+import { at, failWith, fakeApi, product, reply, unreadAlert, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 
 const UNREAD = "?unread=true";
@@ -19,6 +19,8 @@ const scripted = () => {
   api.on(apiRoutes.listAlerts, reply(wire.alerts, []), UNREAD);
   api.on(apiRoutes.listAlerts, reply(wire.alerts, []));
   api.on(apiRoutes.listPlugins, reply(wire.plugins, []));
+  const shown = { product: product("p1", "Product"), listings: [] };
+  api.on(at(apiRoutes.getProduct, { productId: "p1" }), reply(wire.detail, shown));
   api.on(apiRoutes.getSettings, reply(wire.settings, settingsSchema.parse(DEFAULT_SETTINGS)));
   return api;
 };
@@ -49,6 +51,13 @@ describe("App shell", () => {
     const screen = await renderApp(scripted().client);
     await screen.getByRole("link", { name: "Settings" }).click();
     await expect.element(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  });
+
+  it("moves focus to the new screen after a navigation", async () => {
+    const screen = await renderApp(scripted().client);
+    await expect.element(screen.getByRole("main")).not.toHaveFocus();
+    await screen.getByRole("link", { name: "Plugins" }).click();
+    await expect.element(screen.getByRole("main")).toHaveFocus();
   });
 
   it("shows a not found screen for a path no route serves", async () => {

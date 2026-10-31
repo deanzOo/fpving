@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import type { RouterHistory } from "@tanstack/react-router";
 import { useState } from "react";
+import { z } from "zod";
 import { Alerts } from "./alerts.tsx";
 import { ClientContext } from "./client.ts";
 import type { Client } from "./client.ts";
@@ -10,18 +11,24 @@ import { ErrorView } from "./error-view.tsx";
 import { Layout } from "./layout.tsx";
 import { Matches } from "./matches.tsx";
 import { Plugins } from "./plugins.tsx";
+import { ProductDetail } from "./product.tsx";
 import { SettingsScreen } from "./settings.tsx";
-import { NotFound, Placeholder } from "./screens.tsx";
+import { NotFound } from "./screens.tsx";
 import { Watchlist } from "./watchlist.tsx";
 
 const rootRoute = createRootRoute({ component: Layout, notFoundComponent: NotFound });
 
-const placeholder = (path: string, title: string) =>
-  createRoute({ getParentRoute: () => rootRoute, path, component: () => <Placeholder title={title} /> });
+const productParams = z.object({ id: z.string().min(1) });
+
+const productRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/products/$id",
+  component: () => <ProductDetail id={productParams.parse(productRoute.useParams()).id} />,
+});
 
 const routeTree = rootRoute.addChildren([
   createRoute({ getParentRoute: () => rootRoute, path: "/", component: Watchlist }),
-  placeholder("/products/$id", "Product"),
+  productRoute,
   createRoute({ getParentRoute: () => rootRoute, path: "/matches", component: Matches }),
   createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts }),
   createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsScreen }),
