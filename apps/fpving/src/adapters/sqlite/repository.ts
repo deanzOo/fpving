@@ -15,9 +15,10 @@ import {
 } from "@fpving/core";
 import type { DuplicateUrl, Listing, NotFound, PriceSnapshot, Repository, Result } from "@fpving/core";
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, max, ne, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { alias } from "drizzle-orm/sqlite-core";
 import {
   fromCandidateRow,
   fromFxRow,
@@ -54,6 +55,9 @@ const LATEST_RANK = 1;
 const BUSY_TIMEOUT_MS = 5000;
 const SCANNED_STATUSES = [ListingStatus.Active, ListingStatus.Stale];
 const ACTIVE = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 0 };
+
+const older = alias(priceSnapshots, "older");
+const tied = alias(priceSnapshots, "tied");
 
 const settle = async <T>(work: () => T): Promise<T> =>
   new Promise((resolve) => {
@@ -262,20 +266,28 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
         }),
       listForTrend: async (since) =>
         settle(() => {
-          const ranked = db.select({
-            ...getTableColumns(priceSnapshots),
-            rank: sql<number>`row_number() over (
-              partition by ${priceSnapshots.listingId}, ${lt(priceSnapshots.observedAt, since)}
-              order by ${priceSnapshots.observedAt} desc, ${priceSnapshots.id} desc
-            )`.as("rank"),
-          }).from(priceSnapshots)
-            .innerJoin(listings, eq(listings.id, priceSnapshots.listingId))
-            .innerJoin(products, eq(products.id, listings.productId))
-            .where(and(isNull(products.archivedAt), inArray(listings.status, SCANNED_STATUSES)))
-            .as("ranked");
-          return db.select().from(ranked)
-            .where(or(gte(ranked.observedAt, since), eq(ranked.rank, LATEST_RANK)))
-            .orderBy(asc(ranked.listingId), asc(ranked.observedAt), asc(ranked.id))
+          const scanned = and(isNull(products.archivedAt), inArray(listings.status, SCANNED_STATUSES));
+          const ofProduct = eq(products.id, listings.productId);
+          const newestBefore = db.select({ at: max(older.observedAt) }).from(older)
+            .where(and(eq(older.listingId, listings.id), lt(older.observedAt, since)));
+          const seedId = db.select({ id: max(tied.id) }).from(tied)
+            .where(and(eq(tied.listingId, listings.id), eq(tied.observedAt, newestBefore)));
+          return db.select(getTableColumns(priceSnapshots)).from(priceSnapshots)
+            .where(and(
+              inArray(
+                priceSnapshots.listingId,
+                db.select({ id: listings.id }).from(listings).innerJoin(products, ofProduct).where(scanned),
+              ),
+              gte(priceSnapshots.observedAt, since),
+            ))
+            .unionAll(db.select(getTableColumns(priceSnapshots)).from(priceSnapshots)
+              .where(inArray(
+                priceSnapshots.id,
+                db.select({ id: sql<string>`(${seedId})` }).from(listings)
+                  .innerJoin(products, ofProduct)
+                  .where(scanned),
+              )))
+            .orderBy(asc(priceSnapshots.listingId), asc(priceSnapshots.observedAt), asc(priceSnapshots.id))
             .all()
             .map(fromSnapshotRow);
         }),
