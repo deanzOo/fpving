@@ -38,7 +38,7 @@ describe("HTTP server shell", () => {
     ready = true;
     server = createServer({ port: PORT, logger, isReady: () => ready, openWhileStarting: [OPEN] });
     server.get(OPEN, () => ({ open: true }));
-    server.post(ECHO, { schema: { body: z.object({ text: z.string() }) } }, (request) => request.body);
+    server.post(ECHO, { schema: { body: z.object({ text: z.string() }) } }, () => ({ accepted: true }));
     server.get(ECHO, () => ({ echoed: true }));
     server.get(BOOM, () => {
       throw new Error(SECRET_DETAIL);
@@ -93,7 +93,7 @@ describe("HTTP server shell", () => {
     it("accepts a state-changing request with no Origin, such as from curl", async () => {
       const response = await post({ ...json, host: LOCAL });
       expect(response.statusCode).toBe(OK);
-      expect(response.json()).toEqual({ text: "hi" });
+      expect(response.json()).toEqual({ accepted: true });
     });
 
     it.each(["cross-site", "same-site"])(
