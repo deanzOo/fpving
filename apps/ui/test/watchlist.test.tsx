@@ -194,13 +194,14 @@ describe("Adding a product by URL", () => {
     await expect.element(field).toHaveAccessibleDescription(shown);
   });
 
-  it("explains an already_tracked refusal next to the URL field", async () => {
+  it("links an already_tracked refusal to the product that already watches the page", async () => {
     const api = scripted([]);
     api.on(apiRoutes.addProduct, alreadyTracked("p1", "Acme X5 frame"));
     const screen = await renderApp(api.client);
     await screen.getByLabelText("Store URL").fill(PAGE);
     await userEvent.keyboard("{Enter}");
-    await expect.element(screen.getByRole("alert"))
-      .toHaveTextContent("This page is already watched: already tracked by product p1 \"Acme X5 frame\".");
+    const alert = screen.getByRole("alert");
+    await expect.element(alert).toHaveTextContent("Already watched as Acme X5 frame");
+    await expect.element(alert.getByRole("link", { name: "Acme X5 frame" })).toHaveAttribute("href", "/products/p1");
   });
 });
