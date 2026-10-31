@@ -199,7 +199,7 @@ export const apiRoutes = {
     method: "PUT",
     url: "/api/settings",
     summary: "Replaces the settings; a ship-to or currency change restarts the plugins, a new interval the schedule.",
-    schema: { body: settingsSchema, response: { [Ok]: settingsSchema } },
+    schema: { body: settingsSchema, response: { [Ok]: settingsSchema, [ServiceUnavailable]: apiErrorSchema } },
   },
   listPlugins: {
     method: "GET",

@@ -17,6 +17,7 @@ import type {
   AddProductError,
   FindMatchesError,
   MatchDeps,
+  Result,
   SchedulerDeps,
   SchedulerHandle,
   Settings,
@@ -29,6 +30,11 @@ import { apiError, ApiErrorKind } from "./errors.js";
 import { HttpStatus } from "./server.js";
 import type { AppServer } from "./server.js";
 
+/** Why a settings change was not applied. */
+export interface SettingsChangeError {
+  readonly kind: typeof ApiErrorKind.ShuttingDown;
+}
+
 /** What the domain routes read on each request, once startup completed. */
 export interface ApiRuntime {
   /** The ports core's use cases take, as they are now. */
@@ -38,7 +44,7 @@ export interface ApiRuntime {
   /** The plugins screen rows. */
   plugins(): readonly PluginRow[];
   /** Saves the settings and restarts what depends on them. */
-  applySettings(settings: Settings): Promise<void>;
+  applySettings(settings: Settings): Promise<Result<void, SettingsChangeError>>;
   /** Whether a settings change is restarting the schedule or the plugins right now. */
   restarting(): boolean;
   /** Whether the app started shutting down. */
@@ -316,8 +322,10 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.putSettings,
     handler: async ({ body }, reply) => {
-      await runtime().applySettings(body);
-      return reply.code(HttpStatus.Ok).send(body);
+      const applied = await runtime().applySettings(body);
+      return applied.ok
+        ? reply.code(HttpStatus.Ok).send(body)
+        : reply.code(shuttingDown.status).send(shuttingDown.body);
     },
   });
 

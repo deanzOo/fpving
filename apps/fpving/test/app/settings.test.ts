@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, ok, pluginIdSchema, settingsSchema } from "@fpving/core";
+import { DEFAULT_SETTINGS, err, ok, pluginIdSchema, settingsSchema } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
@@ -7,6 +7,7 @@ import { createSettingsApplier } from "../../src/app/settings.ts";
 import type { AppDeps } from "../../src/app/settings.ts";
 import { startPluginHost } from "../../src/plugins/runtime/host.ts";
 import type { PluginHost } from "../../src/plugins/runtime/host.ts";
+import { ApiErrorKind } from "../../src/server/errors.ts";
 import { cleanUpTemp, openTempSqliteRepository } from "../adapters/sqlite/temp-db.ts";
 import { fakeServices } from "../plugins/runtime/fake-worker.ts";
 import { fakeGateway } from "../support/api-harness.ts";
@@ -80,7 +81,7 @@ describe("Settings applier", () => {
   it("refuses a change that arrives after it was closed, starting no plugin host and no schedule", async () => {
     const { applier, startHost, armed, repository } = await applierHarness();
     await applier.close();
-    await expect(applier.apply(US)).rejects.toThrow();
+    expect(await applier.apply(US)).toEqual(err({ kind: ApiErrorKind.ShuttingDown }));
     expect({ hosts: startHost.mock.calls.length, armed }).toEqual({ hosts: 1, armed: [] });
     expect(await repository.settings.get()).toMatchObject({ shipToCountry: "IL" });
   });
@@ -161,7 +162,7 @@ describe("Settings applier", () => {
   it("applies the change and logs a warning when the old host fails to shut down", async () => {
     const { applier, live, hosts, spies, logger } = await applierHarness();
     spies[0]?.mockRejectedValueOnce(new Error("worker stuck"));
-    await expect(applier.apply(US)).resolves.toBeUndefined();
+    expect(await applier.apply(US)).toEqual(ok(undefined));
     expect(live.host).toBe(hosts.at(-1));
     expect(logger.events.filter((event) => event.level === "warn").map((event) => event.message)).toEqual([
       "the old plugin host did not shut down",

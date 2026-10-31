@@ -1,7 +1,9 @@
 import { inspect } from "node:util";
-import { startScheduler } from "@fpving/core";
-import type { MatchDeps, SchedulerDeps, SchedulerHandle, Settings, StoreGateway } from "@fpving/core";
+import { err, ok, startScheduler } from "@fpving/core";
+import type { MatchDeps, Result, SchedulerDeps, SchedulerHandle, Settings, StoreGateway } from "@fpving/core";
 import type { PluginHost } from "../plugins/runtime/host.js";
+import type { SettingsChangeError } from "../server/api.js";
+import { ApiErrorKind } from "../server/errors.js";
 import { withinDeadline } from "./lifecycle.js";
 
 /** Every port core's use cases take. */
@@ -31,18 +33,19 @@ export interface SettingsApplierOptions {
  * far has been applied.
  */
 export interface SettingsApplier {
-  apply(settings: Settings): Promise<void>;
+  apply(settings: Settings): Promise<Result<void, SettingsChangeError>>;
   close(): Promise<void>;
   /** Whether a change is restarting the schedule or the plugin host right now. */
   restarting(): boolean;
 }
 
-const CLOSED = "the app is shutting down; settings are no longer applied";
 const OLD_HOST_STUCK = "the old plugin host did not shut down";
 
 const DRAIN_DEADLINE_MS = 5000;
 
 const settledEither = (): void => undefined;
+
+const changed = ok(undefined);
 
 type DrainableGateway = StoreGateway & { drained(): Promise<boolean> };
 
@@ -136,9 +139,9 @@ export const createSettingsApplier = (options: SettingsApplierOptions): Settings
   return {
     apply: async (next) => {
       if (closed) {
-        return Promise.reject(new Error(CLOSED));
+        return err({ kind: ApiErrorKind.ShuttingDown });
       }
-      const run = queue.then(async () => reconfigure(next));
+      const run = queue.then(async () => reconfigure(next)).then(() => changed);
       // The caller gets the failure and the server logs it; the queue only waits for it.
       queue = run.then(settledEither, settledEither);
       return run;

@@ -101,7 +101,10 @@ export const startApiHarness = async () => {
   const rows: { current: readonly PluginRow[] } = { current: [] };
   const restarting = { current: false };
   const stopping = { current: false };
-  const applySettings = vi.fn<ApiRuntime["applySettings"]>(async (settings) => repository.settings.save(settings));
+  const applySettings = vi.fn<ApiRuntime["applySettings"]>(async (settings) => {
+    await repository.settings.save(settings);
+    return ok(undefined);
+  });
   const runtime: ApiRuntime = {
     deps: () => deps,
     scans: () => scans.current,

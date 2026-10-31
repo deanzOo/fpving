@@ -450,7 +450,7 @@ describe("App settings changes", () => {
     expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
   });
 
-  it("answers 503 shutting_down to scan now once shutdown started", async () => {
+  it("answers 503 shutting_down to scan now and to a settings change once shutdown started", async () => {
     mkdirSync(dataDir, { recursive: true });
     writeFileSync(join(dataDir, PLUGINS_FILE), JSON.stringify([fixturePlugin("good")]));
     const shipTo: string[] = [];
@@ -476,11 +476,16 @@ describe("App settings changes", () => {
     });
     const shuttingDown = running.shutdown();
     const scan = await running.server.inject({ method: "POST", url: apiRoutes.startScan.url, headers: host() });
+    const putSettings = { method: "PUT", url: apiRoutes.putSettings.url, headers: host(), payload } as const;
+    const late = await running.server.inject(putSettings);
     readyUs();
     await putting;
     await shuttingDown;
-    expect(scan.statusCode).toBe(UNAVAILABLE);
-    expect(scan.json()).toMatchObject({ error: { kind: ApiErrorKind.ShuttingDown } });
+    expect([scan.statusCode, late.statusCode]).toEqual([UNAVAILABLE, UNAVAILABLE]);
+    expect([scan.json(), late.json()]).toMatchObject([
+      { error: { kind: ApiErrorKind.ShuttingDown } },
+      { error: { kind: ApiErrorKind.ShuttingDown } },
+    ]);
   });
 
   it("restarts nothing when only the drop threshold changes", async () => {
