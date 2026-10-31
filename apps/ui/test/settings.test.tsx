@@ -5,6 +5,7 @@ import { HttpStatus } from "@fpving/app/http-status";
 import { DEFAULT_SETTINGS, settingsSchema, ThresholdBasis } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { describe, expect, it } from "vitest";
+import { QueryKey } from "../src/queries.ts";
 import { failWith, fakeApi, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 
@@ -75,6 +76,20 @@ describe("Settings", () => {
       },
     };
     expect(api.sent).toContainEqual({ method: "PUT", path: apiRoutes.putSettings.url, body: expected });
+  });
+
+  it("marks every cached read that depends on the settings stale once saved, so landed costs refresh", async () => {
+    const api = scripted();
+    saveWith(api);
+    const screen = await open(api);
+    const dependent = [[...QueryKey.Product, "p1"], QueryKey.Watchlist, QueryKey.Plugins];
+    for (const key of dependent) {
+      screen.queryClient.setQueryData(key, []);
+    }
+    await screen.getByRole("button", { name: "Save settings" }).click();
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
+    const stale = dependent.map((key) => screen.queryClient.getQueryState(key)?.isInvalidated);
+    expect(stale).toEqual([true, true, true]);
   });
 
   it.each([

@@ -90,7 +90,9 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
     mutationFn: client.putSettings,
     onSuccess: async (next) => {
       queryClient.setQueryData(QueryKey.Settings, next);
-      await queryClient.invalidateQueries({ queryKey: QueryKey.Watchlist });
+      await Promise.all([QueryKey.Watchlist, QueryKey.Product, QueryKey.Plugins].map(
+        async (queryKey) => queryClient.invalidateQueries({ queryKey }),
+      ));
     },
   });
   return (
