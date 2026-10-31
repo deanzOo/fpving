@@ -50,7 +50,6 @@ export interface ProductDetail {
 export const watchlist = async ({ repository }: Pick<CoreDeps, "repository">): Promise<WatchlistEntry[]> => {
   const settings = await repository.settings.get();
   const rates = await repository.fxRates.latest();
-  // ponytail: three reads per product; fine for a personal watchlist, add a joined query if it grows to thousands.
   return Promise.all((await repository.products.list()).map(async (product): Promise<WatchlistEntry> => {
     if (rates === null) {
       return { product, cheapest: null };
