@@ -7,7 +7,7 @@ import type { ListingId, ProductId } from "../ids.js";
 import { cheapestBy } from "../alerts/new-cheapest.js";
 import type { Ranked } from "../alerts/new-cheapest.js";
 import type { FxTable } from "../pricing/fx.js";
-import { landedCostExact } from "../pricing/landed-cost.js";
+import { comparableLandedCost } from "../pricing/landed-cost.js";
 import { roundMinor } from "../pricing/money.js";
 import { liveProduct } from "./add.js";
 import type { CoreDeps, ProductNotFound } from "./add.js";
@@ -17,13 +17,7 @@ const EPOCH = new Date(0);
 const MS_PER_DAY = 86_400_000;
 
 const displayPricer = (settings: Settings, rates: FxTable | null) => ({
-  exact: (snapshot: PriceSnapshot): number | null => {
-    if (rates === null || snapshot.shipTo !== settings.shipToCountry) {
-      return null;
-    }
-    const cost = landedCostExact(snapshot, settings, rates);
-    return cost.ok ? cost.value : null;
-  },
+  exact: comparableLandedCost(settings, rates),
   shown: (landedMinor: number): Money => ({ amountMinor: roundMinor(landedMinor), currency: settings.displayCurrency }),
 });
 
@@ -103,7 +97,7 @@ export const watchlist = async (
     const ranked = days.map((at) => cheapestBy(own.flatMap((listing): ListingWithLatest[] => {
       const latest = snapshotsOf.get(listing.id)?.findLast(({ observedAt }) => observedAt <= at);
       return latest === undefined ? [] : [{ listing, latest }];
-    }), settings.shipToCountry, pricer.exact));
+    }), pricer.exact));
     const cheapest = ranked.at(-1);
     return {
       product,
