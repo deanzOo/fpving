@@ -1,6 +1,7 @@
 import { apiRoutes } from "@fpving/app/api-routes";
 import { ApiErrorKind } from "@fpving/app/errors";
 import { HttpStatus } from "@fpving/app/http-status";
+import { DEFAULT_SETTINGS, settingsSchema } from "@fpving/core";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -18,6 +19,7 @@ const scripted = () => {
   api.on(apiRoutes.listAlerts, reply(wire.alerts, []), UNREAD);
   api.on(apiRoutes.listAlerts, reply(wire.alerts, []));
   api.on(apiRoutes.listPlugins, reply(wire.plugins, []));
+  api.on(apiRoutes.getSettings, reply(wire.settings, settingsSchema.parse(DEFAULT_SETTINGS)));
   return api;
 };
 

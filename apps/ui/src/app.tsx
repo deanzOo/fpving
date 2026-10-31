@@ -9,6 +9,7 @@ import type { Client } from "./client.ts";
 import { ErrorView } from "./error-view.tsx";
 import { Layout } from "./layout.tsx";
 import { Plugins } from "./plugins.tsx";
+import { SettingsScreen } from "./settings.tsx";
 import { NotFound, Placeholder } from "./screens.tsx";
 import { Watchlist } from "./watchlist.tsx";
 
@@ -22,7 +23,7 @@ const routeTree = rootRoute.addChildren([
   placeholder("/products/$id", "Product"),
   placeholder("/matches", "Matches"),
   createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts }),
-  placeholder("/settings", "Settings"),
+  createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsScreen }),
   createRoute({ getParentRoute: () => rootRoute, path: "/plugins", component: Plugins }),
 ]);
 
