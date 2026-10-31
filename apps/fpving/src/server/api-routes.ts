@@ -11,6 +11,7 @@ import {
   productSchema,
   scanRunSchema,
   settingsSchema,
+  TREND_DAYS,
 } from "@fpving/core";
 import { manifestSchema, moneySchema, storeErrorSchema } from "@fpving/plugin-sdk";
 import { z } from "zod";
@@ -34,6 +35,8 @@ const productDetailSchema = z.object({
 const watchlistSchema = z.array(z.object({
   product: productSchema,
   cheapest: z.object({ listingId: listingIdSchema, landedCost: moneySchema }).nullable(),
+  trend: z.array(moneySchema.nullable()).length(TREND_DAYS),
+  unreadAlerts: countSchema,
 }));
 
 const pluginRowSchema = z.object({
@@ -41,6 +44,8 @@ const pluginRowSchema = z.object({
   manifest: manifestSchema.nullable(),
   status: z.enum(PluginStatusKind),
   issues: z.array(z.object({ kind: z.enum(PluginIssueKind), detail: z.string() })),
+  backoffUntil: z.date().nullable(),
+  staleListings: countSchema,
 });
 
 /** One row of the plugins screen: a `plugins.json` entry, a rejected entry or the unusable file itself. */
@@ -81,7 +86,8 @@ export const apiRoutes = {
   listProducts: {
     method: "GET",
     url: "/api/products",
-    summary: "The watched products, newest first, each with its cheapest landed price in the display currency.",
+    summary: "The watched products, newest first, each with its cheapest landed price in the display currency, "
+      + `that price once a day over the last ${String(TREND_DAYS)} days and its unread alert count.`,
     schema: { response: { [Ok]: watchlistSchema } },
   },
   getProduct: {
@@ -204,7 +210,8 @@ export const apiRoutes = {
   listPlugins: {
     method: "GET",
     url: "/api/plugins",
-    summary: "Every plugin with its status, rejected `plugins.json` entries and an unusable `plugins.json`.",
+    summary: "Every plugin with its status, backoff and stale listing count, rejected `plugins.json` entries and an "
+      + "unusable `plugins.json`.",
     schema: { response: { [Ok]: z.array(pluginRowSchema) } },
   },
   startScan: {

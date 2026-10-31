@@ -26,6 +26,7 @@ import { StoreErrorKind } from "@fpving/plugin-sdk";
 import { GatewayRefusal } from "../plugins/store-gateway.js";
 import { apiRoutes } from "./api-routes.js";
 import type { PluginRow, ScanStatus } from "./api-routes.js";
+import type { PluginActivity } from "./plugin-rows.js";
 import { apiError, ApiErrorKind } from "./errors.js";
 import { HttpStatus } from "./server.js";
 import type { AppServer } from "./server.js";
@@ -41,8 +42,8 @@ export interface ApiRuntime {
   deps(): MatchDeps & SchedulerDeps;
   /** The running scan schedule. */
   scans(): SchedulerHandle;
-  /** The plugins screen rows. */
-  plugins(): readonly PluginRow[];
+  /** The plugins screen rows, given what the repository holds about the plugins now. */
+  plugins(activity: PluginActivity): readonly PluginRow[];
   /** Saves the settings and restarts what depends on them. */
   applySettings(settings: Settings): Promise<Result<void, SettingsChangeError>>;
   /** Whether a settings change is restarting the schedule or the plugins right now. */
@@ -337,7 +338,11 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
 
   server.route({
     ...apiRoutes.listPlugins,
-    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send([...runtime().plugins()]),
+    handler: async (_request, reply) => {
+      const { repository, clock } = deps();
+      const [health, scanned] = await Promise.all([repository.pluginHealth.list(), repository.listings.listToScan()]);
+      return reply.code(HttpStatus.Ok).send([...runtime().plugins({ health, scanned, now: clock.now() })]);
+    },
   });
 
   server.route({

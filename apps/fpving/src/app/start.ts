@@ -301,7 +301,7 @@ export const startApp = async (
     api.attach({
       deps: () => parts.deps,
       scans: () => parts.scans,
-      plugins: () => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue),
+      plugins: (activity) => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue, activity),
       applySettings: async (next) => settingsApplier.apply(next),
       restarting: () => settingsApplier.restarting(),
       stopping: () => stopping,

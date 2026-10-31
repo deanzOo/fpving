@@ -105,14 +105,14 @@ export const startApiHarness = async () => {
     await repository.settings.save(settings);
     return ok(undefined);
   });
-  const runtime: ApiRuntime = {
+  const runtime = {
     deps: () => deps,
     scans: () => scans.current,
-    plugins: () => rows.current,
+    plugins: vi.fn<ApiRuntime["plugins"]>(() => rows.current),
     applySettings,
     restarting: () => restarting.current,
     stopping: () => stopping.current,
-  };
+  } satisfies ApiRuntime;
   const server = createServer({ port: API_PORT, logger, isReady: () => true, openWhileStarting: [] });
   registerApiRoutes(server).attach(runtime);
   await server.ready();
@@ -126,6 +126,7 @@ export const startApiHarness = async () => {
     logger,
     scans,
     rows,
+    runtime,
     restarting,
     stopping,
     applySettings,

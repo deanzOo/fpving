@@ -2,6 +2,7 @@ import {
   AlertKind,
   alertSchema,
   err,
+  listingIdSchema,
   ListingOrigin,
   listingSchema,
   ListingStatus,
@@ -9,6 +10,7 @@ import {
   priceSnapshotSchema,
   productIdSchema,
   productSchema,
+  TREND_DAYS,
 } from "@fpving/core";
 import type { Alert } from "@fpving/core";
 import { StoreErrorKind } from "@fpving/plugin-sdk";
@@ -149,6 +151,8 @@ describe("Watchlist API", () => {
   const entries = z.array(z.object({
     product: z.object({ id: z.string() }),
     cheapest: z.object({ listingId: z.string(), landedCost: z.object({ currency: z.string() }) }).nullable(),
+    trend: z.array(z.object({ currency: z.string() }).nullable()),
+    unreadAlerts: z.int(),
   }));
   const watchlist = async () => entries.parse((await api.request("GET", "/api/products")).json());
 
@@ -161,6 +165,18 @@ describe("Watchlist API", () => {
     const listed = await watchlist();
     expect(listed.map(({ product, cheapest }) => [product.id, cheapest?.listingId, cheapest?.landedCost.currency]))
       .toEqual([[second.product.id, second.listing.id, "USD"], [first.product.id, first.listing.id, "USD"]]);
+  });
+
+  it("gives each watched product a daily trend ending at its cheapest price and its unread alert count", async () => {
+    const settings = await api.repository.settings.get();
+    await api.repository.settings.save({ ...settings, displayCurrency: "USD" });
+    await api.scans.current.scanNow();
+    await addProduct();
+    const [entry] = await watchlist();
+    expect(entry?.trend).toHaveLength(TREND_DAYS);
+    expect(entry?.cheapest).not.toBeNull();
+    expect(entry?.trend.at(-1)).toEqual(entry?.cheapest?.landedCost);
+    expect(entry?.unreadAlerts).toBe(0);
   });
 
   it("renames a product, answering 204", async () => {
@@ -527,9 +543,27 @@ describe("Settings API", () => {
 
 describe("Plugins API", () => {
   it("answers the runtime's plugin rows", async () => {
-    api.rows.current = [{ source: "plugins.json", manifest: null, status: "disabled", issues: [] }];
+    api.rows.current = [
+      { source: "plugins.json", manifest: null, status: "disabled", issues: [], backoffUntil: null, staleListings: 0 },
+    ];
     const response = await api.request("GET", apiRoutes.listPlugins.url);
     expect(response.json()).toEqual(api.rows.current);
+  });
+
+  it("builds the rows from every plugin's health and the listings a scan fetches, as of now", async () => {
+    const { listing } = await addProduct();
+    const stale = { status: ListingStatus.Stale, failureStreak: 1, notFoundStreak: 0 };
+    await api.repository.listings.updateStatus(listingIdSchema.parse(listing.id), stale);
+    const health = { pluginId: SHOP, consecutiveBlocks: 1, backoffUntil: null };
+    await api.repository.pluginHealth.upsert(health);
+    const { clock } = api.runtime.deps();
+    const before = clock.now();
+    await api.request("GET", apiRoutes.listPlugins.url);
+    const after = clock.now();
+    const [activity] = api.runtime.plugins.mock.lastCall ?? [];
+    expect(activity).toMatchObject({ health: [health], scanned: [{ id: listing.id, status: ListingStatus.Stale }] });
+    expect(activity?.now.getTime()).toBeGreaterThan(before.getTime());
+    expect(activity?.now.getTime()).toBeLessThan(after.getTime());
   });
 });
 
