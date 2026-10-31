@@ -52,7 +52,8 @@
   "pnpm": {
     "overrides": {
       "eslint-plugin-tsdoc>@typescript-eslint/utils": "8.71.2",
-      "@esbuild-kit/core-utils>esbuild": "0.25.12"
+      "@esbuild-kit/core-utils>esbuild": "0.25.12",
+      "glob@13": "14.0.2"
     },
     "ignoredBuiltDependencies": [
       "better-sqlite3",
