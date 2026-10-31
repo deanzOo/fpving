@@ -162,6 +162,13 @@ describe("The watchlist trend", () => {
     }));
   });
 
+  it("has no price on any day for a product whose listings are all gone", async () => {
+    const repository = await withRates();
+    const gone = listing("l1", { status: ListingStatus.Gone });
+    await watched(repository, product("p1", NOW), [[gone, snapshot("s1", "l1")]]);
+    expect(await watchlist({ repository, clock })).toMatchObject([{ cheapest: null, trend: trendOf(() => null) }]);
+  });
+
   it("has no price on any day before any exchange rates were fetched", async () => {
     const repository = inMemoryRepository();
     await watched(repository, product("p1", NOW), [[listing("l1"), snapshot("s1", "l1")]]);
