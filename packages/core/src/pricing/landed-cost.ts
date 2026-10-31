@@ -70,8 +70,7 @@ export const landedCostExact = (
   return total.ok ? convertExact(total.value, settings.displayCurrency, rates) : total;
 };
 
-/** What {@link comparableLandedCost} prices by: the pricing settings and the ship-to country costs are compared for. */
-export type ComparableSettings = PricingSettings & { readonly shipToCountry: CountryCode };
+type ComparableSettings = PricingSettings & { readonly shipToCountry: CountryCode };
 
 /**
  * The one rule for a landed cost that can be compared and shown: the exact landed cost of a snapshot in the display

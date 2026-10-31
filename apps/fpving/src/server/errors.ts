@@ -31,10 +31,9 @@ const messageSchema = z.string().min(1);
 
 const { AlreadyTracked, ...PlainKinds } = ApiErrorKind;
 
-/** Every kind but `already_tracked`, whose reply also names the product. */
-export const plainErrorKindSchema = z.enum(PlainKinds);
+const plainErrorKindSchema = z.enum(PlainKinds);
 
-/** One of the kinds {@link plainErrorKindSchema} accepts. */
+/** Any error kind but `already_tracked`, whose reply also names the product. */
 export type PlainErrorKind = z.infer<typeof plainErrorKindSchema>;
 
 /**
