@@ -8,6 +8,7 @@ import { ClientContext } from "./client.ts";
 import type { Client } from "./client.ts";
 import { ErrorView } from "./error-view.tsx";
 import { Layout } from "./layout.tsx";
+import { Plugins } from "./plugins.tsx";
 import { NotFound, Placeholder } from "./screens.tsx";
 import { Watchlist } from "./watchlist.tsx";
 
@@ -22,7 +23,7 @@ const routeTree = rootRoute.addChildren([
   placeholder("/matches", "Matches"),
   createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts }),
   placeholder("/settings", "Settings"),
-  placeholder("/plugins", "Plugins"),
+  createRoute({ getParentRoute: () => rootRoute, path: "/plugins", component: Plugins }),
 ]);
 
 const createAppRouter = (history: RouterHistory) =>

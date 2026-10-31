@@ -17,6 +17,7 @@ const scripted = () => {
   api.on(apiRoutes.listProducts, reply(wire.watchlist, []));
   api.on(apiRoutes.listAlerts, reply(wire.alerts, []), UNREAD);
   api.on(apiRoutes.listAlerts, reply(wire.alerts, []));
+  api.on(apiRoutes.listPlugins, reply(wire.plugins, []));
   return api;
 };
 
