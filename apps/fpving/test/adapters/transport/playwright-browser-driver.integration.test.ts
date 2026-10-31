@@ -91,7 +91,7 @@ describe.skipIf(!chromiumInstalled)(
       BROWSER_TIMEOUT_MS,
     );
 
-    describe("with a page that opens a popup", () => {
+    describe("With a page that opens a popup", () => {
       let popupProfile: string;
       let popupDriver: ClosableBrowserDriver;
       let opened: BrowserContext | undefined;
@@ -131,7 +131,7 @@ describe.skipIf(!chromiumInstalled)(
       );
     });
 
-    describe("with a page on a public name whose requests aim at a private host", () => {
+    describe("With a page on a public name whose requests aim at a private host", () => {
       let privateServer: LocalServer;
       let pageServer: LocalServer;
       let strict: ClosableBrowserDriver;

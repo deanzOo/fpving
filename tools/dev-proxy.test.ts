@@ -56,7 +56,7 @@ describe("Dev server proxy", () => {
     expect(() => devProxy(join(dir, "missing.env"), {})).toThrow(/PORT/u);
   });
 
-  describe("against the server's guards", () => {
+  describe("Against the server's guards", () => {
     const server = createServer({ port: PORT, logger: recordingLogger(), isReady: () => true, openWhileStarting: [] });
     server.post(ECHO, () => ({ ok: true }));
 

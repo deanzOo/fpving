@@ -12,7 +12,7 @@ const module = (children: SpecModule["children"], file = "test/a.test.ts", proje
   children,
 });
 
-describe("renderSpec", () => {
+describe("Rendering the behaviour spec", () => {
   it("renders a project as a title with its suites one level deeper", () => {
     const md = renderSpec([module([suite("Price drop alert", [test("fires when the price falls")])])]);
     expect(md).toBe("## Core\n\n### Price drop alert\n- fires when the price falls\n");

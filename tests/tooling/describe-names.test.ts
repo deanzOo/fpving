@@ -14,10 +14,14 @@ const describeNames = async (pattern: string): Promise<string[]> => {
 };
 
 describe("Behaviour spec headings", () => {
-  it("starts every package describe name with a capital, so the spec reads in sentence case", async () => {
+  it("starts every describe name with a capital, so the spec reads in sentence case", async () => {
     const names = [
       ...(await describeNames("packages/*/test/**/*.test.ts")),
       ...(await describeNames("packages/*/src/**/*.ts")),
+      ...(await describeNames("apps/*/test/**/*.test.ts")),
+      ...(await describeNames("apps/*/test/**/*.test.tsx")),
+      ...(await describeNames("tools/**/*.test.ts")),
+      ...(await describeNames("tests/**/*.test.ts")),
     ];
     expect(names.length).toBeGreaterThan(0);
     expect(names.filter((name) => !SENTENCE_CASE.test(name.split(": ").slice(1).join(": ")))).toEqual([]);

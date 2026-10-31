@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateSpecPage, renderSpecPage } from "../../tools/spec-to-docs.ts";
 
-describe("renderSpecPage", () => {
+describe("Rendering the behaviour spec page", () => {
   it("prefixes the spec with starlight frontmatter", () => {
     const page = renderSpecPage("## Alerts\n- fires\n");
     expect(page.startsWith("---\ntitle: Behaviour specification\n")).toBe(true);
@@ -27,7 +27,7 @@ describe("renderSpecPage", () => {
   });
 });
 
-describe("generateSpecPage", () => {
+describe("Generating the behaviour spec page", () => {
   let dir = "";
 
   beforeEach(async () => {

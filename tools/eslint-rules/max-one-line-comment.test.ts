@@ -6,7 +6,7 @@ import { maxOneLineComment } from "./max-one-line-comment.ts";
 RuleTester.describe = describe;
 RuleTester.it = it;
 
-describe("max-one-line-comment", () => {
+describe("The max-one-line-comment lint rule", () => {
   new RuleTester({ languageOptions: { parser: tseslint.parser } }).run("max-one-line-comment", maxOneLineComment, {
     valid: [
       "// one\nconst a = 1;",
