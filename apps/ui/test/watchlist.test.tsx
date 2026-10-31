@@ -79,7 +79,7 @@ describe("Watchlist", () => {
     const gapDay = Math.floor(TREND_DAYS / HALF);
     const trend = row().trend.map((price, day) => (day === gapDay ? null : price));
     const screen = await renderApp(scripted([row({ trend })]).client);
-    await expect.element(screen.getByRole("img", { name: /lowest \$123\.45/u })).toBeVisible();
+    await expect.element(screen.getByRole("application", { name: /lowest \$123\.45/u })).toBeVisible();
     expect(lineSegments(screen.container)).toBe(SEGMENTS_AROUND_ONE_GAP);
   });
 
@@ -103,18 +103,30 @@ describe("Watchlist", () => {
     const trend = row().trend.map((price, day) => (day === TREND_DAYS - 1 ? LOWER : price));
     const screen = await renderApp(scripted([row({ trend })]).client);
     const name = "Last 30 days: lowest $110.00, highest $123.45, latest $110.00, 27 days with a price";
-    await expect.element(screen.getByRole("img", { name })).toBeVisible();
+    await expect.element(screen.getByRole("application", { name })).toBeVisible();
   });
 
   it("shows the price of the day under the pointer", async () => {
     const screen = await renderApp(scripted([row()]).client);
-    await userEvent.hover(screen.getByRole("img", { name: /Last 30 days/u }));
+    await userEvent.hover(screen.getByRole("application", { name: /Last 30 days/u }));
     await expect.element(screen.getByText(/\$123\.45, (today|yesterday|\d+ days ago)/u)).toBeVisible();
+  });
+
+  it("lets the keyboard reach the trend and step through the days to read each price", async () => {
+    const screen = await renderApp(scripted([row()]).client);
+    await screen.getByLabelText("Store URL").click();
+    await userEvent.tab();
+    await userEvent.tab();
+    await userEvent.tab();
+    const chart = screen.getByRole("application", { name: /^Last 30 days: lowest \$123\.45/u });
+    await expect.element(chart).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(screen.getByText(/^(No price|\$123\.45), (today|yesterday|\d+ days ago)$/u)).toBeVisible();
   });
 
   it("says a day had no price when the pointer is over a gap", async () => {
     const screen = await renderApp(scripted([row()]).client);
-    await userEvent.hover(screen.getByRole("img", { name: /Last 30 days/u }), { position: LEFT_EDGE });
+    await userEvent.hover(screen.getByRole("application", { name: /Last 30 days/u }), { position: LEFT_EDGE });
     await expect.element(screen.getByText("No price, 29 days ago")).toBeVisible();
   });
 

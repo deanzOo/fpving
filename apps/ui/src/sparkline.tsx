@@ -16,7 +16,7 @@ const relativeDay = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 /**
  * A product's cheapest price once a day, oldest first, as a 2px line with no axes. A day without a price leaves a
  * gap instead of a bridged segment, and a price with no priced day beside it is a dot. The figure's name sums the
- * range up; hovering shows the day's price.
+ * range up; hovering, or focusing it and pressing the arrow keys, shows each day's price.
  *
  * @param props - The trend, one entry a day, null on a day without a price.
  * @returns The sparkline, or a note when no day has a price.
@@ -52,8 +52,8 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
     );
   };
   return (
-    <div role="img" aria-label={name} className="text-series">
-      <LineChart width={WIDTH} height={HEIGHT} data={data} accessibilityLayer={false} margin={MARGIN}>
+    <div className="text-series">
+      <LineChart width={WIDTH} height={HEIGHT} data={data} title={name} margin={MARGIN}>
         <XAxis dataKey={DAY} hide />
         <YAxis hide domain={["dataMin", "dataMax"]} />
         <Tooltip
