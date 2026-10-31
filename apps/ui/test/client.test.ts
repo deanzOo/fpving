@@ -85,6 +85,13 @@ describe("API client", () => {
     expect((await failureOf(api.client.listProducts())).kind).toBe(ClientErrorKind.BadResponse);
   });
 
+  it("builds the path from the route's path with each param percent-encoded", async () => {
+    const api = fakeApi();
+    await failureOf(api.client.removeListing({ productId: "p 1/2", listingId: "l?1" }));
+    expect(api.sent.map(({ method, path }) => `${method} ${path}`))
+      .toEqual(["DELETE /api/products/p%201%2F2/listings/l%3F1"]);
+  });
+
   it("throws unreachable when the request cannot be sent", async () => {
     const client = createClient(async () => Promise.reject(new TypeError("Failed to fetch")));
     expect((await failureOf(client.listProducts())).kind).toBe(ClientErrorKind.Unreachable);

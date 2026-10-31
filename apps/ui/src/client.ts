@@ -53,6 +53,7 @@ interface Route {
 }
 
 interface CallInput {
+  readonly params?: Readonly<Record<string, string>>;
   readonly query?: Readonly<Record<string, string | undefined>>;
   readonly body?: unknown;
 }
@@ -106,7 +107,11 @@ const send = async <S extends z.ZodType>(
 ): Promise<z.output<S>> => {
   const query = Object.entries(request.query ?? {})
     .flatMap(([key, value]) => (value === undefined ? [] : [[key, value]]));
-  const path = query.length === 0 ? route.url : `${route.url}?${new URLSearchParams(query).toString()}`;
+  const url = Object.entries(request.params ?? {}).reduce(
+    (built, [name, value]) => built.replace(`:${name}`, encodeURIComponent(value)),
+    route.url,
+  );
+  const path = query.length === 0 ? url : `${url}?${new URLSearchParams(query).toString()}`;
   const init: RequestInit = request.body === undefined
     ? { method: route.method }
     : { method: route.method, headers: { "content-type": "application/json" }, body: JSON.stringify(request.body) };
@@ -136,14 +141,49 @@ const send = async <S extends z.ZodType>(
  * @param fetcher - The transport.
  * @returns One function per route the UI calls.
  */
-export const createClient = (fetcher: Fetch) => ({
-  listProducts: async () =>
-    send(fetcher, apiRoutes.listProducts, apiRoutes.listProducts.schema.response[HttpStatus.Ok]),
-  addProduct: async (body: z.input<typeof apiRoutes.addProduct.schema.body>) =>
-    send(fetcher, apiRoutes.addProduct, apiRoutes.addProduct.schema.response[HttpStatus.Created], { body }),
-  listAlerts: async (query: z.input<typeof apiRoutes.listAlerts.schema.querystring>) =>
-    send(fetcher, apiRoutes.listAlerts, apiRoutes.listAlerts.schema.response[HttpStatus.Ok], { query }),
-});
+export const createClient = (fetcher: Fetch) => {
+  const { Ok, Created, Accepted, NoContent } = HttpStatus;
+  const routes = apiRoutes;
+  return {
+    listProducts: async () => send(fetcher, routes.listProducts, routes.listProducts.schema.response[Ok]),
+    getProduct: async (params: z.input<typeof routes.getProduct.schema.params>) =>
+      send(fetcher, routes.getProduct, routes.getProduct.schema.response[Ok], { params }),
+    renameProduct: async (
+      params: z.input<typeof routes.renameProduct.schema.params>,
+      body: z.input<typeof routes.renameProduct.schema.body>,
+    ) => send(fetcher, routes.renameProduct, routes.renameProduct.schema.response[NoContent], { params, body }),
+    archiveProduct: async (params: z.input<typeof routes.archiveProduct.schema.params>) =>
+      send(fetcher, routes.archiveProduct, routes.archiveProduct.schema.response[NoContent], { params }),
+    addProduct: async (body: z.input<typeof routes.addProduct.schema.body>) =>
+      send(fetcher, routes.addProduct, routes.addProduct.schema.response[Created], { body }),
+    addListing: async (
+      params: z.input<typeof routes.addListing.schema.params>,
+      body: z.input<typeof routes.addListing.schema.body>,
+    ) => send(fetcher, routes.addListing, routes.addListing.schema.response[Created], { params, body }),
+    removeListing: async (params: z.input<typeof routes.removeListing.schema.params>) =>
+      send(fetcher, routes.removeListing, routes.removeListing.schema.response[NoContent], { params }),
+    listCandidates: async (params: z.input<typeof routes.listCandidates.schema.params>) =>
+      send(fetcher, routes.listCandidates, routes.listCandidates.schema.response[Ok], { params }),
+    findMatches: async (params: z.input<typeof routes.findMatches.schema.params>) =>
+      send(fetcher, routes.findMatches, routes.findMatches.schema.response[Ok], { params }),
+    acceptCandidate: async (params: z.input<typeof routes.acceptCandidate.schema.params>) =>
+      send(fetcher, routes.acceptCandidate, routes.acceptCandidate.schema.response[Created], { params }),
+    rejectCandidate: async (params: z.input<typeof routes.rejectCandidate.schema.params>) =>
+      send(fetcher, routes.rejectCandidate, routes.rejectCandidate.schema.response[NoContent], { params }),
+    listAlerts: async (query: z.input<typeof routes.listAlerts.schema.querystring>) =>
+      send(fetcher, routes.listAlerts, routes.listAlerts.schema.response[Ok], { query }),
+    markAlertRead: async (params: z.input<typeof routes.markAlertRead.schema.params>) =>
+      send(fetcher, routes.markAlertRead, routes.markAlertRead.schema.response[NoContent], { params }),
+    markAllAlertsRead: async () =>
+      send(fetcher, routes.markAllAlertsRead, routes.markAllAlertsRead.schema.response[Ok]),
+    getSettings: async () => send(fetcher, routes.getSettings, routes.getSettings.schema.response[Ok]),
+    putSettings: async (body: z.input<typeof routes.putSettings.schema.body>) =>
+      send(fetcher, routes.putSettings, routes.putSettings.schema.response[Ok], { body }),
+    listPlugins: async () => send(fetcher, routes.listPlugins, routes.listPlugins.schema.response[Ok]),
+    startScan: async () => send(fetcher, routes.startScan, routes.startScan.schema.response[Accepted]),
+    getScan: async () => send(fetcher, routes.getScan, routes.getScan.schema.response[Ok]),
+  };
+};
 
 /** The client the screens call. */
 export type Client = ReturnType<typeof createClient>;
