@@ -5,7 +5,7 @@ description: The product detail answer carries each snapshot's landed cost, comp
 
 - Status: Accepted
 - Date: 2026-10-31
-- Amends [ADR 0024](../0024-http-api-error-envelope-and-route-table/): the product detail answer's history entries gain `landedCost`. Prices stay store-native in storage, as [ADR 0006](../0006-store-native-money-snapshots-and-read-time-fx/) decided.
+- Extends [ADR 0006](../0006-store-native-money-snapshots-and-read-time-fx/) to the product detail answer: snapshots stay store-native in storage, and their landed cost is computed at read time with today's rates, as the watchlist's is.
 
 ## Context and problem statement
 
