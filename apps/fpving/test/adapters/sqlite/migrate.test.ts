@@ -74,6 +74,16 @@ const seeded = (path: string): Record<string, unknown[]> => {
 
 const snapshotSchema = z.looseObject({ tables: z.record(z.string(), z.unknown()) });
 
+const OWNER_ONLY_FILE = 0o600;
+
+const recordedModes = () => {
+  const calls: [string, number][] = [];
+  const chmod = (file: string, mode: number): void => {
+    calls.push([basename(file), mode]);
+  };
+  return { calls, chmod };
+};
+
 const backups = (dir: string): string[] => readdirSync(dir).filter((name) => name.endsWith(".bak"));
 
 describe("SQLite migrations", () => {
@@ -91,6 +101,30 @@ describe("SQLite migrations", () => {
     expect(migrate(path)).toEqual({ backupPath: null });
     expect(tables(path)).toEqual(expect.arrayContaining(["products", "listings", "price_snapshots", "settings"]));
     expect(backups(dir)).toEqual([]);
+  });
+
+  it("makes a new database file owner-only before its write-ahead log exists", () => {
+    const { calls, chmod } = recordedModes();
+    migrate(join(tempDir(), "fpving.db"), APP_MIGRATIONS, chmod);
+    expect(calls).toEqual([["fpving.db", OWNER_ONLY_FILE]]);
+  });
+
+  it("makes the database, its open write-ahead log files and its backup owner-only", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    seeded(path);
+    const holder = new Database(path);
+    holder.pragma("journal_mode = WAL");
+    holder.prepare("select 1 from fx_tables").all();
+    const { calls, chmod } = recordedModes();
+    const { backupPath } = migrate(path, migrationsWith("CREATE TABLE `extra` (`id` integer PRIMARY KEY);"), chmod);
+    holder.close();
+    expect(calls).toEqual([
+      ["fpving.db", OWNER_ONLY_FILE],
+      ["fpving.db-wal", OWNER_ONLY_FILE],
+      ["fpving.db-shm", OWNER_ONLY_FILE],
+      [basename(backupPath ?? ""), OWNER_ONLY_FILE],
+    ]);
   });
 
   it("leaves an up-to-date database alone and makes no backup", () => {
