@@ -27,7 +27,7 @@
     "zod": "4.6.7"
   },
   "peerDependencies": {
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.5"
   },
   "peerDependenciesMeta": {
     "vitest": {
@@ -37,6 +37,6 @@
   "devDependencies": {
     "@types/node": "24.19.2",
     "@types/semver": "7.8.0",
-    "vitest": "5.0.4"
+    "vitest": "5.0.5"
   }
 }
