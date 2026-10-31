@@ -179,6 +179,29 @@ describe("Watchlist API", () => {
     expect(entry?.unreadAlerts).toBe(0);
   });
 
+  it("answers each product's unread alert count, which drops once an alert is read", async () => {
+    const { product, listing } = await addProduct();
+    const [snapshot] = await api.repository.snapshots.latestPerListing(product.id);
+    const first = "a-1";
+    const ids = [first, "a-2"];
+    for (const id of ids) {
+      await api.repository.alerts.save(alertSchema.parse({
+        id,
+        productId: product.id,
+        listingId: listing.id,
+        kind: AlertKind.BackInStock,
+        beforeSnapshotId: null,
+        afterSnapshotId: snapshot?.id,
+        createdAt: new Date(0),
+        readAt: null,
+      }));
+    }
+    expect((await watchlist()).map(({ unreadAlerts }) => unreadAlerts)).toEqual([ids.length]);
+    const read = await api.request("POST", `/api/alerts/${first}/read`);
+    expect(read.statusCode).toBe(HttpStatus.NoContent);
+    expect((await watchlist()).map(({ unreadAlerts }) => unreadAlerts)).toEqual([ids.length - 1]);
+  });
+
   it("renames a product, answering 204", async () => {
     const { product } = await addProduct();
     const response = await api.request("PATCH", `/api/products/${product.id}`, { name: "Quad frame" });
