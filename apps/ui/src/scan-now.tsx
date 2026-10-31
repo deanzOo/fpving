@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toFailure, useClient } from "./client.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
@@ -9,8 +9,8 @@ const POLL_MS = 1000;
 
 /**
  * The scan now control and the scan status: running, or when the last scan finished with how many listings it
- * fetched, how many failed and how many alerts it raised. While a scan runs the status is polled, and once it
- * finishes the watchlist and the alerts are read again.
+ * fetched, how many failed and how many alerts it raised. While a scan runs the status is polled, and when a scan
+ * seen running finishes the watchlist and the alerts are read again.
  *
  * @returns The control.
  */
@@ -28,15 +28,17 @@ export const ScanNow = () => {
       queryClient.setQueryData(QueryKey.Scan, next);
     },
   });
-  const finishedAt = status?.lastResult?.finishedAt.getTime();
+  const running = status?.running === true;
+  const wasRunning = useRef(false);
   useEffect(() => {
-    if (finishedAt !== undefined) {
+    if (wasRunning.current && !running) {
       void queryClient.invalidateQueries({ queryKey: QueryKey.Watchlist });
       void queryClient.invalidateQueries({ queryKey: QueryKey.Alerts });
     }
-  }, [finishedAt, queryClient]);
+    wasRunning.current = running;
+  }, [running, queryClient]);
   const last = status?.lastResult;
-  const said = status?.running === true
+  const said = running
     ? "Scanning every listing…"
     : last === null || last === undefined
       ? "No scan has finished since fpving started."
@@ -48,7 +50,7 @@ export const ScanNow = () => {
       <p role="status" className="text-sm text-ink-muted">{status === undefined ? "" : said}</p>
       <button
         type="button"
-        disabled={started.isPending || status?.running === true}
+        disabled={started.isPending || running}
         onClick={() => {
           started.mutate();
         }}
