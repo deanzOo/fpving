@@ -23,13 +23,12 @@ const relativeDay = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
  */
 export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[] }) => {
   const priced = trend.filter((price) => price !== null);
-  const [first] = priced;
-  if (first === undefined) {
+  const latest = priced.at(-1);
+  if (latest === undefined) {
     return <span className="text-sm text-ink-muted">No prices in the last {trend.length} days</span>;
   }
   const amounts = priced.map(({ amountMinor }) => amountMinor);
-  const money = (amountMinor: number) => formatMoney({ amountMinor, currency: first.currency });
-  const latest = priced.reduce((_earlier, price) => price, first);
+  const money = (amountMinor: number) => formatMoney({ amountMinor, currency: latest.currency });
   const name = `Last ${String(trend.length)} days: lowest ${money(Math.min(...amounts))}, highest `
     + `${money(Math.max(...amounts))}, latest ${formatMoney(latest)}, ${String(priced.length)} days with a price`;
   const data = trend.map((price, day) => ({ day, amountMinor: price?.amountMinor ?? null }));
