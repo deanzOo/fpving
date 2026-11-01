@@ -12,13 +12,13 @@ export default defineConfig({
   test: {
     reporters: ["default", new SpecReporter()],
     projects: [
-      { extends: true, test: { name: "core", root: "packages/core", include: ["test/**/*.test.ts"] } },
-      { extends: true, test: { name: "plugin-sdk", root: "packages/plugin-sdk", include: ["test/**/*.test.ts"] } },
+      { extends: true, test: { name: "core", dir: "packages/core", include: ["test/**/*.test.ts"] } },
+      { extends: true, test: { name: "plugin-sdk", dir: "packages/plugin-sdk", include: ["test/**/*.test.ts"] } },
       {
         extends: true,
         test: {
           name: "app",
-          root: "apps/fpving",
+          dir: "apps/fpving",
           include: ["test/**/*.test.ts"],
           exclude: [...configDefaults.exclude, E2E_TESTS],
         },
@@ -27,7 +27,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "e2e",
-          root: "apps/fpving",
+          dir: "apps/fpving",
           include: [E2E_TESTS],
           globalSetup: [fileURLToPath(new URL("apps/fpving/test/e2e/build-ui.ts", import.meta.url))],
           testTimeout: E2E_TIMEOUT_MS,
