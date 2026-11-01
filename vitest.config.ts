@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { configDefaults, defineConfig } from "vitest/config";
 import { SpecReporter } from "./tools/spec-reporter.ts";
 
@@ -28,7 +29,7 @@ export default defineConfig({
           name: "e2e",
           root: "apps/fpving",
           include: [E2E_TESTS],
-          globalSetup: ["test/e2e/build-ui.ts"],
+          globalSetup: [fileURLToPath(new URL("apps/fpving/test/e2e/build-ui.ts", import.meta.url))],
           testTimeout: E2E_TIMEOUT_MS,
           hookTimeout: E2E_TIMEOUT_MS,
         },
