@@ -15,7 +15,7 @@ The full guide is [CONTRIBUTING.md](https://github.com/deanzoo/fpving/blob/main/
 
 ## End-to-end journey
 
-`pnpm test` includes the `e2e` project, which builds the UI, starts the app in process with fake LLM, rates and notifier, and drives Chromium from adding a product to its price drop alert. Run it alone with `pnpm vitest run --project e2e`; `FPVING_E2E_HEADED=1` shows the browser. See [ADR 0029](../adr/0029-in-process-e2e-with-vitest-and-the-playwright-library/).
+`pnpm test` includes the `e2e` project, which builds the UI, starts the app in process with fake LLM, rates and notifier, and drives Chromium from adding a product to its price drop alert. Run it alone with `pnpm vitest run --project e2e`; `FPVING_E2E_HEADED=1` shows the browser. It stays out of the coverage run (`verify` runs it as `pnpm test:e2e`). Its setup empties and rebuilds `apps/ui/dist/web`, which a running app or dev server serving that folder briefly loses, and in watch mode it builds once per session, so restart Vitest after a UI change. See [ADR 0029](../adr/0029-in-process-e2e-with-vitest-and-the-playwright-library/).
 
 ## Rules in brief
 
