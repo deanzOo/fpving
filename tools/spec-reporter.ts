@@ -24,6 +24,7 @@ const PROJECT_TITLES = new Map([
   ["core", "Core"],
   ["plugin-sdk", "Plugin SDK"],
   ["app", "App"],
+  ["e2e", "End to end"],
 ]);
 const INTERNAL_SUFFIX = ".internal.test.ts";
 const TEST_FILE_SUFFIX = /\.test\.ts$/;
