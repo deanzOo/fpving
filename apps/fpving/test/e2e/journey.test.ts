@@ -5,7 +5,7 @@ import { LlmVerdict, ok } from "@fpving/core";
 import { fakeCurrencyRates, fakeLlmJudge, fakeNotifier } from "@fpving/core/testing";
 import { chromium } from "playwright";
 import type { ConsoleMessage, Page } from "playwright";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { startApp } from "../../src/app/start.ts";
 import { PLUGINS_FILE } from "../../src/plugins/config.ts";
 import { freePort, FX } from "../support/app-fixtures.ts";
@@ -130,6 +130,14 @@ beforeAll(async () => {
   const page = context.pages()[0] ?? await context.newPage();
   await page.goto(app.address);
   journey = { page, address: app.address, server, notifier };
+});
+
+beforeEach(({ task, skip }) => {
+  const steps = task.suite?.tasks ?? [];
+  const unfinished = steps.slice(0, steps.indexOf(task)).find(({ result }) => result?.state !== "pass");
+  if (unfinished !== undefined) {
+    skip(`the journey's steps run in order, and "${unfinished.name}" did not pass`);
+  }
 });
 
 afterEach(() => {
