@@ -1,5 +1,6 @@
-import { ok } from "../../src/index.ts";
-import type { AlertNotification, Notifier, NotifyFailed, Result } from "../../src/index.ts";
+import { ok } from "@fpving/plugin-sdk";
+import type { Result } from "@fpving/plugin-sdk";
+import type { AlertNotification, Notifier, NotifyFailed } from "../ports/notifier.js";
 
 /** A {@link Notifier} that records every notification in `sent` and answers `answer`. */
 export const fakeNotifier = (

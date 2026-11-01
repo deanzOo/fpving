@@ -17,7 +17,7 @@ import {
 } from "../../src/index.ts";
 import type { LlmJudge, Repository } from "../../src/index.ts";
 import { similarity } from "../../src/matching/similarity.ts";
-import { fakeLlmJudge } from "../fakes/fake-llm.ts";
+import { fakeLlmJudge } from "../../src/testing/fake-llm.ts";
 import {
   EXACT,
   gateway,

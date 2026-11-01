@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { err, nextScanDue, ok, PortErrorKind, RatesRefresh, refreshRatesIfStale } from "../../src/index.ts";
 import type { FxTable, RatesUnavailable, Result } from "../../src/index.ts";
 import { fakeClock } from "../fakes/fake-clock.ts";
-import { fakeCurrencyRates } from "../fakes/fake-rates.ts";
+import { fakeCurrencyRates } from "../../src/testing/fake-rates.ts";
 import { fakeLogger } from "../fakes/fake-logger.ts";
 import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
 
