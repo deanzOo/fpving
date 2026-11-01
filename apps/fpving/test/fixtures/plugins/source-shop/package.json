@@ -1,0 +1,6 @@
+{
+  "name": "fixture-plugin-source-shop",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs"
+}
