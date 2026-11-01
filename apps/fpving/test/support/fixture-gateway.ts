@@ -28,9 +28,21 @@ export const CAPABLE_SHOP = pluginIdSchema.parse("capable-shop");
 /** When the fixture gateway's debug sink stamps its files. */
 export const FIXTURE_NOW = new Date("2026-10-29T10:11:12.345Z");
 
-const ORIGIN_ENV = "FPVING_FIXTURE_ORIGIN";
+/** The variable the fixture plugin reads the local server's origin from. */
+export const ORIGIN_ENV = "FPVING_FIXTURE_ORIGIN";
+
+/** The folder of the test-only plugin in `test/fixture-plugin`. */
+export const FIXTURE_PLUGIN_DIR = fileURLToPath(new URL("../fixture-plugin", import.meta.url));
+
 const LOAD_TIMEOUT_MS = 20_000;
-const FIXTURE_PLUGIN_DIR = fileURLToPath(new URL("../fixture-plugin", import.meta.url));
+
+/** The real HTTP client with the app's user agent, allowed to reach the local server, and no wait between requests. */
+export const localHttpClient = () => createFetchHttpClient({
+  fetch,
+  limiter: createDomainLimiter({ now: () => Date.now(), sleep: async () => Promise.resolve(), random: () => 0 }),
+  userAgent: createUserAgent(readAppVersion()),
+  allowPrivateHosts: true,
+});
 
 /** A gateway over real plugin workers that read the local server, and what a test needs to look behind it. */
 export interface FixtureGateway {
@@ -57,9 +69,7 @@ export const startFixtureGateway = async (extra: readonly PluginEntry[] = []): P
     throw new Error(`the fixture plugins.json was refused: ${config.error.detail}`);
   }
   const { services, mocks } = fakeServices();
-  const limiter = createDomainLimiter({ now: () => Date.now(), sleep: async () => Promise.resolve(), random: () => 0 });
-  const userAgent = createUserAgent(readAppVersion());
-  const http = createFetchHttpClient({ fetch, limiter, userAgent, allowPrivateHosts: true });
+  const http = localHttpClient();
   vi.stubEnv(ORIGIN_ENV, server.origin);
   const host = await startPluginHost({
     entries: config.value.entries,
