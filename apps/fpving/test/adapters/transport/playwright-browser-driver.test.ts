@@ -45,11 +45,17 @@ interface FakePageSpec {
   readonly closeError?: Error;
   readonly finalUrl?: string;
   readonly popups?: number;
+  readonly popupsWhileClosing?: number;
 }
 
-const fakePopup = (log: string[], opensNested: boolean): BrowserPageHandle => {
+const fakePopup = (
+  log: string[],
+  opensNested: boolean,
+  opener: BrowserPageHandle | null = null,
+): BrowserPageHandle => {
   const handlers: ((popup: BrowserPageHandle) => void)[] = [];
   const popup: BrowserPageHandle = {
+    opener: () => Promise.resolve(opener),
     goto: () => Promise.resolve(null),
     content: () => Promise.resolve(""),
     url: () => "about:blank",
@@ -77,7 +83,14 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
   let launches = 0;
   let contextCloses = 0;
   const popupHandlers: ((popup: BrowserPageHandle) => void)[] = [];
+  const pageHandlers: ((page: BrowserPageHandle) => void)[] = [];
+  const reportPage = (reported: BrowserPageHandle): void => {
+    for (const handler of pageHandlers) {
+      handler(reported);
+    }
+  };
   const page: BrowserPageHandle = {
+    opener: () => Promise.resolve(null),
     on: (_event, handler) => {
       popupHandlers.push(handler);
     },
@@ -101,9 +114,17 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
       return spec.contentError ? Promise.reject(spec.contentError) : Promise.resolve("<html>hi</html>");
     },
     url: () => spec.finalUrl ?? URL_OUT,
-    close: () => {
+    close: async () => {
+      for (let index = 0; index < (spec.popupsWhileClosing ?? 0); index += 1) {
+        for (const handler of popupHandlers) {
+          handler(fakePopup(log, false));
+        }
+      }
+      await Promise.resolve();
       log.push("page closed");
-      return spec.closeError ? Promise.reject(spec.closeError) : Promise.resolve();
+      if (spec.closeError) {
+        throw spec.closeError;
+      }
     },
   };
   const routes: { pattern: string; handler: (route: RouteHandle) => Promise<void> }[] = [];
@@ -119,7 +140,14 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
       log.push("route websockets");
       return Promise.resolve();
     },
-    newPage: () => Promise.resolve(page),
+    on: (_event, handler) => {
+      pageHandlers.push(handler);
+    },
+    newPage: async () => {
+      reportPage(page);
+      await Promise.resolve();
+      return page;
+    },
     close: () => {
       contextCloses += 1;
       return Promise.resolve();
@@ -150,6 +178,8 @@ const harness = (spec: FakePageSpec = {}, launchError?: Error, launchGate?: Prom
     seen,
     routes,
     socketRoutes,
+    page,
+    reportPage,
     launches: () => launches,
     contextCloses: () => contextCloses,
   };
@@ -196,6 +226,45 @@ describe("Rendering pages in the host browser", () => {
     await driver.fetchPage(URL_IN);
     expect(log.filter((entry) => entry === "popup closed")).toHaveLength(POPUPS_CLOSED);
     expect(log.at(-1)).toBe("page closed");
+  });
+
+  it("closes a popup reported to the page while the page is closing", async () => {
+    const { driver, log } = harness({ popupsWhileClosing: 1 });
+    await driver.fetchPage(URL_IN);
+    expect(log.filter((entry) => entry === "popup closed")).toHaveLength(1);
+  });
+
+  it("closes a popup reported to the page while the page is closing after navigation failed", async () => {
+    const { driver, log } = harness({ popupsWhileClosing: 1, gotoError: new Error("net::ERR_CONNECTION_REFUSED") });
+    await driver.fetchPage(URL_IN);
+    expect(log.filter((entry) => entry === "popup closed")).toHaveLength(1);
+  });
+
+  it("closes a popup reported to the page while closing the page fails", async () => {
+    const { driver, log } = harness({ popupsWhileClosing: 1, closeError: new Error("target closed") });
+    await driver.fetchPage(URL_IN);
+    expect(log.filter((entry) => entry === "popup closed")).toHaveLength(1);
+  });
+
+  it("closes a popup the browser reports only after its opener closed", async () => {
+    const { driver, log, reportPage } = harness();
+    await driver.fetchPage(URL_IN);
+    reportPage(fakePopup(log, false));
+    await expect.poll(() => log.filter((entry) => entry === "popup closed")).toHaveLength(1);
+  });
+
+  it("does not mistake the page a fetch is still opening for a popup whose opener closed", async () => {
+    const { driver, log } = harness();
+    expect(await driver.fetchPage(URL_IN)).toMatchObject({ ok: true });
+    expect(log.filter((entry) => entry === "page closed")).toHaveLength(1);
+  });
+
+  it("leaves a popup whose opener is still open to the fetch that owns the opener", async () => {
+    const { driver, log, page, reportPage } = harness();
+    await driver.fetchPage(URL_IN);
+    reportPage(fakePopup(log, false, page));
+    await driver.fetchPage(URL_IN);
+    expect(log).not.toContain("popup closed");
   });
 
   it("closes every popup the page opened when navigation fails", async () => {

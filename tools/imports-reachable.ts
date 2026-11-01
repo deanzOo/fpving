@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 
-const IMPORT = /^(?:import|export)\b[^;]*from "([^"]+)";$/gm;
+const IMPORT = /(?:^(?:import|export)\b[^;]*?\bfrom\s*|^import\s*|\bimport\s*\(\s*)(["'])([^"']+)\1/gmu;
 
 /**
- * Every bare package specifier and every relative module href reachable by following the static imports and
- * re-exports of `file`, so a test can prove a published entry never loads a package such as `vitest`.
+ * Every bare package specifier and every relative module href reachable by following the imports (static,
+ * side-effect and dynamic, in either quote style) and re-exports of `file`, so a test can prove a published entry
+ * never loads a package such as `vitest`.
  */
 export const importsReachableFrom = (file: URL, seen = new Set<string>()): Set<string> => {
-  for (const [, specifier = ""] of readFileSync(file, "utf8").matchAll(IMPORT)) {
+  for (const [, , specifier = ""] of readFileSync(file, "utf8").matchAll(IMPORT)) {
     if (!specifier.startsWith(".")) {
       seen.add(specifier);
       continue;

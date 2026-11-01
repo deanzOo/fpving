@@ -10,6 +10,7 @@
     "packages/*": { "project": ["src/**/*.ts"] },
     "packages/core": { "project": ["src/**/*.ts", "eval/**/*.ts"] },
     "apps/*": { "project": ["src/**/*.ts"] },
+    "apps/ui": { "project": ["src/**/*.{ts,tsx,css}", "test/**/*.{ts,tsx}"] },
     "apps/docs": { "project": ["*.ts", "src/**/*.ts", "src/**/*.{astro,mdx}"] }
   }
 }

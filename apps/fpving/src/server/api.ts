@@ -26,8 +26,10 @@ import { StoreErrorKind } from "@fpving/plugin-sdk";
 import { GatewayRefusal } from "../plugins/store-gateway.js";
 import { apiRoutes } from "./api-routes.js";
 import type { PluginRow, ScanStatus } from "./api-routes.js";
-import { apiError, ApiErrorKind } from "./errors.js";
-import { HttpStatus } from "./server.js";
+import type { PluginActivity } from "./plugin-rows.js";
+import { alreadyTrackedError, apiError, ApiErrorKind } from "./errors.js";
+import type { PlainErrorKind } from "./errors.js";
+import { HttpStatus } from "./http-status.js";
 import type { AppServer } from "./server.js";
 
 /** Why a settings change was not applied: the app is shutting down, or a plugin host failed to start or a save. */
@@ -41,8 +43,8 @@ export interface ApiRuntime {
   deps(): MatchDeps & SchedulerDeps;
   /** The running scan schedule. */
   scans(): SchedulerHandle;
-  /** The plugins screen rows. */
-  plugins(): readonly PluginRow[];
+  /** The plugins screen rows, given what the repository holds about the plugins now. */
+  plugins(activity: PluginActivity): readonly PluginRow[];
   /** Saves the settings and restarts what depends on them. */
   applySettings(settings: Settings): Promise<Result<void, SettingsChangeError>>;
   /** Whether a settings change is restarting the schedule or the plugins right now. */
@@ -71,7 +73,7 @@ const Message = {
 
 const failure = <S extends (typeof HttpStatus)[keyof typeof HttpStatus]>(
   status: S,
-  kind: ApiErrorKind,
+  kind: PlainErrorKind,
   message: string,
 ) => ({ status, body: apiError(kind, message) });
 
@@ -83,7 +85,10 @@ const addFailure = (error: AddProductError) => {
       return failure(HttpStatus.UnprocessableContent, error.kind, `no plugin handles ${error.host}`);
     case AddErrorKind.AlreadyTracked: {
       const { id, name } = error.product;
-      return failure(HttpStatus.Conflict, error.kind, `already tracked by product ${id} "${name}"`);
+      return {
+        status: HttpStatus.Conflict,
+        body: alreadyTrackedError({ id, name }, `already tracked by product ${id} "${name}"`),
+      };
     }
     case AddErrorKind.FetchFailed: {
       const { kind, detail } = error.error;
@@ -337,7 +342,11 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
 
   server.route({
     ...apiRoutes.listPlugins,
-    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send([...runtime().plugins()]),
+    handler: async (_request, reply) => {
+      const { repository, clock } = deps();
+      const [health, scanned] = await Promise.all([repository.pluginHealth.list(), repository.listings.listToScan()]);
+      return reply.code(HttpStatus.Ok).send([...runtime().plugins({ health, scanned, now: clock.now() })]);
+    },
   });
 
   server.route({

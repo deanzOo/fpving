@@ -2,6 +2,7 @@ import {
   AlertKind,
   alertSchema,
   err,
+  listingIdSchema,
   ListingOrigin,
   listingSchema,
   ListingStatus,
@@ -9,6 +10,7 @@ import {
   priceSnapshotSchema,
   productIdSchema,
   productSchema,
+  TREND_DAYS,
 } from "@fpving/core";
 import type { Alert } from "@fpving/core";
 import { StoreErrorKind } from "@fpving/plugin-sdk";
@@ -18,7 +20,8 @@ import { GatewayRefusal } from "../../src/plugins/store-gateway.ts";
 import { NOT_ATTACHED, registerApiRoutes } from "../../src/server/api.ts";
 import { apiRoutes } from "../../src/server/api-routes.ts";
 import { ApiErrorKind, apiErrorSchema } from "../../src/server/errors.ts";
-import { createServer, HttpStatus } from "../../src/server/server.ts";
+import { HttpStatus } from "../../src/server/http-status.ts";
+import { createServer } from "../../src/server/server.ts";
 import {
   API_HOST,
   API_PORT,
@@ -115,13 +118,17 @@ describe("Products API", () => {
     });
   });
 
-  it("answers 409 already_tracked naming the product that tracks the URL", async () => {
+  it("answers 409 already_tracked naming the product that tracks the URL, with its id and name", async () => {
     const first = await addProduct();
     const response = await api.request("POST", apiRoutes.addProduct.url, { url: PAGE });
     expect(response.statusCode).toBe(HttpStatus.Conflict);
-    const error = errorOf(response.json());
-    expect(error.kind).toBe(ApiErrorKind.AlreadyTracked);
-    expect(error.message).toBe(`already tracked by product ${first.product.id} "${LISTING.title}"`);
+    expect(response.json()).toEqual({
+      error: {
+        kind: ApiErrorKind.AlreadyTracked,
+        message: `already tracked by product ${first.product.id} "${LISTING.title}"`,
+        product: { id: first.product.id, name: LISTING.title },
+      },
+    });
   });
 
   it("answers a product with its listings and each listing's price history, oldest first", async () => {
@@ -138,6 +145,20 @@ describe("Products API", () => {
     expect(detail.listings[0]?.history[0]?.id).toBe(first?.id);
   });
 
+  it("answers each snapshot of a product's detail with its landed cost, the watchlist's cheapest price", async () => {
+    const settings = await api.repository.settings.get();
+    await api.repository.settings.save({ ...settings, displayCurrency: "USD" });
+    await api.scans.current.scanNow();
+    const { product } = await addProduct();
+    const detail = z.object({
+      listings: z.array(z.object({ history: z.array(z.object({ landedCost: z.unknown() })) })),
+    }).parse((await api.request("GET", `/api/products/${product.id}`)).json());
+    const [row] = z.array(z.object({ cheapest: z.object({ landedCost: z.unknown() }) }))
+      .parse((await api.request("GET", "/api/products")).json());
+    expect(detail.listings[0]?.history.at(-1)?.landedCost).toEqual(row?.cheapest.landedCost);
+    expect(row?.cheapest.landedCost).toMatchObject({ currency: "USD" });
+  });
+
   it("answers 404 product_not_found for an unknown product", async () => {
     const response = await api.request("GET", "/api/products/nope");
     expect(response.statusCode).toBe(HttpStatus.NotFound);
@@ -149,6 +170,8 @@ describe("Watchlist API", () => {
   const entries = z.array(z.object({
     product: z.object({ id: z.string() }),
     cheapest: z.object({ listingId: z.string(), landedCost: z.object({ currency: z.string() }) }).nullable(),
+    trend: z.array(z.object({ currency: z.string() }).nullable()),
+    unreadAlerts: z.int(),
   }));
   const watchlist = async () => entries.parse((await api.request("GET", "/api/products")).json());
 
@@ -161,6 +184,41 @@ describe("Watchlist API", () => {
     const listed = await watchlist();
     expect(listed.map(({ product, cheapest }) => [product.id, cheapest?.listingId, cheapest?.landedCost.currency]))
       .toEqual([[second.product.id, second.listing.id, "USD"], [first.product.id, first.listing.id, "USD"]]);
+  });
+
+  it("gives each watched product a daily trend ending at its cheapest price and its unread alert count", async () => {
+    const settings = await api.repository.settings.get();
+    await api.repository.settings.save({ ...settings, displayCurrency: "USD" });
+    await api.scans.current.scanNow();
+    await addProduct();
+    const [entry] = await watchlist();
+    expect(entry?.trend).toHaveLength(TREND_DAYS);
+    expect(entry?.cheapest).not.toBeNull();
+    expect(entry?.trend.at(-1)).toEqual(entry?.cheapest?.landedCost);
+    expect(entry?.unreadAlerts).toBe(0);
+  });
+
+  it("answers each product's unread alert count, which drops once an alert is read", async () => {
+    const { product, listing } = await addProduct();
+    const [snapshot] = await api.repository.snapshots.latestPerListing(product.id);
+    const first = "a-1";
+    const ids = [first, "a-2"];
+    for (const id of ids) {
+      await api.repository.alerts.save(alertSchema.parse({
+        id,
+        productId: product.id,
+        listingId: listing.id,
+        kind: AlertKind.BackInStock,
+        beforeSnapshotId: null,
+        afterSnapshotId: snapshot?.id,
+        createdAt: new Date(0),
+        readAt: null,
+      }));
+    }
+    expect((await watchlist()).map(({ unreadAlerts }) => unreadAlerts)).toEqual([ids.length]);
+    const read = await api.request("POST", `/api/alerts/${first}/read`);
+    expect(read.statusCode).toBe(HttpStatus.NoContent);
+    expect((await watchlist()).map(({ unreadAlerts }) => unreadAlerts)).toEqual([ids.length - 1]);
   });
 
   it("renames a product, answering 204", async () => {
@@ -255,11 +313,12 @@ describe("Listings API", () => {
       .toEqual({ status: HttpStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
-  it("answers 409 already_tracked naming the product for a URL another listing tracks", async () => {
+  it("answers 409 already_tracked with the id and name of the product for a URL another listing tracks", async () => {
     const { product } = await addProduct();
     const other = await addProduct(OTHER_PAGE);
     const response = await api.request("POST", `/api/products/${other.product.id}/listings`, { url: PAGE });
     expect(response.statusCode).toBe(HttpStatus.Conflict);
+    expect(response.json()).toMatchObject({ error: { product: { id: product.id, name: LISTING.title } } });
     expect(errorOf(response.json()).message).toContain(product.id);
   });
 
@@ -420,13 +479,16 @@ describe("Match candidates API", () => {
       .toEqual({ status: HttpStatus.NotFound, kind: ApiErrorKind.ProductNotFound });
   });
 
-  it("answers 409 already_tracked when a listing started tracking the candidate's URL", async () => {
-    const id = await pendingId();
-    await addProduct(MATCH);
-    const response = await api.request("POST", `/api/candidates/${id}/accept`);
-    expect(response.statusCode).toBe(HttpStatus.Conflict);
-    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.AlreadyTracked);
-  });
+  it("answers 409 already_tracked with the tracking product when a listing started tracking the candidate's URL",
+    async () => {
+      const id = await pendingId();
+      const tracking = await addProduct(MATCH);
+      const response = await api.request("POST", `/api/candidates/${id}/accept`);
+      expect(response.statusCode).toBe(HttpStatus.Conflict);
+      expect(response.json()).toMatchObject({
+        error: { kind: ApiErrorKind.AlreadyTracked, product: { id: tracking.product.id, name: LISTING.title } },
+      });
+    });
 });
 
 describe("Alerts API", () => {
@@ -527,9 +589,27 @@ describe("Settings API", () => {
 
 describe("Plugins API", () => {
   it("answers the runtime's plugin rows", async () => {
-    api.rows.current = [{ source: "plugins.json", manifest: null, status: "disabled", issues: [] }];
+    api.rows.current = [
+      { source: "plugins.json", manifest: null, status: "disabled", issues: [], backoffUntil: null, staleListings: 0 },
+    ];
     const response = await api.request("GET", apiRoutes.listPlugins.url);
     expect(response.json()).toEqual(api.rows.current);
+  });
+
+  it("builds the rows from every plugin's health and the listings a scan fetches, as of now", async () => {
+    const { listing } = await addProduct();
+    const stale = { status: ListingStatus.Stale, failureStreak: 1, notFoundStreak: 0 };
+    await api.repository.listings.updateStatus(listingIdSchema.parse(listing.id), stale);
+    const health = { pluginId: SHOP, consecutiveBlocks: 1, backoffUntil: null };
+    await api.repository.pluginHealth.upsert(health);
+    const { clock } = api.runtime.deps();
+    const before = clock.now();
+    await api.request("GET", apiRoutes.listPlugins.url);
+    const after = clock.now();
+    const [activity] = api.runtime.plugins.mock.lastCall ?? [];
+    expect(activity).toMatchObject({ health: [health], scanned: [{ id: listing.id, status: ListingStatus.Stale }] });
+    expect(activity?.now.getTime()).toBeGreaterThan(before.getTime());
+    expect(activity?.now.getTime()).toBeLessThan(after.getTime());
   });
 });
 

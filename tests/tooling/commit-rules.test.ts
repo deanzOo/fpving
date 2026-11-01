@@ -14,7 +14,7 @@ async function check(message: string) {
   });
 }
 
-describe("commit rules", () => {
+describe("Commit rules", () => {
   it("accepts a typed and scoped subject", async () => {
     expect((await check("feat(core): add money type")).valid).toBe(true);
   });

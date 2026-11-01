@@ -1,33 +1,20 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { inspect } from "node:util";
 import type { Logger } from "@fpving/core";
+import fastifyStatic from "@fastify/static";
 import fastify from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { apiError, ApiErrorKind } from "./errors.js";
+import { HttpStatus } from "./http-status.js";
 
 /** The only address the server binds. */
 export const LOOPBACK_HOST = "127.0.0.1";
 
 /** The largest request body accepted, 64 KiB; JSON commands are far smaller. */
 export const MAX_REQUEST_BODY_BYTES = 65_536;
-
-/** Every status the server answers with, from the shell and from the routes. */
-export const HttpStatus = {
-  Ok: 200,
-  Created: 201,
-  Accepted: 202,
-  NoContent: 204,
-  BadRequest: 400,
-  Forbidden: 403,
-  NotFound: 404,
-  Conflict: 409,
-  MisdirectedRequest: 421,
-  UnprocessableContent: 422,
-  InternalServerError: 500,
-  BadGateway: 502,
-  ServiceUnavailable: 503,
-} as const;
 
 /** The bodies of guard refusals. */
 export const GuardRefusal = {
@@ -47,6 +34,31 @@ export const INTERNAL_ERROR = "internal error";
 /** What a path no route serves answers. */
 export const NO_ROUTE = "no route serves this method and path";
 
+/** What a UI path answers when the UI folder has no index page. */
+export const UI_NOT_BUILT = "the UI is not built; run pnpm build";
+
+/** The policy every answer carries: only this origin's own scripts, styles and requests, and no framing. */
+export const CONTENT_SECURITY_POLICY
+  = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'";
+
+const SECURITY_HEADERS = {
+  "content-security-policy": CONTENT_SECURITY_POLICY,
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+} as const;
+
+const INDEX_PAGE = "index.html";
+const PAGE_METHODS: readonly string[] = ["GET", "HEAD"];
+
+const HEX_RADIX = 16;
+const PERCENT_ESCAPE = /%([0-9a-f]{2})/giu;
+
+// The router matches the percent-decoded path, so an API request is classified on that too.
+const isApiRequest = (url: string): boolean => {
+  const decoded = url.replace(PERCENT_ESCAPE, (_escape, hex: string) => String.fromCharCode(parseInt(hex, HEX_RADIX)));
+  return /^\/api(?:[/?]|$)/u.test(decoded);
+};
+
 const LOCAL_HOSTNAMES = [LOOPBACK_HOST, "localhost"] as const;
 const READ_METHODS: readonly string[] = ["GET", "HEAD", "OPTIONS"];
 const HTTP_SCHEME = "http://";
@@ -63,6 +75,8 @@ export interface ServerOptions {
   readonly isReady: () => boolean;
   /** Paths served while starting, such as the health route. */
   readonly openWhileStarting: readonly string[];
+  /** The built UI's folder, served on every non-API GET; the index page answers paths no file matches. */
+  readonly uiRoot?: string;
 }
 
 const FIRST_CLIENT_ERROR = 400;
@@ -74,26 +88,30 @@ const clientErrorSchema = z.object({
 
 /**
  * Creates the Fastify server with the Zod type provider, the localhost guards and a readiness gate, without routes.
- * Until `isReady()` is true every route but those in `openWhileStarting`, unknown paths included, answers 503 with
- * {@link STARTING}, after the guards. A request whose
- * Host header is not `127.0.0.1:<port>` or `localhost:<port>` is refused with 421, which defeats DNS rebinding. A
- * request with a method other than GET, HEAD or OPTIONS that carries an `Origin` other than its own is refused with
- * 403, and so is one without `Origin` whose `Sec-Fetch-Site` is `cross-site` or `same-site`; one with neither, such as
- * from curl, is served. No CORS header is ever sent. Bodies over {@link MAX_REQUEST_BODY_BYTES} get 413. A 4xx error
- * Fastify raised (validation, body limit, content type) answers its message; another 4xx keeps its status, answers
- * {@link CLIENT_ERROR} and logs its message; any other error answers 500 with {@link INTERNAL_ERROR} and logs it. An
- * unknown path answers 404. Every refusal is an {@link apiError} envelope.
+ * Until `isReady()` is true every `/api` path but those in `openWhileStarting`, unknown ones included, answers 503
+ * with {@link STARTING}, after the guards; the UI is served meanwhile. With `uiRoot`, a GET or HEAD outside `/api`
+ * serves the file it names from that folder, or the index page when none matches, or {@link UI_NOT_BUILT} when the
+ * folder had no index page when the server was created. Every answer carries {@link CONTENT_SECURITY_POLICY},
+ * `nosniff` and `no-referrer`. A request whose Host header is not `127.0.0.1:<port>` or `localhost:<port>` is refused
+ * with 421, which defeats DNS rebinding. A request with a method other than GET, HEAD or OPTIONS that carries an
+ * `Origin` other than its own is refused with 403, and so is one without `Origin` whose `Sec-Fetch-Site` is
+ * `cross-site` or `same-site`; one with neither, such as from curl, is served. No CORS header is ever sent. Bodies
+ * over {@link MAX_REQUEST_BODY_BYTES} get 413. A 4xx error Fastify raised (validation, body limit, content type)
+ * answers its message; another 4xx keeps its status, answers {@link CLIENT_ERROR} and logs its message; any other
+ * error answers 500 with {@link INTERNAL_ERROR} and logs it. An unknown path answers 404. Every refusal is an
+ * {@link apiError} envelope.
  *
- * @param options - The port and the logger.
+ * @param options - The port, the logger, the readiness check and the UI folder.
  * @returns The server, not yet listening.
  */
 export const createServer = (options: ServerOptions) => {
-  const { port, logger, isReady, openWhileStarting } = options;
+  const { port, logger, isReady, openWhileStarting, uiRoot } = options;
   const allowedHosts: readonly string[] = LOCAL_HOSTNAMES.map((name) => `${name}:${String(port)}`);
   const server = fastify({ logger: false, bodyLimit: MAX_REQUEST_BODY_BYTES }).withTypeProvider<ZodTypeProvider>();
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
   server.addHook("onRequest", async (request, reply) => {
+    reply.headers(SECURITY_HEADERS);
     const host = request.host.toLowerCase();
     if (!allowedHosts.includes(host)) {
       const refusal = apiError(ApiErrorKind.MisdirectedRequest, GuardRefusal.Host);
@@ -105,7 +123,7 @@ export const createServer = (options: ServerOptions) => {
     if (!READ_METHODS.includes(request.method) && foreign) {
       return reply.status(HttpStatus.Forbidden).send(apiError(ApiErrorKind.CrossOrigin, GuardRefusal.Origin));
     }
-    if (!isReady() && !openWhileStarting.includes(request.routeOptions.url ?? "")) {
+    if (!isReady() && isApiRequest(request.url) && !openWhileStarting.includes(request.routeOptions.url ?? "")) {
       return reply.status(HttpStatus.ServiceUnavailable).send(apiError(ApiErrorKind.Starting, STARTING));
     }
     return undefined;
@@ -123,8 +141,19 @@ export const createServer = (options: ServerOptions) => {
     logger.error("request failed", { method: request.method, url: request.url, detail: inspect(error) });
     return reply.status(HttpStatus.InternalServerError).send(apiError(ApiErrorKind.Internal, INTERNAL_ERROR));
   });
-  server.setNotFoundHandler(async (_request, reply) =>
-    reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, NO_ROUTE)));
+  const indexBuilt = uiRoot !== undefined && existsSync(join(uiRoot, INDEX_PAGE));
+  if (uiRoot !== undefined) {
+    void server.register(fastifyStatic, { root: uiRoot, dotfiles: "ignore" });
+  }
+  server.setNotFoundHandler(async (request, reply) => {
+    if (uiRoot === undefined || !PAGE_METHODS.includes(request.method) || isApiRequest(request.url)) {
+      return reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, NO_ROUTE));
+    }
+    if (!indexBuilt) {
+      return reply.status(HttpStatus.NotFound).send(apiError(ApiErrorKind.NotFound, UI_NOT_BUILT));
+    }
+    return reply.sendFile(INDEX_PAGE);
+  });
   return server;
 };
 

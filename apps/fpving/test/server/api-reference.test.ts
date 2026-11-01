@@ -28,6 +28,12 @@ describe("HTTP API reference page", () => {
     expect(page).toContain("#### Response 404\n\nThe error envelope.");
   });
 
+  it("shows that an already_tracked error also names the product that tracks the URL", () => {
+    const envelope = renderApiReference().split("## GET /api/products")[0] ?? "";
+    expect(envelope).toContain("\"const\": \"already_tracked\"");
+    expect(envelope).toContain("\"product\": {");
+  });
+
   it("describes dates as ISO date-time strings", () => {
     expect(renderApiReference()).toContain("\"format\": \"date-time\"");
   });

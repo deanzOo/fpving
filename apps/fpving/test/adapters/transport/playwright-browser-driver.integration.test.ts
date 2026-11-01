@@ -13,6 +13,7 @@ import { NOT_FOUND, startLocalServer } from "../../support/local-server.ts";
 import type { LocalServer } from "../../support/local-server.ts";
 
 const BROWSER_TIMEOUT_MS = 60_000;
+const SETTLE_TIMEOUT_MS = 10_000;
 const OK = 200;
 const RENDERED_HTML_MARKER = "<h1 id=\"title\">rendered</h1>";
 const OPENER_AND_POPUP = 2;
@@ -91,7 +92,7 @@ describe.skipIf(!chromiumInstalled)(
       BROWSER_TIMEOUT_MS,
     );
 
-    describe("with a page that opens a popup", () => {
+    describe("With a page that opens a popup", () => {
       let popupProfile: string;
       let popupDriver: ClosableBrowserDriver;
       let opened: BrowserContext | undefined;
@@ -120,18 +121,31 @@ describe.skipIf(!chromiumInstalled)(
       }, BROWSER_TIMEOUT_MS);
 
       it(
-        "leaves only the pages the context started with once the fetch returns",
+        "leaves only the pages the context started with once the popup the page opened is reported",
         async () => {
           const result = await popupDriver.fetchPage(`${server.origin}/popup-opener`);
           expect(result).toMatchObject({ ok: true, value: { status: OK } });
-          expect(pagesSeen).toHaveLength(OPENER_AND_POPUP);
-          expect(opened?.pages()).toEqual(startingPages);
+          await expect.poll(() => pagesSeen, { timeout: SETTLE_TIMEOUT_MS }).toHaveLength(OPENER_AND_POPUP);
+          await expect.poll(() => opened?.pages(), { timeout: SETTLE_TIMEOUT_MS }).toEqual(startingPages);
+        },
+        BROWSER_TIMEOUT_MS,
+      );
+
+      it(
+        "closes a popup that the browser reports only after the fetch has closed its opener",
+        async () => {
+          const result = await popupDriver.fetchPage(`${server.origin}/late-popup-opener`);
+          expect(result).toMatchObject({ ok: true, value: { status: OK } });
+          server.releaseLatePopup();
+          const reported = () => pagesSeen.map((page) => new URL(page.url()).pathname);
+          await expect.poll(reported, { timeout: SETTLE_TIMEOUT_MS }).toContain("/late-popup");
+          await expect.poll(() => opened?.pages(), { timeout: SETTLE_TIMEOUT_MS }).toEqual(startingPages);
         },
         BROWSER_TIMEOUT_MS,
       );
     });
 
-    describe("with a page on a public name whose requests aim at a private host", () => {
+    describe("With a page on a public name whose requests aim at a private host", () => {
       let privateServer: LocalServer;
       let pageServer: LocalServer;
       let strict: ClosableBrowserDriver;

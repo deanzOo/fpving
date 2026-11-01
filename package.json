@@ -8,7 +8,8 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && pnpm --filter @fpving/ui build",
+    "dev": "tsc -b && node tools/dev-cli.ts",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
@@ -35,7 +36,7 @@
     "@fpving/core": "workspace:*",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "24.19.2",
-    "@vitest/coverage-v8": "5.0.4",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "10.12.0",
     "eslint-plugin-jsdoc": "65.3.1",
     "eslint-plugin-tsdoc": "0.5.4",
@@ -46,7 +47,8 @@
     "license-checker-rseidelsohn": "5.0.1",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",
-    "vitest": "5.0.4",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
     "yaml": "2.9.1"
   },
   "pnpm": {

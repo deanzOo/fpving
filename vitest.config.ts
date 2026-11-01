@@ -12,6 +12,7 @@ export default defineConfig({
       { extends: true, test: { name: "core", root: "packages/core", include: ["test/**/*.test.ts"] } },
       { extends: true, test: { name: "plugin-sdk", root: "packages/plugin-sdk", include: ["test/**/*.test.ts"] } },
       { extends: true, test: { name: "app", root: "apps/fpving", include: ["test/**/*.test.ts"] } },
+      "apps/ui/vite.config.ts",
       { extends: true, test: { name: "tooling", include: ["tests/tooling/**/*.test.ts", "tools/**/*.test.ts"] } },
     ],
     coverage: {
@@ -19,6 +20,7 @@ export default defineConfig({
       include: ["packages/*/src/**", "packages/core/eval/**/*.ts", "apps/*/src/**", "tools/**"],
       exclude: [
         "**/*.test.ts",
+        "**/*.test.tsx",
         "**/fixtures/**",
         "packages/*/src/index.ts",
         "packages/plugin-sdk/src/contract/index.ts",
@@ -26,6 +28,7 @@ export default defineConfig({
         "packages/core/src/testing/index.ts",
         "apps/*/src/index.ts",
         "apps/fpving/src/main.ts",
+        "apps/ui/src/main.tsx",
         "apps/fpving/src/adapters/transport/launch-chromium.ts",
         "apps/fpving/src/plugins/runtime/worker-entry.ts",
         "tools/*-cli.ts",

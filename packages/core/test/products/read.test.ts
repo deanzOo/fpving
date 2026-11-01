@@ -2,6 +2,8 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import {
   AddErrorKind,
+  alertIdSchema,
+  AlertKind,
   DEFAULT_SETTINGS,
   err,
   landedCost,
@@ -12,10 +14,12 @@ import {
   productDetail,
   productIdSchema,
   settingsSchema,
+  TREND_DAYS,
   watchlist,
 } from "../../src/index.ts";
 import type { Listing, PriceSnapshot, Product, Repository } from "../../src/index.ts";
 import { daysAgo, listing, NOW, rates, snapshot } from "../alerts/builders.ts";
+import { fakeClock } from "../fakes/fake-clock.ts";
 import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
 
 const CHEAP = 5000;
@@ -23,6 +27,10 @@ const DEAR = 9000;
 const TIE_USD_MINOR = 1001;
 const TIE_ILS_MINOR = 3604;
 const OLDER_DAYS = 2;
+const LONG_AGO_DAYS = 40;
+const DROP_DAYS = 10;
+const FIRST_DAYS = 5;
+const SECOND_DAYS = 3;
 const settings = settingsSchema.parse(DEFAULT_SETTINGS);
 
 const product = (id: string, createdAt: Date): Product => ({
@@ -58,6 +66,11 @@ const landed = (row: PriceSnapshot) => {
   return cost.value;
 };
 
+const clock = fakeClock(NOW);
+
+const trendOf = (pointsFrom: (daysAgoAtPoint: number) => ReturnType<typeof landed> | null) =>
+  Array.from({ length: TREND_DAYS }, (_, index) => pointsFrom(TREND_DAYS - 1 - index));
+
 const withRates = async (): Promise<Repository> => {
   const repository = inMemoryRepository();
   await repository.fxRates.save(rates);
@@ -76,7 +89,7 @@ describe("The watchlist", () => {
     await watched(repository, product("p2", daysAgo(1)), [[listing("l3"), only]]);
     await watched(repository, product("p3", NOW), [[listing("l4"), snapshot("s4", "l4")]]);
     await repository.products.archive(productIdSchema.parse("p3"), NOW);
-    const entries = await watchlist({ repository });
+    const entries = await watchlist({ repository, clock });
     expect(entries.map(({ product: row, cheapest }) => [row.id, cheapest])).toEqual([
       ["p2", { listingId: "l3", landedCost: landed(only) }],
       ["p1", { listingId: "l1", landedCost: landed(cheap) }],
@@ -95,7 +108,7 @@ describe("The watchlist", () => {
       [listing("l6"), snapshot("s6", "l6", { itemPrice: { amountMinor: CHEAP, currency: "JPY" } })],
     ]);
     const expected = { listingId: "l1", landedCost: landed(priced) };
-    expect(await watchlist({ repository })).toMatchObject([{ cheapest: expected }]);
+    expect(await watchlist({ repository, clock })).toMatchObject([{ cheapest: expected }]);
   });
 
   it("picks the cheapest on the exact landed cost, as alerts do, and rounds only the price it shows", async () => {
@@ -105,7 +118,7 @@ describe("The watchlist", () => {
       [listing("l1"), snapshot("s1", "l1", { itemPrice: { amountMinor: TIE_ILS_MINOR, currency: "ILS" } })],
       [listing("l2", { addedAt: NOW }), exactlyCheaper],
     ]);
-    expect(await watchlist({ repository })).toMatchObject([
+    expect(await watchlist({ repository, clock })).toMatchObject([
       { cheapest: { listingId: "l2", landedCost: landed(exactlyCheaper) } },
     ]);
   });
@@ -113,13 +126,79 @@ describe("The watchlist", () => {
   it("has no cheapest price for a product none of whose listings can be priced", async () => {
     const repository = await withRates();
     await watched(repository, product("p1", NOW), [[listing("l1"), snapshot("s1", "l1", { inStock: false })]]);
-    expect(await watchlist({ repository })).toMatchObject([{ cheapest: null }]);
+    expect(await watchlist({ repository, clock })).toMatchObject([{ cheapest: null }]);
   });
 
   it("has no cheapest price for a product before any exchange rates were fetched", async () => {
     const repository = inMemoryRepository();
     await watched(repository, product("p1", NOW), [[listing("l1"), snapshot("s1", "l1")]]);
-    expect(await watchlist({ repository })).toMatchObject([{ cheapest: null }]);
+    expect(await watchlist({ repository, clock })).toMatchObject([{ cheapest: null }]);
+  });
+});
+
+describe("The watchlist trend", () => {
+  it("has the cheapest landed price once a day for 30 days, oldest first, ending at the cheapest price", async () => {
+    const repository = await withRates();
+    const dear = snapshot("s1", "l1", { ...price(DEAR), observedAt: daysAgo(LONG_AGO_DAYS) });
+    const cheap = snapshot("s2", "l1", { ...price(CHEAP), observedAt: daysAgo(DROP_DAYS) });
+    await watched(repository, product("p1", NOW), [[listing("l1"), dear]]);
+    await repository.snapshots.append(cheap);
+    const [entry] = await watchlist({ repository, clock });
+    expect(entry?.trend).toEqual(trendOf((days) => landed(days > DROP_DAYS ? dear : cheap)));
+    expect(entry?.trend.at(-1)).toEqual(entry?.cheapest?.landedCost);
+  });
+
+  it("counts a listing only from the day of its first snapshot, with no price on a day none qualifies", async () => {
+    const repository = await withRates();
+    const first = snapshot("s1", "l1", { ...price(DEAR), observedAt: daysAgo(FIRST_DAYS) });
+    const second = snapshot("s2", "l2", { ...price(CHEAP), observedAt: daysAgo(SECOND_DAYS) });
+    await watched(repository, product("p1", NOW), [[listing("l1"), first], [listing("l2"), second]]);
+    const [entry] = await watchlist({ repository, clock });
+    expect(entry?.trend).toEqual(trendOf((days) => {
+      if (days > FIRST_DAYS) {
+        return null;
+      }
+      return landed(days > SECOND_DAYS ? first : second);
+    }));
+  });
+
+  it("has no price on any day for a product whose listings are all gone", async () => {
+    const repository = await withRates();
+    const gone = listing("l1", { status: ListingStatus.Gone });
+    await watched(repository, product("p1", NOW), [[gone, snapshot("s1", "l1")]]);
+    expect(await watchlist({ repository, clock })).toMatchObject([{ cheapest: null, trend: trendOf(() => null) }]);
+  });
+
+  it("has no price on any day before any exchange rates were fetched", async () => {
+    const repository = inMemoryRepository();
+    await watched(repository, product("p1", NOW), [[listing("l1"), snapshot("s1", "l1")]]);
+    expect(await watchlist({ repository, clock })).toMatchObject([{ trend: trendOf(() => null) }]);
+  });
+});
+
+describe("The watchlist alert badge", () => {
+  it("counts each product's unread alerts, ignoring read ones", async () => {
+    const repository = await withRates();
+    await watched(repository, product("p1", daysAgo(1)), [[listing("l1"), snapshot("s1", "l1")]]);
+    await watched(repository, product("p2", NOW), [[listing("l2"), snapshot("s2", "l2")]]);
+    const alerts = [["a1", null], ["a2", null], ["a3", NOW]] as const;
+    for (const [id, readAt] of alerts) {
+      await repository.alerts.save({
+        id: alertIdSchema.parse(id),
+        productId: productIdSchema.parse("p1"),
+        listingId: listingIdSchema.parse("l1"),
+        kind: AlertKind.PriceDrop,
+        beforeSnapshotId: null,
+        afterSnapshotId: snapshot("s1", "l1").id,
+        createdAt: NOW,
+        readAt,
+      });
+    }
+    const entries = await watchlist({ repository, clock });
+    expect(entries.map(({ product: row, unreadAlerts }) => [row.id, unreadAlerts])).toEqual([
+      ["p2", 0],
+      ["p1", alerts.filter(([, readAt]) => readAt === null).length],
+    ]);
   });
 });
 
@@ -136,6 +215,31 @@ describe("A product's detail", () => {
     expect(detail.ok && detail.value.listings.map(({ listing: l, history }) => [l.id, history.map((s) => s.id)]))
       .toEqual([["l1", ["s1", "s3"]], ["l2", ["s2"]]]);
     expect(detail.ok && detail.value.product).toEqual(row);
+  });
+
+  it("prices each snapshot at its landed cost in the display currency over the latest rates", async () => {
+    const repository = await withRates();
+    const row = product("p1", NOW);
+    const priced = snapshot("s1", "l1", price(CHEAP));
+    await watched(repository, row, [[listing("l1"), priced]]);
+    const detail = await productDetail({ repository }, row.id);
+    const [entry] = detail.ok ? detail.value.listings.flatMap(({ history }) => history) : [];
+    expect(entry).toEqual({ ...priced, landedCost: landed(priced) });
+    expect(entry?.landedCost?.currency).toBe(settings.displayCurrency);
+  });
+
+  it.each([
+    ["shipping is unknown", snapshot("s1", "l1", { shipping: { kind: ShippingKind.Unknown } }), true],
+    ["a rate is missing", snapshot("s1", "l1", { itemPrice: { amountMinor: CHEAP, currency: "EUR" } }), true],
+    ["the snapshot was quoted for another ship-to country", snapshot("s1", "l1", { shipTo: "DE" }), true],
+    ["no rates were stored yet", snapshot("s1", "l1"), false],
+  ] as const)("prices a snapshot at null when %s", async (_label, unpriced, storeRates) => {
+    const repository = storeRates ? await withRates() : inMemoryRepository();
+    const row = product("p1", NOW);
+    await watched(repository, row, [[listing("l1"), unpriced]]);
+    const detail = await productDetail({ repository }, row.id);
+    expect(detail.ok && detail.value.listings.flatMap(({ history }) => history.map((s) => s.landedCost)))
+      .toEqual([null]);
   });
 
   it("leaves removed listings out", async () => {

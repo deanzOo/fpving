@@ -47,6 +47,8 @@ export interface LocalServer {
   readonly origin: string;
   /** The path of every request the server received, in order. */
   readonly requests: readonly string[];
+  /** Answers every `/late-popup` request, held until now, and the ones after it. */
+  releaseLatePopup(): void;
   close(): Promise<void>;
 }
 
@@ -62,8 +64,14 @@ const socketPage = (target: string): string => [
 
 const POPUP_OPENER_HTML = "<!doctype html><html><body><script>window.open(\"/popup-target\");</script></body></html>";
 const POPUP_TARGET_HTML = "<!doctype html><html><body>popup</body></html>";
+const LATE_POPUP_OPENER_HTML = "<!doctype html><html><body><script>window.open('/late-popup');</script></body></html>";
 
-const respond = (request: IncomingMessage, response: ServerResponse, target: string): void => {
+const respond = (
+  request: IncomingMessage,
+  response: ServerResponse,
+  target: string,
+  latePopup: Promise<void>,
+): void => {
   const url = new URL(request.url ?? "/", "http://fixture");
   const fixturePage = FIXTURE_PAGES[url.pathname];
   if (fixturePage !== undefined) {
@@ -79,6 +87,16 @@ const respond = (request: IncomingMessage, response: ServerResponse, target: str
     case "/popup-opener":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
       response.end(POPUP_OPENER_HTML);
+      return;
+    case "/late-popup-opener":
+      response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
+      response.end(LATE_POPUP_OPENER_HTML);
+      return;
+    case "/late-popup":
+      void latePopup.then(() => {
+        response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
+        response.end(POPUP_TARGET_HTML);
+      });
       return;
     case "/popup-target":
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
@@ -127,16 +145,20 @@ export interface LocalServerOptions {
 
 /**
  * Serves the fixture page, the fixture plugin's product, unparseable product and search pages, a page that opens a
- * popup with `window.open`, a redirect to it, a user agent echo, a 404, a request that never answers, a page whose
- * subresources load from `options.target`, a page that opens a WebSocket to `options.target` and reports
- * `/socket-done` once it closes, and a redirect to `options.target`. WebSocket upgrades are logged as
- * `upgrade <path>` and refused.
+ * popup with `window.open`, a redirect to it, a user agent echo, a 404, a request that never answers, a page that opens
+ * a popup whose response waits for {@link LocalServer.releaseLatePopup}, a page whose subresources load from
+ * `options.target`, a page that opens a WebSocket to `options.target` and reports `/socket-done` once it closes, and a
+ * redirect to `options.target`. WebSocket upgrades are logged as `upgrade <path>` and refused.
  */
 export const startLocalServer = async (options: LocalServerOptions = {}): Promise<LocalServer> => {
   const requests: string[] = [];
+  let releaseLatePopup: () => void = () => undefined;
+  const latePopup = new Promise<void>((resolve) => {
+    releaseLatePopup = resolve;
+  });
   const server = createServer((request, response) => {
     requests.push(request.url ?? "");
-    respond(request, response, options.target ?? "");
+    respond(request, response, options.target ?? "", latePopup);
   });
   server.on("upgrade", (request: IncomingMessage, socket: Duplex) => {
     requests.push(`upgrade ${request.url ?? ""}`);
@@ -146,6 +168,7 @@ export const startLocalServer = async (options: LocalServerOptions = {}): Promis
   return {
     origin,
     requests,
+    releaseLatePopup,
     close: async () =>
       new Promise((resolve, reject) => {
         server.closeAllConnections();

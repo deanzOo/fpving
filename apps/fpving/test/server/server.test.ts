@@ -4,7 +4,6 @@ import {
   createServer,
   GuardRefusal,
   CLIENT_ERROR,
-  HttpStatus,
   INTERNAL_ERROR,
   MAX_REQUEST_BODY_BYTES,
   NO_ROUTE,
@@ -12,6 +11,7 @@ import {
 } from "../../src/server/server.ts";
 import type { AppServer } from "../../src/server/server.ts";
 import { apiError, ApiErrorKind, apiErrorSchema } from "../../src/server/errors.ts";
+import { HttpStatus } from "../../src/server/http-status.ts";
 import { recordingLogger } from "../support/recording-logger.ts";
 
 const PORT = 4321;

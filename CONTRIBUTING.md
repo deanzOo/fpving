@@ -8,7 +8,8 @@ Thanks for helping. Be kind: see the [Code of Conduct](CODE_OF_CONDUCT.md).
 2. Enable pnpm through corepack: `corepack enable`. The pinned version comes from `packageManager`.
 3. Install the `gitleaks` binary, which the pre-commit hook needs: `brew install gitleaks`, or download a build for Windows or Linux from <https://github.com/gitleaks/gitleaks/releases>.
 4. `pnpm install`
-5. `pnpm verify` is the local gate. It runs the build (which also typechecks), lint, tests with the 100% coverage gate, the docs build, duplication, unused-code and license checks. `pnpm typecheck` is a quick non-emitting check.
+5. `pnpm --filter @fpving/app exec playwright install chromium`. The UI tests run in it (Vitest browser mode), so `pnpm test` needs it.
+6. `pnpm verify` is the local gate. It runs the build (which also typechecks), lint, tests with the 100% coverage gate, the docs build, duplication, unused-code and license checks. `pnpm typecheck` is a quick non-emitting check.
 
 CI additionally runs gitleaks, osv-scanner, commitlint and the lychee link check, none of which are part of `verify`. To run the vulnerability scan locally, install the `osv-scanner` binary (`brew install osv-scanner`, or <https://github.com/google/osv-scanner/releases>) and run `pnpm audit:osv`; it needs network access.
 

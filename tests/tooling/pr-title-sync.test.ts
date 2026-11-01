@@ -30,7 +30,7 @@ function lines(value: unknown): string[] {
   return typeof value === "string" ? value.split("\n").filter((line) => line !== "") : [];
 }
 
-describe("pr title workflow", () => {
+describe("PR title workflow", () => {
   it("allows exactly the commit types", () => {
     expect(lines(actionInputs()["types"])).toEqual([...COMMIT_TYPES]);
   });

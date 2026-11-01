@@ -4,6 +4,7 @@
     { "path": "packages/plugin-sdk" },
     { "path": "packages/core" },
     { "path": "apps/fpving" },
+    { "path": "apps/ui" },
     { "path": "tsconfig.tools.json" }
   ]
 }

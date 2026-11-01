@@ -3,11 +3,9 @@ title: Configuration
 description: The settings, the plugin list, the data directory, the server and logging.
 ---
 
-:::caution[Planned]
-No settings screen exists yet; the settings are read and written through the HTTP API.
-:::
-
 ## Settings
+
+The Settings screen edits every setting: the display currency, the ship-to country, the import tax (duty-free threshold and its currency, what the threshold applies to, and VAT), the scan interval and the price drop that raises an alert. Amounts are typed in major units and percentages with up to two decimals; the screen checks each field with the settings schema and sends whole minor units and basis points. A change the server could not apply (`settings_not_applied`) leaves the old settings in force and can be saved again.
 
 `GET /api/settings` answers the saved settings, or the defaults before any were saved. `PUT /api/settings` takes the whole settings object, saves it and applies it to the running app without a restart; it answers the settings it saved, or 400 `invalid_request` for a body that fails the schema. See the [HTTP API reference](../reference/http-api/).
 

@@ -18,6 +18,7 @@ updates:
     directories:
       - /
       - /.github/actions/setup
+      - /.github/actions/chromium
     schedule:
       interval: weekly
     cooldown:

@@ -15,6 +15,7 @@ export interface BrowserPageHandle {
   url(): string;
   close(): Promise<void>;
   on(event: "popup", handler: (popup: BrowserPageHandle) => void): unknown;
+  opener(): Promise<BrowserPageHandle | null>;
 }
 
 /** The part of a Playwright `Route` the driver uses: one intercepted request the page made. */
@@ -37,6 +38,7 @@ export interface BrowserContextHandle {
   routeWebSocket(url: RegExp, handler: (route: WebSocketRouteHandle) => Promise<void>): Promise<unknown>;
   newPage(): Promise<BrowserPageHandle>;
   close(): Promise<void>;
+  on(event: "page", handler: (page: BrowserPageHandle) => void): unknown;
 }
 
 /** Opens the persistent browser context whose profile lives in `userDataDir`. */
@@ -77,16 +79,17 @@ const navigate = async (
   return ok({ status: response.status(), html: await page.content(), finalUrl });
 };
 
-const closeAll = async (pages: readonly BrowserPageHandle[]): Promise<void> => {
-  await Promise.allSettled(pages.map(async (page) => page.close()));
+const closeAll = async (pages: BrowserPageHandle[]): Promise<void> => {
+  while (pages.length > 0) {
+    await Promise.allSettled(pages.splice(0).map(async (page) => page.close()));
+  }
 };
 
 const load = async (
-  context: BrowserContextHandle,
+  page: BrowserPageHandle,
   url: string,
   allowPrivateHosts: boolean,
 ): Promise<Result<BrowserPage, TransportError>> => {
-  const page = await context.newPage();
   const popups: BrowserPageHandle[] = [];
   const track = (popup: BrowserPageHandle): void => {
     popups.push(popup);
@@ -99,10 +102,15 @@ const load = async (
   } catch (error) {
     await closeAll(popups);
     await page.close().catch(() => undefined);
+    await closeAll(popups);
     throw error;
   }
   await closeAll(popups);
-  await page.close();
+  try {
+    await page.close();
+  } finally {
+    await closeAll(popups);
+  }
   return result;
 };
 
@@ -121,7 +129,8 @@ const refuseBlockedSockets = (allowPrivateHosts: boolean) => async (socket: WebS
 
 /**
  * Creates the SDK {@link BrowserDriver} on Playwright. One persistent context is launched on the first page and
- * reused; each page opens in a tab that is always closed again, together with every popup it opened. Every request
+ * reused; each page opens in a tab that is always closed again, together with every popup it opened, including one
+ * the browser reports only after its opener closed, which is closed as soon as it appears. Every request
  * a page starts (subresources, XHR and fetch) is routed through the URL policy and aborted when refused, every
  * WebSocket it opens is checked the same way and closed when refused, and a navigation that was redirected to a
  * refused host is a `network` error. Playwright
@@ -134,6 +143,30 @@ export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): Cl
   let pending: Promise<BrowserContextHandle> | undefined;
   let closed = false;
   const allowPrivateHosts = options.allowPrivateHosts ?? false;
+  const opening = new Set<Promise<BrowserPageHandle>>();
+  const opened = new WeakSet<BrowserPageHandle>();
+
+  const openPage = async (launched: BrowserContextHandle): Promise<BrowserPageHandle> => {
+    const creating = launched.newPage();
+    opening.add(creating);
+    try {
+      const page = await creating;
+      opened.add(page);
+      return page;
+    } finally {
+      opening.delete(creating);
+    }
+  };
+
+  const closeOrphan = async (page: BrowserPageHandle): Promise<void> => {
+    if ((await page.opener()) !== null) {
+      return;
+    }
+    await Promise.allSettled(opening);
+    if (!opened.has(page)) {
+      await closeAll([page]);
+    }
+  };
 
   const context = async (): Promise<BrowserContextHandle> => {
     if (pending === undefined) {
@@ -142,6 +175,7 @@ export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): Cl
         .then(async (launched) => {
           await launched.route("**/*", refuseBlockedRequests(allowPrivateHosts));
           await launched.routeWebSocket(ANY_URL, refuseBlockedSockets(allowPrivateHosts));
+          launched.on("page", (page) => void closeOrphan(page));
           return launched;
         })
         .catch((error: unknown) => {
@@ -163,7 +197,7 @@ export const createPlaywrightBrowserDriver = (options: BrowserDriverOptions): Cl
             return transportFailure(false, "browser closed");
           }
           try {
-            return await load(await context(), target, allowPrivateHosts);
+            return await load(await openPage(await context()), target, allowPrivateHosts);
           } catch (error) {
             return transportFailure(error instanceof errors.TimeoutError, error);
           }

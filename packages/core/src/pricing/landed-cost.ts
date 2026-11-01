@@ -1,5 +1,5 @@
 import { ShippingKind } from "@fpving/plugin-sdk";
-import type { Amount, CurrencyCode, Money, Result, Shipping } from "@fpving/plugin-sdk";
+import type { Amount, CountryCode, CurrencyCode, Money, Result, Shipping } from "@fpving/plugin-sdk";
 import { err } from "@fpving/plugin-sdk";
 import { PricingErrorKind } from "./errors.js";
 import { convert, convertExact } from "./fx.js";
@@ -69,3 +69,23 @@ export const landedCostExact = (
   const total = landedTotal(listing, settings, rates);
   return total.ok ? convertExact(total.value, settings.displayCurrency, rates) : total;
 };
+
+type ComparableSettings = PricingSettings & { readonly shipToCountry: CountryCode };
+
+/**
+ * The one rule for a landed cost that can be compared and shown: the exact landed cost of a snapshot in the display
+ * currency, in unrounded minor units, over `rates`. Null when no rates are stored yet, the snapshot was quoted for a
+ * ship-to country other than `settings.shipToCountry`, its shipping is unknown or a rate is missing.
+ *
+ * @param settings - The display currency, the import tax rule and the ship-to country.
+ * @param rates - The latest stored exchange rates, or null before any were stored.
+ * @returns The cost of a snapshot, or null when it cannot be compared.
+ */
+export const comparableLandedCost = (settings: ComparableSettings, rates: FxTable | null) =>
+  (snapshot: { shipTo: CountryCode; itemPrice: Money; shipping: Shipping }): number | null => {
+    if (rates === null || snapshot.shipTo !== settings.shipToCountry) {
+      return null;
+    }
+    const cost = landedCostExact(snapshot, settings, rates);
+    return cost.ok ? cost.value : null;
+  };

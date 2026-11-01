@@ -4,7 +4,7 @@ description: The planned first-run flow, how to run the server today, and what e
 ---
 
 :::caution[Not built yet]
-The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts and answers a JSON API (see the [HTTP API reference](../reference/http-api/)); the UI is not built yet.
+The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts, answers a JSON API (see the [HTTP API reference](../reference/http-api/)) and serves the UI with all of its screens.
 :::
 
 ## Planned flow
@@ -34,7 +34,13 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - The plugin list in `DATA_DIR/plugins.json`, the check of each plugin's `sdkVersion` against the SDK, and the map from declared domains to plugins. The plugin host loads each listed plugin in its own worker thread, with call deadlines, one restart and a status for each plugin; the store gateway routes core's fetches and searches to it, and the pages a plugin cannot parse are saved under `DATA_DIR/debug/`.
 - Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
 - `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
-
+- The UI in `apps/ui`: the app shell with its navigation and six screens.
+  - Watchlist: paste a store URL to watch a product, see each product's cheapest landed cost, its 30-day price trend and its unread alerts, and start a scan with the last scan's result beside it. A URL another product already watches links to that product.
+  - Product: rename it, stop watching it (after a confirm step), see each listing's store, latest price, shipping, landed cost, stock and status, remove a listing, add one by URL, and a chart of each listing's landed cost over time.
+  - Matches: the pending match candidates of every product, with the judge's verdict and reason and the similarity, to accept or reject, and a search for more per product. Candidates judged different are hidden until you ask to see them.
+  - Alerts: every alert newest first or only the unread ones, marking one or all of them read.
+  - Settings: every setting in one form.
+  - Plugins: each `plugins.json` entry with its state (loaded, disabled with the reason, or backing off and when it retries), its domains and its stale listing count, plus rejected entries and an unusable `plugins.json`.
 - The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health` and the domain routes (the watchlist, products, listings, match candidates, alerts, settings, plugins, scan now), refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
 
 To work on it, follow the setup in [Contributing](../contributing/).
@@ -44,7 +50,18 @@ To work on it, follow the setup in [Contributing](../contributing/).
 After the contributor setup and `pnpm worktree:init`:
 
 ```sh
+pnpm build
 pnpm --filter @fpving/app start
 ```
 
-It builds, loads the worktree's `.env` (a variable already set in the shell wins), creates `DATA_DIR`, listens on `http://127.0.0.1:<PORT>` and migrates the database; until startup completes only the health route answers. Check it with `curl http://127.0.0.1:<PORT>/api/health`. Logs go to `DATA_DIR/logs/fpving.log`. Stop it with Ctrl+C. During a scan, stopping waits up to ten seconds for it and then exits 1; a second Ctrl+C is ignored meanwhile. Ctrl+C while it starts cancels the startup. A startup failure, such as the port being taken by another instance, prints one line and exits 1 before the database is touched. Leaving it running starts the scan schedule, which fetches exchange rates from the Frankfurter API on the first boot. See [Configuration](../configuration/).
+`pnpm build` also builds the UI into `apps/ui/dist/web`. Open `http://127.0.0.1:<PORT>` (or `http://localhost:<PORT>`), with the `PORT` from your `.env`, to use it; the address is printed when the server is listening. Any other host name is refused. Without a UI build the page says to run `pnpm build`.
+
+To work on the UI with hot reload, keep the server running and start Vite in a second terminal:
+
+```sh
+pnpm dev
+```
+
+Then open the address Vite prints. Vite forwards `/api` to the server on your worktree's `PORT`, so both must belong to the same worktree.
+
+It builds, loads the worktree's `.env` (a variable already set in the shell wins), creates `DATA_DIR`, listens on `http://127.0.0.1:<PORT>` and migrates the database; until startup completes the API answers 503 `starting` on every route but health, while the UI already loads and shows that error with a retry. Check it with `curl http://127.0.0.1:<PORT>/api/health`. Logs go to `DATA_DIR/logs/fpving.log`. Stop it with Ctrl+C. During a scan, stopping waits up to ten seconds for it and then exits 1; a second Ctrl+C is ignored meanwhile. Ctrl+C while it starts cancels the startup. A startup failure, such as the port being taken by another instance, prints one line and exits 1 before the database is touched. Leaving it running starts the scan schedule, which fetches exchange rates from the Frankfurter API on the first boot. See [Configuration](../configuration/).

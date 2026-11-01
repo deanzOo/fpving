@@ -15,9 +15,10 @@ import {
 } from "@fpving/core";
 import type { DuplicateUrl, Listing, NotFound, PriceSnapshot, Repository, Result } from "@fpving/core";
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, max, ne, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { alias } from "drizzle-orm/sqlite-core";
 import {
   fromCandidateRow,
   fromFxRow,
@@ -54,6 +55,9 @@ const LATEST_RANK = 1;
 const BUSY_TIMEOUT_MS = 5000;
 const SCANNED_STATUSES = [ListingStatus.Active, ListingStatus.Stale];
 const ACTIVE = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 0 };
+
+const older = alias(priceSnapshots, "older");
+const tied = alias(priceSnapshots, "tied");
 
 const settle = async <T>(work: () => T): Promise<T> =>
   new Promise((resolve) => {
@@ -260,6 +264,33 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
             .as("ranked");
           return db.select().from(ranked).where(eq(ranked.rank, LATEST_RANK)).all().map(fromSnapshotRow);
         }),
+      listForTrend: async (since) =>
+        settle(() => {
+          const scanned = and(isNull(products.archivedAt), inArray(listings.status, SCANNED_STATUSES));
+          const ofProduct = eq(products.id, listings.productId);
+          const newestBefore = db.select({ at: max(older.observedAt) }).from(older)
+            .where(and(eq(older.listingId, listings.id), lt(older.observedAt, since)));
+          const seedId = db.select({ id: max(tied.id) }).from(tied)
+            .where(and(eq(tied.listingId, listings.id), eq(tied.observedAt, newestBefore)));
+          return db.select(getTableColumns(priceSnapshots)).from(priceSnapshots)
+            .where(and(
+              inArray(
+                priceSnapshots.listingId,
+                db.select({ id: listings.id }).from(listings).innerJoin(products, ofProduct).where(scanned),
+              ),
+              gte(priceSnapshots.observedAt, since),
+            ))
+            .unionAll(db.select(getTableColumns(priceSnapshots)).from(priceSnapshots)
+              .where(inArray(
+                priceSnapshots.id,
+                db.select({ id: sql<string>`(${seedId})` }).from(listings)
+                  .innerJoin(products, ofProduct)
+                  .where(scanned),
+              )))
+            .orderBy(asc(priceSnapshots.listingId), asc(priceSnapshots.observedAt), asc(priceSnapshots.id))
+            .all()
+            .map(fromSnapshotRow);
+        }),
     },
     matchCandidates: {
       save: async (candidates) =>
@@ -369,6 +400,10 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
             db.select().from(pluginHealth).where(eq(pluginHealth.pluginId, pluginId)).get()
             ?? { pluginId, consecutiveBlocks: 0, backoffUntil: null },
           )),
+      list: async () =>
+        settle(() =>
+          db.select().from(pluginHealth).orderBy(asc(pluginHealth.pluginId)).all()
+            .map((row) => pluginHealthSchema.parse(row))),
       upsert: async (health) =>
         settle(() => {
           db.insert(pluginHealth).values(health)

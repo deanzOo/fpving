@@ -8,7 +8,7 @@ The full guide is [CONTRIBUTING.md](https://github.com/deanzoo/fpving/blob/main/
 ## Setup
 
 1. Install Node 24 (`nvm install` reads `.nvmrc`) and enable corepack.
-2. `pnpm install`
+2. `pnpm install`, then `pnpm --filter @fpving/app exec playwright install chromium` for the UI tests.
 3. `pnpm verify` is the local gate: it runs the build (which typechecks), lint, tests with the coverage gate, the docs build, duplication, unused-code and license checks. CI also runs gitleaks, osv-scanner, commitlint and the lychee link check.
 4. `pnpm worktree:init` writes this worktree's `.env` from `.env.example`: `PORT` is `4000 + fnv1a(absolute worktree path) % 1000` and `DATA_DIR` is the absolute path `<worktree path>/.data/<worktree directory name>`; the app rejects a relative `DATA_DIR`. It never overwrites an existing `.env` and exits 0 when one exists. The app's logs and browser profile live in `DATA_DIR`, so they are per worktree too; a Playwright profile for the E2E suite is planned, not built. See [ADR 0015](../adr/0015-per-worktree-env-and-port/).
 5. `pnpm docs:dev` serves this site locally. Run `pnpm test` once first so the behaviour spec page can be generated.

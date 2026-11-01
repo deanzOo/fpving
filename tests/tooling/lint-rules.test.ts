@@ -17,7 +17,7 @@ const lint = (name: string): string[] => {
   return ruleIds;
 };
 
-describe("lint rules", () => {
+describe("Lint rules", () => {
   beforeAll(async () => {
     const eslint = new ESLint({ cwd: root, ignore: false });
     for (const result of await eslint.lintFiles([`${FIXTURES}**/*.ts`])) {

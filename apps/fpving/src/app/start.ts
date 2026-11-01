@@ -1,5 +1,6 @@
 import { chmod, mkdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { err, ok, startScheduler } from "@fpving/core";
 import type {
@@ -53,6 +54,8 @@ export const DB_FILE = "fpving.db";
 export const LOG_FILE = join("logs", "fpving.log");
 
 const BROWSER_PROFILE_DIR = "browser-profile";
+
+const UI_ROOT = fileURLToPath(new URL("../../../ui/dist/web", import.meta.url));
 
 const OWNER_ONLY_DIR = 0o700;
 const GROUP_OR_WORLD = 0o077;
@@ -177,11 +180,11 @@ const judgeFor = (env: Env, logger: ClosableLogger): LlmJudge => {
  * warning when others can open it) and opens the log; a failure there is `data_dir_failed`. Then it binds the server
  * to `127.0.0.1:PORT`, which is the single-instance lock: a second instance fails there, before it touches the
  * database, loads a plugin or scans.
- * While starting, only the health route answers; every other route answers 503. Then it migrates and opens the
- * database, starts the plugin host with the saved ship-to country and display currency, wires every adapter into
- * core and starts the scan schedule. Any failure after the log opened, and a shutdown requested through `signal`
- * while starting, closes what was opened, within the shutdown deadline. A settings change restarts the plugin host or
- * the schedule as needed, see `createSettingsApplier`.
+ * While starting, only the health route and the built UI in `apps/ui/dist/web` answer; every other route answers 503.
+ * Then it migrates and opens the database, starts the plugin host with the saved ship-to country and display currency,
+ * wires every adapter into core and starts the scan schedule. Any failure after the log opened, and a shutdown
+ * requested through `signal` while starting, closes what was opened, within the shutdown deadline. A settings change
+ * restarts the plugin host or the schedule as needed, see `createSettingsApplier`.
  *
  * @param source - The `process.env`-shaped environment.
  * @param overrides - Ports to use instead of the real adapters, see {@link AppPorts}.
@@ -240,7 +243,13 @@ export const startApp = async (
       profileDir: join(dataDir, BROWSER_PROFILE_DIR),
     });
     opened({ name: ShutdownStepName.Browser, run: async () => browser.close() });
-    const server = createServer({ port: env.PORT, logger, isReady: () => ready, openWhileStarting: [HEALTH_PATH] });
+    const server = createServer({
+      port: env.PORT,
+      logger,
+      isReady: () => ready,
+      openWhileStarting: [HEALTH_PATH],
+      uiRoot: UI_ROOT,
+    });
     registerHealthRoute(server, {
       version,
       ready: () => ready,
@@ -301,7 +310,7 @@ export const startApp = async (
     api.attach({
       deps: () => parts.deps,
       scans: () => parts.scans,
-      plugins: () => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue),
+      plugins: (activity) => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue, activity),
       applySettings: async (next) => settingsApplier.apply(next),
       restarting: () => settingsApplier.restarting(),
       stopping: () => stopping,

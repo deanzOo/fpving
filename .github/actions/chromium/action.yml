@@ -1,0 +1,17 @@
+name: chromium
+description: Install the Chromium build of the locked Playwright version, cached per OS
+runs:
+  using: composite
+  steps:
+    - name: Read the locked Playwright version
+      id: playwright
+      shell: bash
+      run: echo "version=$(pnpm --filter @fpving/app exec playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+    - name: Cache the Chromium download
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.os == 'Linux' && '~/.cache/ms-playwright' || runner.os == 'macOS' && '~/Library/Caches/ms-playwright' || '~\AppData\Local\ms-playwright' }}
+        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+    - name: Install Chromium
+      shell: bash
+      run: pnpm --filter @fpving/app exec playwright install ${{ runner.os == 'Linux' && '--with-deps' || '' }} chromium

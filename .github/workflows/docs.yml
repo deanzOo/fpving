@@ -21,6 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - uses: ./.github/actions/chromium
       - run: pnpm test
       - run: pnpm docs:build
       - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
