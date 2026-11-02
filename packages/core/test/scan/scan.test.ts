@@ -512,6 +512,22 @@ describe("Scanning listings", () => {
       ]);
     });
 
+    it("notifies a back in stock alert with its own body", async () => {
+      const { deps, notifier } = await setup({ bases: [snapshot(l1, PRICE, { inStock: false })] });
+      await scanListings(deps);
+      expect(notifier.sent.map(({ title, body }) => ({ title, body }))).toEqual([
+        { title: "Product p1", body: "It is back in stock." },
+      ]);
+    });
+
+    it("notifies a new cheapest alert with its own body", async () => {
+      const { deps, notifier } = await cheapestGoesGone([]);
+      await scanListings(deps);
+      expect(notifier.sent.map(({ title, body }) => ({ title, body }))).toEqual([
+        { title: "Product p1", body: "Another listing is now the cheapest." },
+      ]);
+    });
+
     it("evaluates a listing against its snapshots of the last 30 days only", async () => {
       const bases = [
         snapshot(l1, PRICE, { inStock: false, observedAt: daysAgo(AGE_DAYS.thirtyOne) }),
