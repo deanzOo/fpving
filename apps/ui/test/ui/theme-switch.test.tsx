@@ -34,6 +34,12 @@ describe("Theme switch", () => {
     await expect.element(group.getByRole("radio", { name: "Dark" })).not.toBeChecked();
   });
 
+  it("names the group for screen readers only, covering nothing on the page", async () => {
+    const screen = await render(<ThemeSwitch />);
+    const legend = screen.getByText("Theme", { exact: true }).element();
+    expect(legend.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+  });
+
   it("leaves the colours to the system while System is chosen", async () => {
     await render(<ThemeSwitch />);
     expect(document.documentElement).not.toHaveAttribute("data-theme");

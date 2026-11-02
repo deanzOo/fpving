@@ -23,7 +23,7 @@ export const ThemeSwitch = () => {
   };
   return (
     <fieldset className="flex rounded-1 border border-line-strong">
-      <legend className="absolute inset-0 cursor-pointer appearance-none">Theme</legend>
+      <legend className="sr-only">Theme</legend>
       {CHOICES.map(({ theme, label }) => (
         <label
           key={theme}
