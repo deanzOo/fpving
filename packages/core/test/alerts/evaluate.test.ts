@@ -117,6 +117,15 @@ describe("Price drop alert", () => {
     });
   });
 
+  it("points at the oldest of equally low snapshots, which the history lists first", () => {
+    const history = [
+      priced("s0", HUNDRED, { observedAt: daysAgo(AGE.twenty) }),
+      priced("s1", HUNDRED, { observedAt: daysAgo(AGE.ten) }),
+    ];
+    const result = evaluate(dropInput(arriving("s2", SIX_PERCENT), history));
+    expect(result.alerts.map((alert) => alert.beforeSnapshotId)).toEqual([snapshotIdSchema.parse("s0")]);
+  });
+
   it("ignores a lower price older than 30 days", () => {
     const history = [
       priced("s0", LOWER, { observedAt: daysAgo(AGE.thirtyOne) }),
@@ -409,6 +418,16 @@ describe("New cheapest alert", () => {
     const incoming = arriving("in", HIGHER, { inStock: false });
     const result = run([entry("b", HUNDRED, {}, ListingStatus.Removed)], listingB, incoming);
     expect(result).toEqual({ alerts: [], cheapestListingId: null });
+  });
+
+  it("keeps the previous cheapest when another listing is gone or removed and no listing qualifies", () => {
+    const incoming = arriving("in", HIGHER, { inStock: false });
+    const others = [
+      entry("b", HUNDRED, {}, ListingStatus.Stale),
+      entry("c", HUNDRED, {}, ListingStatus.Gone),
+      entry("d", HUNDRED, {}, ListingStatus.Removed),
+    ];
+    expect(run(others, listingB, incoming)).toEqual({ alerts: [], cheapestListingId: listingB });
   });
 
   it("clears a previous cheapest that is gone even without exchange rates", () => {
