@@ -35,6 +35,8 @@
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
     "@eslint/js": "10.0.1",
     "@fpving/core": "workspace:*",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "24.19.2",
     "@vitest/coverage-v8": "5.0.5",
