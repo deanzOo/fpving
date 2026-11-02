@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --project=!e2e",
     "test:e2e": "vitest run --project e2e --reporter=default",
+    "mutation": "pnpm build && stryker run",
     "dup": "jscpd",
     "knip": "knip",
     "licenses:check": "license-checker-rseidelsohn --excludePrivatePackages --onlyAllow \"MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;Python-2.0;CC-BY-4.0;CC-BY-3.0;MPL-2.0;(MIT AND CC-BY-3.0)\"",
@@ -35,6 +36,9 @@
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
     "@eslint/js": "10.0.1",
     "@fpving/core": "workspace:*",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/typescript-checker": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "24.19.2",
     "@vitest/coverage-v8": "5.0.5",
@@ -56,7 +60,8 @@
     "overrides": {
       "eslint-plugin-tsdoc>@typescript-eslint/utils": "8.71.2",
       "@esbuild-kit/core-utils>esbuild": "0.25.12",
-      "glob@13": "14.0.2"
+      "glob@13": "14.0.2",
+      "typed-rest-client>qs": "6.16.1"
     },
     "ignoredBuiltDependencies": [
       "better-sqlite3",

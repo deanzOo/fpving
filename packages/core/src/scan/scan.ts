@@ -163,9 +163,7 @@ const scanPlugin = async (
       transitions.push({ listingId, productId, from, to: update.status });
     }
   }
-  if (!backingOff) {
-    await repository.pluginHealth.upsert({ pluginId, consecutiveBlocks, backoffUntil });
-  }
+  await repository.pluginHealth.upsert({ pluginId, consecutiveBlocks, backoffUntil });
   const outcome = outcomeOf(errorKind, succeeded);
   const run: ScanRun = {
     id: scanRunIdSchema.parse(deps.ids.next()),

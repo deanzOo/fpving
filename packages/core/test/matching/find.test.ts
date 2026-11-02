@@ -342,7 +342,7 @@ describe("Judging unjudged candidates again", () => {
     const [exact] = await repository.matchCandidates.listPending();
     await repository.matchCandidates.reject(exact?.id ?? matchCandidateIdSchema.parse("missing"));
     await rejudgeUnjudged(deps, productId);
-    await rejudgeUnjudged(deps, productId);
+    expect(await rejudgeUnjudged(deps, productId)).toEqual(ok([]));
     expect(llm.compared).toEqual([[SOURCE_TITLE, OLDER.title]]);
   });
 

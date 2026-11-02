@@ -14,6 +14,7 @@ export default defineConfig(
       "**/dist/**",
       "**/coverage/**",
       "reports/**",
+      ".stryker-tmp/**",
       "graphify-out/**",
       "apps/docs/.astro/**",
       "apps/docs/src/content.config.ts",
@@ -78,7 +79,17 @@ export default defineConfig(
       "no-warning-comments": [
         "error",
         {
-          terms: ["todo", "fixme", "hack", "xxx", "v8 ignore", "c8 ignore", "istanbul ignore", "node:coverage"],
+          terms: [
+            "todo",
+            "fixme",
+            "hack",
+            "xxx",
+            "v8 ignore",
+            "c8 ignore",
+            "istanbul ignore",
+            "node:coverage",
+            "stryker disable",
+          ],
           location: "anywhere",
         },
       ],

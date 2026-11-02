@@ -71,6 +71,13 @@ describe("Accepting a match candidate", () => {
     expect(await pendingIds(repository)).toEqual([older.id]);
   });
 
+  it("accepts the candidate it is given when several are pending, leaving the others pending", async () => {
+    const { deps, repository, exact, older } = await withCandidates();
+    const accepted = await acceptCandidate(deps, older.id);
+    expect(accepted.ok && accepted.value.listing.url).toBe(older.url);
+    expect(await pendingIds(repository)).toEqual([exact.id]);
+  });
+
   it("quotes the first snapshot for the saved ship-to country", async () => {
     const { deps, repository, exact } = await withCandidates();
     await repository.settings.save({ ...(await repository.settings.get()), shipToCountry: "US" });

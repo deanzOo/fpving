@@ -158,6 +158,7 @@ describe("The scan schedule", () => {
     const { deps, scheduler, stores } = await setup({ lastScanAgo: 0 });
     const handle = await startScheduler(deps);
     await handle.scanNow();
+    expect(scheduler.live()).toBe(1);
     await scheduler.tick();
     expect(stores.fetched).toHaveLength(TWICE);
     await handle.stop();

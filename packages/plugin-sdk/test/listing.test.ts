@@ -57,6 +57,17 @@ describe("Fetched listing", () => {
   it.each(["/frame.jpg", "javascript:alert(1)", "data:image/png;base64,AA=="])("rejects the image url %j", (image) => {
     expect(rejects({ images: [image] })).toBe(true);
   });
+
+  it.each(["http://cdn.example.com/frame.jpg", "https://cdn.example.com/frame.jpg"])("accepts the image url %j", (image) => {
+    expect(rejects({ images: [image] })).toBe(false);
+  });
+
+  it.each(["xhttp://cdn.example.com/frame.jpg", "httpx://cdn.example.com/frame.jpg"])(
+    "rejects the image url %j, whose scheme only contains http",
+    (image) => {
+      expect(rejects({ images: [image] })).toBe(true);
+    },
+  );
 });
 
 describe("Search candidate", () => {
@@ -64,6 +75,10 @@ describe("Search candidate", () => {
     const candidate = { url: "https://example.com/p/1", title: "Example frame" };
     expect(searchCandidateSchema.parse(candidate)).toEqual(candidate);
     expect(searchCandidateSchema.safeParse({ ...candidate, itemPrice: listing.itemPrice }).success).toBe(true);
+  });
+
+  it("rejects a blank candidate title", () => {
+    expect(searchCandidateSchema.safeParse({ url: "https://example.com/p/1", title: "  " }).success).toBe(false);
   });
 
   it("rejects a relative candidate url", () => {

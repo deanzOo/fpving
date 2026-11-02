@@ -5,6 +5,7 @@ const WORKSPACE_SCOPE = "@fpving/";
 
 const CONFIGS = [
   "vitest.config.ts",
+  "stryker.vitest.config.ts",
   "eslint.config.ts",
   "commitlint.config.ts",
   "apps/ui/vite.config.ts",

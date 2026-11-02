@@ -7,7 +7,9 @@ import { keptCheapest, newCheapest } from "./new-cheapest.js";
 import { priceDrop } from "./price-drop.js";
 
 /**
- * Everything one evaluation reads. `history` is the listing's earlier snapshots, `incoming` the one just observed.
+ * Everything one evaluation reads. `history` is the listing's earlier snapshots, oldest first, as
+ * `SnapshotRepository.listSince` returns them; a price drop against equally low snapshots points at the first of
+ * them. `incoming` is the one just observed.
  * `productListings` holds the product's listings with their newest snapshots; the listing's own entry is replaced by
  * the incoming snapshot, or added if absent. History entries that are the incoming snapshot or not older than it are
  * ignored. `rates` is null when no exchange rates were ever fetched; see {@link evaluateCheapest}.
@@ -54,9 +56,7 @@ export const evaluateCheapest = (input: CheapestInput): Evaluation => {
  */
 export const evaluate = (input: EvaluateInput): Evaluation => {
   const { listing, incoming, now } = input;
-  const history = input.history.filter(
-    (snapshot) => snapshot.id !== incoming.id && snapshot.observedAt < incoming.observedAt,
-  );
+  const history = input.history.filter((snapshot) => snapshot.observedAt < incoming.observedAt);
   const productListings = [
     ...input.productListings.filter((entry) => entry.listing.id !== listing.id),
     { listing, latest: incoming },

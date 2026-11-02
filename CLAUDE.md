@@ -9,7 +9,7 @@ Local-first, AGPL-3.0 pnpm monorepo that watches FPV gear prices. Human guide: C
 
 ## Hard rules
 - Node 24, pnpm via `packageManager`. Run `pnpm verify` before any push.
-- TypeScript strictest. No `any`, no `as` (except `as const`), no `!`, no `@ts-*`, no `eslint-disable`, no coverage-ignore comments (`v8`/`c8`/`istanbul ignore`), no magic numbers or strings. Magic numbers are lint-enforced; magic strings are a review rule (use `as const` objects). Formatting is ESLint-enforced (`@stylistic`), no Prettier. `unknown` only at a trust boundary.
+- TypeScript strictest. No `any`, no `as` (except `as const`), no `!`, no `@ts-*`, no `eslint-disable`, no coverage-ignore comments (`v8`/`c8`/`istanbul ignore`), no `Stryker disable` comments, no magic numbers or strings. Magic numbers are lint-enforced; magic strings are a review rule (use `as const` objects). Formatting is ESLint-enforced (`@stylistic`), no Prettier. `unknown` only at a trust boundary.
 - Derive types with `z.infer` or `typeof`. No hand-written parallel types. Enums are `as const` objects.
 - Money is `{ amountMinor: int, currency }`, never floats.
 - Domain errors are `Result<T, E>`. No swallowed catches.

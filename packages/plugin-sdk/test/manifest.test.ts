@@ -66,6 +66,10 @@ describe("Plugin manifest", () => {
     expect(rejects({ sdkVersion })).toBe(true);
   });
 
+  it.each(["a.example.com", "x.co", "a.b"])("accepts the domain %j, with single-letter labels", (domain) => {
+    expect(rejects({ domains: [domain] })).toBe(false);
+  });
+
   it("rejects empty domains", () => {
     expect(rejects({ domains: [] })).toBe(true);
   });

@@ -1,4 +1,3 @@
-import { ShippingKind } from "@fpving/plugin-sdk";
 import { AlertKind, ListingStatus } from "../entities.js";
 import type { FxTable } from "../pricing/fx.js";
 import { comparableLandedCost } from "../pricing/landed-cost.js";
@@ -19,8 +18,9 @@ const compare = (a: Ranked, b: Ranked): number =>
   || compareIds(a.entry.listing.id, b.entry.listing.id);
 
 /**
- * The cheapest of a product's listings that are active, in stock and with known shipping, by `cost`, which yields null
- * for a listing it cannot compare, such as one quoted for another ship-to country (see {@link comparableLandedCost}).
+ * The cheapest of a product's listings that are active and in stock, by `cost`, which yields null for a listing it
+ * cannot compare, such as one with unknown shipping or quoted for another ship-to country (see
+ * {@link comparableLandedCost}).
  * Ties go to the earlier `addedAt`, then the lower listing id by code point. Undefined when none qualifies.
  */
 export const cheapestBy = (
@@ -28,12 +28,7 @@ export const cheapestBy = (
   cost: (latest: ListingWithLatest["latest"]) => number | null,
 ): Ranked | undefined =>
   productListings
-    .filter(
-      ({ listing: l, latest }) =>
-        l.status === ListingStatus.Active
-        && latest.inStock
-        && latest.shipping.kind === ShippingKind.Known,
-    )
+    .filter(({ listing: l, latest }) => l.status === ListingStatus.Active && latest.inStock)
     .flatMap((entry): Ranked[] => {
       const landedMinor = cost(entry.latest);
       return landedMinor === null ? [] : [{ entry, landedMinor }];
