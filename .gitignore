@@ -13,3 +13,4 @@ apps/docs/src/content/docs/api
 *.db
 *.db-journal
 *.bak
+.stryker-tmp
