@@ -584,6 +584,19 @@ describe("Scanning listings", () => {
       expect((await repository.products.get(P1))?.cheapestListingId).toBe(l2.id);
     });
 
+    it("still raises a fetched listing's alerts when another listing of the product changed status", async () => {
+      const goingGone = { ...l2, notFoundStreak: 1 };
+      const answers: Options["answers"] = [[l1, fetched(LOWER)], [goingGone, NOT_FOUND]];
+      const { deps } = await setup({ listings: [l1, goingGone], answers });
+      const report = await scanListings(deps);
+      expect(report.transitions.map(({ listingId, to }) => ({ listingId, to }))).toEqual([
+        { listingId: l2.id, to: ListingStatus.Gone },
+      ]);
+      expect(report.alerts.map(({ kind, listingId }) => ({ kind, listingId }))).toEqual([
+        { kind: AlertKind.PriceDrop, listingId: l1.id },
+      ]);
+    });
+
     it("keeps a cheapest listing that went stale when no other listing qualifies", async () => {
       const cheapest = { ...l1, failureStreak: STREAK.two };
       const { deps, repository } = await setup({

@@ -45,6 +45,7 @@ describe("Normalizing a listing URL", () => {
 
   it("strips trailing slashes from the path but keeps the root", () => {
     expect(normalized("https://shop.example/item/")).toEqual(ok("https://shop.example/item"));
+    expect(normalized("https://shop.example/item//")).toEqual(ok("https://shop.example/item"));
     expect(normalized("https://shop.example/")).toEqual(ok("https://shop.example/"));
     expect(normalized("https://shop.example")).toEqual(ok("https://shop.example/"));
   });
@@ -66,6 +67,12 @@ describe("Normalizing a listing URL", () => {
   it("keeps a www. or m. subdomain when the remaining host is not a declared plugin domain", () => {
     expect(normalized("https://www.other.example/item")).toEqual(ok("https://www.other.example/item"));
     expect(normalized("https://m.other.example/item")).toEqual(ok("https://m.other.example/item"));
+  });
+
+  it("strips www. or m. only as the first label, so farm.example.com keeps its host", () => {
+    expect(normalizeListingUrl("https://farm.example.com/item", ["farexample.com"])).toEqual(
+      ok("https://farm.example.com/item"),
+    );
   });
 
   it("keeps any other subdomain", () => {
