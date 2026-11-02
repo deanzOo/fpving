@@ -54,9 +54,7 @@ export const evaluateCheapest = (input: CheapestInput): Evaluation => {
  */
 export const evaluate = (input: EvaluateInput): Evaluation => {
   const { listing, incoming, now } = input;
-  const history = input.history.filter(
-    (snapshot) => snapshot.id !== incoming.id && snapshot.observedAt < incoming.observedAt,
-  );
+  const history = input.history.filter((snapshot) => snapshot.observedAt < incoming.observedAt);
   const productListings = [
     ...input.productListings.filter((entry) => entry.listing.id !== listing.id),
     { listing, latest: incoming },
