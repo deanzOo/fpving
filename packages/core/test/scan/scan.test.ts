@@ -168,6 +168,14 @@ const cheapestGoesGone = async (bases: PriceSnapshot[]) => {
   });
 };
 
+const expectOnlyL2BecomesCheapest = async (options: Options) => {
+  const { deps, repository } = await setup({ products: [product("p1", { cheapestListingId: l1.id })], ...options });
+  const report = await scanListings(deps);
+  const cheapest = report.alerts.filter((row) => row.kind === AlertKind.NewCheapest);
+  expect(cheapest.map((row) => row.listingId)).toEqual([l2.id]);
+  expect((await repository.products.get(P1))?.cheapestListingId).toBe(l2.id);
+};
+
 const state = (status: ListingStatus, failureStreak: number, notFoundStreak: number) => ({
   status,
   failureStreak,
@@ -541,30 +549,16 @@ describe("Scanning listings", () => {
     });
 
     it("raises one new cheapest alert when several listings of a product get cheaper in one scan", async () => {
-      const { deps, repository } = await setup({
-        products: [product("p1", { cheapestListingId: l1.id })],
+      await expectOnlyL2BecomesCheapest({
         listings: [l1, l2, l3],
         bases: [snapshot(l2, LOWER, { inStock: false }), snapshot(l3, LOWER, { inStock: false })],
         answers: [[l2, fetched(LOWEST)], [l3, fetched(LOWER)]],
       });
-      const report = await scanListings(deps);
-      const cheapest = report.alerts.filter((row) => row.kind === AlertKind.NewCheapest);
-      expect(cheapest.map((row) => row.listingId)).toEqual([l2.id]);
-      expect((await repository.products.get(P1))?.cheapestListingId).toBe(l2.id);
     });
 
     it("keeps a fetched listing as the new cheapest when an older snapshot shares its observation time", async () => {
       const tied = snapshot(l2, LOWER, { id: snapshotIdSchema.parse("zz-l2"), observedAt: NOW, inStock: false });
-      const { deps, repository } = await setup({
-        products: [product("p1", { cheapestListingId: l1.id })],
-        listings: [l1, l2],
-        bases: [tied],
-        answers: [[l2, fetched(LOWEST)]],
-      });
-      const report = await scanListings(deps);
-      const cheapest = report.alerts.filter((row) => row.kind === AlertKind.NewCheapest);
-      expect(cheapest.map((row) => row.listingId)).toEqual([l2.id]);
-      expect((await repository.products.get(P1))?.cheapestListingId).toBe(l2.id);
+      await expectOnlyL2BecomesCheapest({ listings: [l1, l2], bases: [tied], answers: [[l2, fetched(LOWEST)]] });
     });
 
     it("stores the product's cheapest listing only when it changed", async () => {
