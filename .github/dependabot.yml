@@ -9,6 +9,8 @@ updates:
     commit-message:
       prefix: build(deps)
     groups:
+      stryker:
+        patterns: ["@stryker-mutator/*"]
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
