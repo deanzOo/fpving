@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --project=!e2e",
     "test:e2e": "vitest run --project e2e --reporter=default",
-    "mutation": "stryker run",
+    "mutation": "pnpm build && stryker run",
     "dup": "jscpd",
     "knip": "knip",
     "licenses:check": "license-checker-rseidelsohn --excludePrivatePackages --onlyAllow \"MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;Python-2.0;CC-BY-4.0;CC-BY-3.0;MPL-2.0;(MIT AND CC-BY-3.0)\"",
