@@ -8,8 +8,9 @@ declare module "vitest/browser" {
   }
 }
 
+// Playwright's defaults: null would fall back to headless Chromium's, which prefers reduced motion.
 afterEach(async () => {
-  await commands.emulateMedia({ colorScheme: null, reducedMotion: null });
+  await commands.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
 });
 
 /** Makes the browser report this colour scheme preference until the test ends. */
