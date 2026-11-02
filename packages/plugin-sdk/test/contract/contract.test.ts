@@ -188,6 +188,21 @@ describe("Store plugin contract kit", () => {
     expect(await failedChecks(plugin)).toEqual(["returns parse_failed with the raw page for the garbage fixture"]);
   });
 
+  it("fails a parse failure whose raw page is empty, and says so", async () => {
+    const plugin = withStore((ctx) => ({
+      fetchListing: async (url) => {
+        const result = await fetchListing(ctx)(url);
+        const parseFailed = !result.ok && result.error.kind === StoreErrorKind.ParseFailed;
+        return parseFailed ? err({ kind: StoreErrorKind.ParseFailed, detail: "no listing", rawPage: "" }) : result;
+      },
+      search: search(ctx),
+    }));
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: "returns parse_failed with the raw page for the garbage fixture",
+      message: "parse_failed carried no rawPage",
+    }]);
+  });
+
   it("fails a plugin that invents a listing for a page it cannot parse", async () => {
     const placeholder = { amountMinor: 1, currency: "USD" } as const;
     const plugin = withStore((ctx) => ({
