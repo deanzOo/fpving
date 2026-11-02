@@ -5,7 +5,8 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import type { TooltipContentProps } from "recharts";
 import type { Client } from "./client.ts";
 import { listingName } from "./listing-name.ts";
-import { loneDot } from "./lone-dot.tsx";
+import { SERIES } from "./ui/chart-theme.tsx";
+import { loneDot } from "./ui/lone-dot.tsx";
 import { formatMoney } from "./money.ts";
 
 type Listings = Awaited<ReturnType<Client["getProduct"]>>["listings"];
@@ -14,16 +15,6 @@ const HEIGHT = 280;
 const STROKE = 2;
 const AXIS_WIDTH = 88;
 const MARGIN = { top: 8, right: 16, bottom: 8, left: 8 } as const;
-const SERIES_COLORS = [
-  "var(--color-series-1)",
-  "var(--color-series-2)",
-  "var(--color-series-3)",
-  "var(--color-series-4)",
-  "var(--color-series-5)",
-  "var(--color-series-6)",
-  "var(--color-series-7)",
-  "var(--color-series-8)",
-] as const;
 const DAY = "day";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
@@ -63,8 +54,8 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     const last = costs.at(-1);
     return last === undefined ? [] : [{ listing, values, costs, last }];
   });
-  const recent = new Set([...pricedListings].sort((a, b) => b.last.day - a.last.day).slice(0, SERIES_COLORS.length));
-  const charted = SERIES_COLORS.flatMap((color, index) => {
+  const recent = new Set([...pricedListings].sort((a, b) => b.last.day - a.last.day).slice(0, SERIES.length));
+  const charted = SERIES.flatMap((color, index) => {
     const entry = pricedListings.filter((candidate) => recent.has(candidate))[index];
     return entry === undefined ? [] : [{ ...entry, color }];
   });
@@ -126,7 +117,7 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
         {notCharted > 0 && (
           <p className="mb-2 text-sm text-ink-muted">
             {`Not charted: ${String(notCharted)} ${notCharted === 1 ? "listing" : "listings"}. The chart shows up to `
-              + `${String(SERIES_COLORS.length)} listings with a landed cost, the most recently priced first; the `
+              + `${String(SERIES.length)} listings with a landed cost, the most recently priced first; the `
               + "table lists them all."}
           </p>
         )}

@@ -5,7 +5,7 @@ import { useClient } from "./client.ts";
 import { formatMoney } from "./money.ts";
 import { QueryKey } from "./queries.ts";
 import { ScanNow } from "./scan-now.tsx";
-import { Sparkline } from "./sparkline.tsx";
+import { Sparkline } from "./ui/sparkline.tsx";
 
 const cell = "border-b border-line px-3 py-2";
 const EMPTY = "Nothing is watched yet. Paste a store URL above to start.";
