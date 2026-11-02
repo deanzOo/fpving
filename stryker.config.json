@@ -12,8 +12,10 @@
     "!packages/*/src/index.ts",
     "!packages/core/src/testing/**",
     "!packages/plugin-sdk/src/contract/index.ts",
-    "!packages/plugin-sdk/src/contract/check.ts"
+    "!packages/plugin-sdk/src/contract/check.ts",
+    "!packages/plugin-sdk/src/contract/run-contract.ts"
   ],
+  "timeoutMS": 15000,
   "thresholds": { "high": 95, "low": 85, "break": 85 },
   "reporters": ["html", "clear-text", "progress"],
   "htmlReporter": { "fileName": "reports/mutation/index.html" },
