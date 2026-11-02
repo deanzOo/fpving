@@ -19,14 +19,14 @@ The full guide is [CONTRIBUTING.md](https://github.com/deanzoo/fpving/blob/main/
 
 ## Mutation testing
 
-`pnpm mutation` runs Stryker over core and the plugin SDK, about ten minutes, outside `verify`; the nightly workflow runs it on `main` and uploads `reports/mutation/index.html` as the `mutation-report` artifact. A score below 85 fails it. In the report, a survived mutant is a change no test noticed: write a behaviour-named test that fails on it. A mutant no test can ever tell apart from the original is excluded in `stryker.config.json` with a one-line reason; `// Stryker disable` comments are banned by lint. See [ADR 0030](../adr/0030-stryker-mutation-testing-nightly/).
+`pnpm mutation` builds, then runs Stryker over core and the plugin SDK, about 12 minutes on eight cores and longer in CI, outside `verify`; the nightly workflow runs it on `main` and uploads `reports/mutation/index.html` as the `mutation-report` artifact. A score below 85 fails it. In the report, a survived mutant is a change no test noticed: write a behaviour-named test that fails on it. A mutant no test can ever tell apart from the original marks a redundant condition: show why it cannot change the result, then simplify the code until the mutant is gone. There is no per-mutant exclusion, and `// Stryker disable` comments are banned by lint. See [ADR 0030](../adr/0030-stryker-mutation-testing-nightly/).
 
 ## Rules in brief
 
 - Write a failing test before the implementation. Test names read as requirements, and describe names are sentence case. Name a test file `*.internal.test.ts` when it checks implementation detail such as a test fake or the shape of a public entry; the behaviour specification leaves it out.
 - Coverage is a hard 100% gate on lines, branches, functions and statements.
 - Formatting is ESLint-enforced (`@stylistic`), with no Prettier.
-- Strict TypeScript: no `any`, no `as` except `as const`, no `!`, no `@ts-*`, no `eslint-disable`.
+- Strict TypeScript: no `any`, no `as` except `as const`, no `!`, no `@ts-*`, no `eslint-disable`, no coverage-ignore or `// Stryker disable` comments.
 - No narrative comments. Every exported symbol in `packages/core/src` and `packages/plugin-sdk/src` carries TSDoc, which lint enforces.
 - Conventional Commits, squash merged through pull requests.
 

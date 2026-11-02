@@ -46,13 +46,13 @@ The `e2e` Vitest project (`apps/fpving/test/e2e`) builds the UI into `apps/ui/di
 
 ### Mutation testing
 
-`pnpm mutation` runs Stryker over `packages/core/src` and `packages/plugin-sdk/src`: it makes small edits to the code, one at a time, and checks that a test fails for each. It takes about ten minutes, so it is not part of `verify`; the nightly workflow runs it on `main` and uploads the report as the `mutation-report` artifact. A score below 85 fails the run. See [ADR 0030](apps/docs/src/content/docs/adr/0030-stryker-mutation-testing-nightly.md).
+`pnpm mutation` builds, then runs Stryker over `packages/core/src` and `packages/plugin-sdk/src`: it makes small edits to the code, one at a time, and checks that a test fails for each. It takes about 12 minutes on eight cores, longer in CI, so it is not part of `verify`; the nightly workflow runs it on `main` and uploads the report as the `mutation-report` artifact. A score below 85 fails the run. See [ADR 0030](apps/docs/src/content/docs/adr/0030-stryker-mutation-testing-nightly.md).
 
 Open `reports/mutation/index.html` after a run. Each file shows its mutants: killed (a test failed), survived (no test noticed), or compile error (rejected by the type checker, left out of the score). For a survivor:
 
 1. Read the mutant and ask what behaviour it breaks.
 2. Write a test, named for that behaviour, that passes on the real code and fails on the mutant. If it exposes a bug, follow the bug protocol.
-3. If no test can tell the mutant apart from the original, it is equivalent: exclude it in `stryker.config.json` with a one-line reason and say so in the pull request. `// Stryker disable` comments are banned by lint.
+3. If no test can tell the mutant apart from the original, it is equivalent, and it usually marks a redundant condition. Show from the types or the call sites why the condition cannot change the result, then simplify the code so the mutant no longer exists, with the existing tests green, and say so in the pull request. There is no per-mutant exclusion, and `// Stryker disable` comments are banned by lint.
 
 ### Bug protocol
 
@@ -64,7 +64,7 @@ Open `reports/mutation/index.html` after a run. Each file shows its mutants: kil
 
 - Formatting is ESLint-enforced through `@stylistic/eslint-plugin` (2-space indent, double quotes, semicolons, trailing commas, 120 columns). There is no Prettier. `pnpm lint --fix` fixes most of it.
 - No comments that narrate code. At most one line, only where the code is genuinely unclear. Public API docs use TSDoc.
-- No `any`, no `as` assertions (except `as const`), no non-null `!`, no `@ts-ignore` or `@ts-expect-error`, no `eslint-disable`, no coverage-ignore comments (`v8 ignore`, `c8 ignore`, `istanbul ignore`; exclusions live in `vitest.config.ts` only), no magic numbers. Lint enforces magic numbers. Magic strings are a review rule: use `as const` objects.
+- No `any`, no `as` assertions (except `as const`), no non-null `!`, no `@ts-ignore` or `@ts-expect-error`, no `eslint-disable`, no coverage-ignore comments (`v8 ignore`, `c8 ignore`, `istanbul ignore`; exclusions live in `vitest.config.ts` only), no `// Stryker disable` comments, no magic numbers. Lint enforces magic numbers. Magic strings are a review rule: use `as const` objects.
 - Derive types from Zod schemas at boundaries. Enums are `as const` objects. Money is integer minor units plus a currency code.
 - Domain errors are `Result` values. Do not swallow exceptions.
 
