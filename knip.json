@@ -10,7 +10,10 @@
     "packages/*": { "project": ["src/**/*.ts"] },
     "packages/core": { "project": ["src/**/*.ts", "eval/**/*.ts"] },
     "apps/*": { "project": ["src/**/*.ts"] },
-    "apps/ui": { "project": ["src/**/*.{ts,tsx,css}", "test/**/*.{ts,tsx}"] },
+    "apps/ui": {
+      "project": ["src/**/*.{ts,tsx,css}", "test/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@fontsource-variable/martian-mono"]
+    },
     "apps/docs": { "project": ["*.ts", "src/**/*.ts", "src/**/*.{astro,mdx}"] }
   }
 }
