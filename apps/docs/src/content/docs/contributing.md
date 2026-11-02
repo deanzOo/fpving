@@ -17,6 +17,10 @@ The full guide is [CONTRIBUTING.md](https://github.com/deanzoo/fpving/blob/main/
 
 `pnpm test` includes the `e2e` project, which builds the UI, starts the app in process with fake LLM, rates and notifier, and drives Chromium from adding a product to its price drop alert. Run it alone with `pnpm vitest run --project e2e`; `FPVING_E2E_HEADED=1` shows the browser. It stays out of the coverage run (`verify` runs it as `pnpm test:e2e`). Its setup empties and rebuilds `apps/ui/dist/web`, which a running app or dev server serving that folder briefly loses, and in watch mode it builds once per session, so restart Vitest after a UI change. See [ADR 0029](../adr/0029-in-process-e2e-with-vitest-and-the-playwright-library/).
 
+## Mutation testing
+
+`pnpm mutation` runs Stryker over core and the plugin SDK, about ten minutes, outside `verify`; the nightly workflow runs it on `main` and uploads `reports/mutation/index.html` as the `mutation-report` artifact. A score below 85 fails it. In the report, a survived mutant is a change no test noticed: write a behaviour-named test that fails on it. A mutant no test can ever tell apart from the original is excluded in `stryker.config.json` with a one-line reason; `// Stryker disable` comments are banned by lint. See [ADR 0030](../adr/0030-stryker-mutation-testing-nightly/).
+
 ## Rules in brief
 
 - Write a failing test before the implementation. Test names read as requirements, and describe names are sentence case. Name a test file `*.internal.test.ts` when it checks implementation detail such as a test fake or the shape of a public entry; the behaviour specification leaves it out.

@@ -44,6 +44,16 @@ The app keeps its log in `DATA_DIR/logs` and its browser profile in `DATA_DIR/br
 
 The `e2e` Vitest project (`apps/fpving/test/e2e`) builds the UI into `apps/ui/dist/web`, starts the app in process with a fake LLM judge, fake exchange rates and a recording notifier, and drives Chromium through the journey from adding a product to its price drop alert. It runs inside `pnpm test`. Run it alone with `pnpm vitest run --project e2e`; set `FPVING_E2E_HEADED=1` to watch it in a visible browser. A page console error or warning, or a CSP violation, fails it. It is left out of `pnpm test:coverage`, so the 100% gate comes from the unit and integration tests; `pnpm verify` and CI run it as `pnpm test:e2e`. Its setup empties and rebuilds `apps/ui/dist/web`, so a `pnpm dev` or `node dist/main.js` serving that folder briefly loses its files, and in watch mode the UI is built once per session, so restart Vitest after a UI change. See [ADR 0029](apps/docs/src/content/docs/adr/0029-in-process-e2e-with-vitest-and-the-playwright-library.md).
 
+### Mutation testing
+
+`pnpm mutation` runs Stryker over `packages/core/src` and `packages/plugin-sdk/src`: it makes small edits to the code, one at a time, and checks that a test fails for each. It takes about ten minutes, so it is not part of `verify`; the nightly workflow runs it on `main` and uploads the report as the `mutation-report` artifact. A score below 85 fails the run. See [ADR 0030](apps/docs/src/content/docs/adr/0030-stryker-mutation-testing-nightly.md).
+
+Open `reports/mutation/index.html` after a run. Each file shows its mutants: killed (a test failed), survived (no test noticed), or compile error (rejected by the type checker, left out of the score). For a survivor:
+
+1. Read the mutant and ask what behaviour it breaks.
+2. Write a test, named for that behaviour, that passes on the real code and fails on the mutant. If it exposes a bug, follow the bug protocol.
+3. If no test can tell the mutant apart from the original, it is equivalent: exclude it in `stryker.config.json` with a one-line reason and say so in the pull request. `// Stryker disable` comments are banned by lint.
+
 ### Bug protocol
 
 1. Write the missing failing test that reproduces the bug.
