@@ -4,7 +4,7 @@ import { addProduct, LlmErrorKind, LlmVerdict, ok, pluginIdSchema } from "../../
 import type { LlmError, MatchDeps, ProductIdentity, Result, Verdict } from "../../src/index.ts";
 import { fakeClock } from "../fakes/fake-clock.ts";
 import { fakeIdGenerator } from "../fakes/fake-id-generator.ts";
-import { fakeLlmJudge } from "../fakes/fake-llm.ts";
+import { fakeLlmJudge } from "../../src/testing/fake-llm.ts";
 import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
 import { fakeStoreGateway } from "../fakes/fake-store-gateway.ts";
 

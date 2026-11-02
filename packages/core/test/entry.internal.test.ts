@@ -8,7 +8,18 @@ describe("Core entry points", () => {
     expect([...importsReachableFrom(new URL("../src/testing/index.ts", import.meta.url))]).toContain("vitest");
   });
 
-  it("exports the repository and store gateway contract suites from the testing entry", () => {
-    expect(Object.keys(testing)).toEqual(["describeRepositoryContract", "describeStoreGatewayContract"]);
+  it("reaches no module of the testing entry from the main entry", () => {
+    const reached = [...importsReachableFrom(new URL("../src/index.ts", import.meta.url))];
+    expect(reached.filter((href) => href.includes("/src/testing/"))).toEqual([]);
+  });
+
+  it("exports the contract suites and the LLM judge, notifier and rates fakes from the testing entry", () => {
+    expect(Object.keys(testing).toSorted()).toEqual([
+      "describeRepositoryContract",
+      "describeStoreGatewayContract",
+      "fakeCurrencyRates",
+      "fakeLlmJudge",
+      "fakeNotifier",
+    ]);
   });
 });

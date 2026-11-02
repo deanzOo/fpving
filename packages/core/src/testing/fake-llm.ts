@@ -1,4 +1,6 @@
-import type { LlmError, LlmJudge, ProductIdentity, Result, Verdict } from "../../src/index.ts";
+import type { Result } from "@fpving/plugin-sdk";
+import type { Verdict } from "../entities.js";
+import type { LlmError, LlmJudge, ProductIdentity } from "../ports/llm-judge.js";
 
 /** An {@link LlmJudge} that gives the same scripted answers to every call and records each compared title pair. */
 export const fakeLlmJudge = (answers: {

@@ -42,6 +42,7 @@ describe("Rendering the behaviour spec", () => {
     ["core", "Core"],
     ["plugin-sdk", "Plugin SDK"],
     ["app", "App"],
+    ["e2e", "End to end"],
   ])("titles the %s product project %s", (project, title) => {
     expect(renderSpec([module([test("works")], "test/a.test.ts", project)])).toContain(`## ${title}\n`);
   });

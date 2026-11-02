@@ -31,7 +31,7 @@ import { fakeClock } from "../fakes/fake-clock.ts";
 import { fetchedListing } from "../fakes/fetched-listing.ts";
 import { fakeIdGenerator } from "../fakes/fake-id-generator.ts";
 import { fakeLogger } from "../fakes/fake-logger.ts";
-import { fakeNotifier } from "../fakes/fake-notifier.ts";
+import { fakeNotifier } from "../../src/testing/fake-notifier.ts";
 import { fakeStoreGateway } from "../fakes/fake-store-gateway.ts";
 import { inMemoryRepository } from "../fakes/in-memory-repository.ts";
 

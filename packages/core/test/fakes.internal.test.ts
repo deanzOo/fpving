@@ -4,9 +4,9 @@ import { alertIdSchema, err, LlmErrorKind, LlmVerdict, ok, pluginIdSchema } from
 import { fakeClock } from "./fakes/fake-clock.ts";
 import { fakeDebugSink } from "./fakes/fake-debug-sink.ts";
 import { fakeIdGenerator } from "./fakes/fake-id-generator.ts";
-import { fakeLlmJudge } from "./fakes/fake-llm.ts";
-import { fakeNotifier } from "./fakes/fake-notifier.ts";
-import { fakeCurrencyRates } from "./fakes/fake-rates.ts";
+import { fakeLlmJudge } from "../src/testing/fake-llm.ts";
+import { fakeNotifier } from "../src/testing/fake-notifier.ts";
+import { fakeCurrencyRates } from "../src/testing/fake-rates.ts";
 import { fakeStoreGateway } from "./fakes/fake-store-gateway.ts";
 
 const MINUTE_MS = 60_000;

@@ -31,7 +31,7 @@ pnpm worktree:init
 
 This writes `.env` from `.env.example` with `PORT` set to `4000 + fnv1a(absolute worktree path) % 1000` (stable for a given path) and `DATA_DIR` set to the absolute path `<worktree path>/.data/<worktree directory name>`. It is absolute so it never depends on the directory the server starts from, and the app rejects a relative `DATA_DIR`. If `.env` already exists it is left untouched and the command exits 0. `.env` and `.data/` are gitignored; `.env.example` is committed and holds placeholders only; its `DATA_DIR` is empty, so a hand-copied `.env` fails validation until it is filled in. Two worktrees can hash to the same port, one chance in a thousand; edit `PORT` in `.env` if so. `ANTHROPIC_API_KEY` is optional, is never written for you, and must not be left empty when uncommented.
 
-The app keeps its log in `DATA_DIR/logs` and its browser profile in `DATA_DIR/browser-profile`, so both are per worktree too. A separate Playwright profile for the E2E suite is planned, not built.
+The app keeps its log in `DATA_DIR/logs` and its browser profile in `DATA_DIR/browser-profile`, so both are per worktree too. The E2E suite never touches them: each test gets a temp Chromium profile, a temp `DATA_DIR` and a free port.
 
 ## Tests first
 
@@ -39,6 +39,10 @@ The app keeps its log in `DATA_DIR/logs` and its browser profile in `DATA_DIR/br
 - Test names read as requirements: `describe("Price drop alert")` and `it("fires when ...")`. Describe names are sentence case, because they become headings in the behaviour specification.
 - Name a test file `*.internal.test.ts` when it checks implementation detail rather than behaviour a user or plugin author relies on (test fakes, the shape of a public entry, wiring). The behaviour specification leaves those files out.
 - Coverage is a hard 100% gate on lines, branches, functions and statements. Exclusions live in `vitest.config.ts` only.
+
+### End-to-end journey
+
+The `e2e` Vitest project (`apps/fpving/test/e2e`) builds the UI into `apps/ui/dist/web`, starts the app in process with a fake LLM judge, fake exchange rates and a recording notifier, and drives Chromium through the journey from adding a product to its price drop alert. It runs inside `pnpm test`. Run it alone with `pnpm vitest run --project e2e`; set `FPVING_E2E_HEADED=1` to watch it in a visible browser. A page console error or warning, or a CSP violation, fails it. It is left out of `pnpm test:coverage`, so the 100% gate comes from the unit and integration tests; `pnpm verify` and CI run it as `pnpm test:e2e`. Its setup empties and rebuilds `apps/ui/dist/web`, so a `pnpm dev` or `node dist/main.js` serving that folder briefly loses its files, and in watch mode the UI is built once per session, so restart Vitest after a UI change. See [ADR 0029](apps/docs/src/content/docs/adr/0029-in-process-e2e-with-vitest-and-the-playwright-library.md).
 
 ### Bug protocol
 

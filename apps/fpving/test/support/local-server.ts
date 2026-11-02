@@ -9,11 +9,24 @@ export const FIXTURE_HTML = [
   "</script></body></html>",
 ].join("");
 
+/** The fixture product's price in US cents until {@link LocalServer.setProductPrice} changes it. */
+export const FIXTURE_PRICE_MINOR = 1999;
+
+const CENTS_PER_DOLLAR = 100;
+const CENT_DIGITS = 2;
+
+const productPage = (amountMinor: number): string => {
+  const dollars = `${String(Math.trunc(amountMinor / CENTS_PER_DOLLAR))}.`
+    + String(amountMinor % CENTS_PER_DOLLAR).padStart(CENT_DIGITS, "0");
+  return [
+    "<!doctype html><html><body><h1 class=\"title\">Fixture Frame</h1>",
+    `<p class="price" data-amount-minor="${String(amountMinor)}" data-currency="USD">$${dollars}</p>`,
+    "<p>In stock</p></body></html>",
+  ].join("");
+};
+
 /** A product page the fixture plugin reads: title, price in minor units and stock. */
-export const FIXTURE_PRODUCT_HTML = [
-  "<!doctype html><html><body><h1 class=\"title\">Fixture Frame</h1>",
-  "<p class=\"price\" data-amount-minor=\"1999\" data-currency=\"USD\">$19.99</p><p>In stock</p></body></html>",
-].join("");
+export const FIXTURE_PRODUCT_HTML = productPage(FIXTURE_PRICE_MINOR);
 
 /** A product page without a price, which the fixture plugin cannot parse. */
 export const FIXTURE_BROKEN_HTML = [
@@ -34,7 +47,6 @@ export const FixturePath = {
 } as const;
 
 const FIXTURE_PAGES: Readonly<Record<string, string>> = {
-  [FixturePath.Product]: FIXTURE_PRODUCT_HTML,
   [FixturePath.Broken]: FIXTURE_BROKEN_HTML,
   [FixturePath.Search]: FIXTURE_SEARCH_HTML,
 };
@@ -49,6 +61,8 @@ export interface LocalServer {
   readonly requests: readonly string[];
   /** Answers every `/late-popup` request, held until now, and the ones after it. */
   releaseLatePopup(): void;
+  /** Changes the price the fixture product page shows from now on. */
+  setProductPrice(amountMinor: number): void;
   close(): Promise<void>;
 }
 
@@ -71,9 +85,10 @@ const respond = (
   response: ServerResponse,
   target: string,
   latePopup: Promise<void>,
+  productPrice: number,
 ): void => {
   const url = new URL(request.url ?? "/", "http://fixture");
-  const fixturePage = FIXTURE_PAGES[url.pathname];
+  const fixturePage = url.pathname === FixturePath.Product ? productPage(productPrice) : FIXTURE_PAGES[url.pathname];
   if (fixturePage !== undefined) {
     response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
     response.end(fixturePage);
@@ -144,11 +159,12 @@ export interface LocalServerOptions {
 }
 
 /**
- * Serves the fixture page, the fixture plugin's product, unparseable product and search pages, a page that opens a
- * popup with `window.open`, a redirect to it, a user agent echo, a 404, a request that never answers, a page that opens
- * a popup whose response waits for {@link LocalServer.releaseLatePopup}, a page whose subresources load from
- * `options.target`, a page that opens a WebSocket to `options.target` and reports `/socket-done` once it closes, and a
- * redirect to `options.target`. WebSocket upgrades are logged as `upgrade <path>` and refused.
+ * Serves the fixture page, the fixture plugin's product at a price {@link LocalServer.setProductPrice} can change,
+ * its unparseable product and search pages, a page that opens a popup with `window.open`, a redirect to it, a user
+ * agent echo, a 404, a request that never answers, a page that opens a popup whose response waits for
+ * {@link LocalServer.releaseLatePopup}, a page whose subresources load from `options.target`, a page that opens a
+ * WebSocket to `options.target` and reports `/socket-done` once it closes, and a redirect to `options.target`.
+ * WebSocket upgrades are logged as `upgrade <path>` and refused.
  */
 export const startLocalServer = async (options: LocalServerOptions = {}): Promise<LocalServer> => {
   const requests: string[] = [];
@@ -156,9 +172,10 @@ export const startLocalServer = async (options: LocalServerOptions = {}): Promis
   const latePopup = new Promise<void>((resolve) => {
     releaseLatePopup = resolve;
   });
+  let productPrice = FIXTURE_PRICE_MINOR;
   const server = createServer((request, response) => {
     requests.push(request.url ?? "");
-    respond(request, response, options.target ?? "", latePopup);
+    respond(request, response, options.target ?? "", latePopup, productPrice);
   });
   server.on("upgrade", (request: IncomingMessage, socket: Duplex) => {
     requests.push(`upgrade ${request.url ?? ""}`);
@@ -169,6 +186,9 @@ export const startLocalServer = async (options: LocalServerOptions = {}): Promis
     origin,
     requests,
     releaseLatePopup,
+    setProductPrice: (amountMinor) => {
+      productPrice = amountMinor;
+    },
     close: async () =>
       new Promise((resolve, reject) => {
         server.closeAllConnections();
