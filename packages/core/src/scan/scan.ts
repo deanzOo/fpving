@@ -163,9 +163,7 @@ const scanPlugin = async (
       transitions.push({ listingId, productId, from, to: update.status });
     }
   }
-  if (!backingOff) {
-    await repository.pluginHealth.upsert({ pluginId, consecutiveBlocks, backoffUntil });
-  }
+  await repository.pluginHealth.upsert({ pluginId, consecutiveBlocks, backoffUntil });
   const outcome = outcomeOf(errorKind, succeeded);
   const run: ScanRun = {
     id: scanRunIdSchema.parse(deps.ids.next()),
@@ -221,11 +219,9 @@ const evaluateProduct = async (
     const input = { listing, history, incoming: snapshot, productListings, previousCheapestListingId };
     await raise(evaluate({ ...input, rates, settings, now }));
   }
-  if (rows.length === 0) {
-    await raise(
-      evaluateCheapest({ productId, productListings, previousCheapestListingId, rates, settings, now: clock.now() }),
-    );
-  }
+  await raise(
+    evaluateCheapest({ productId, productListings, previousCheapestListingId, rates, settings, now: clock.now() }),
+  );
   if (previousCheapestListingId !== product.cheapestListingId) {
     stored(await repository.products.setCheapest(productId, previousCheapestListingId), `product ${productId}`);
   }
