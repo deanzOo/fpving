@@ -29,9 +29,6 @@ export const axisProps = {
   },
 } as const;
 
-/** Recharts tooltip cursor: a dashed crosshair at the hovered day. */
-export const cursorProps = { stroke: "var(--color-line-strong)", strokeDasharray: "2 3" } as const;
-
 /**
  * Recharts line props for one series: a 2px line in its colour that leaves gaps, and a 4px dot ringed in the surface
  * for a priced day with no priced neighbour.
@@ -50,13 +47,7 @@ export const lineProps = (values: readonly unknown[], color: string, dotClass: s
   isAnimationActive: false,
 } as const);
 
-/**
- * A series colour mark for a legend or a tooltip line.
- *
- * @param props - The series colour.
- * @returns The swatch.
- */
-export const Swatch = ({ color }: { readonly color: string }) => (
+const Swatch = ({ color }: { readonly color: string }) => (
   <span aria-hidden="true" className="inline-block h-0.5 w-4 flex-none" style={{ backgroundColor: color }} />
 );
 
