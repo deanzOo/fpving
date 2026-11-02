@@ -8,6 +8,155 @@
   }
 
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-signal;
+    outline: var(--hairline) solid var(--color-signal);
+    outline-offset: var(--bracket-gap);
+  }
+}
+
+@layer components {
+  :where(a, button, summary):focus-visible,
+  .focus-frame:focus-within,
+  .reticle {
+    position: relative;
+  }
+
+  :where(a, button, summary):focus-visible::after,
+  .focus-frame:focus-within::after,
+  .reticle::after {
+    --arm: var(--bracket-arm);
+    --stroke: var(--bracket-stroke);
+    --ink: var(--reticle-color, var(--color-signal));
+    content: "";
+    position: absolute;
+    inset: calc(-1 * (var(--bracket-gap) + var(--bracket-stroke)));
+    pointer-events: none;
+    background:
+      linear-gradient(var(--ink), var(--ink)) left top / var(--arm) var(--stroke) no-repeat,
+      linear-gradient(var(--ink), var(--ink)) left top / var(--stroke) var(--arm) no-repeat,
+      linear-gradient(var(--ink), var(--ink)) right top / var(--arm) var(--stroke) no-repeat,
+      linear-gradient(var(--ink), var(--ink)) right top / var(--stroke) var(--arm) no-repeat,
+      linear-gradient(var(--ink), var(--ink)) left bottom / var(--arm) var(--stroke) no-repeat,
+      linear-gradient(var(--ink), var(--ink)) left bottom / var(--stroke) var(--arm) no-repeat,
+      linear-gradient(var(--ink), var(--ink)) right bottom / var(--arm) var(--stroke) no-repeat,
+      linear-gradient(var(--ink), var(--ink)) right bottom / var(--stroke) var(--arm) no-repeat;
+  }
+
+  .reticle-muted {
+    --reticle-color: var(--color-line-strong);
+  }
+
+  :where(a, button, summary):focus-visible {
+    --reticle-color: var(--color-signal);
+  }
+
+  .focus-frame:focus-within {
+    outline: var(--hairline) solid var(--color-signal);
+    outline-offset: var(--bracket-gap);
+  }
+
+  .focus-frame :focus-visible {
+    outline: none;
+  }
+
+  .pending-mark[aria-disabled="true"]::before {
+    content: "";
+    flex: none;
+    width: 6px;
+    height: 6px;
+    background: var(--color-signal);
+    animation: blink 1s steps(2, start) infinite;
+  }
+
+  .rec::before {
+    content: "";
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-signal);
+    animation: blink 1s steps(2, start) infinite;
+  }
+
+  .sweep {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-line);
+  }
+
+  .sweep::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: -25%;
+    width: 25%;
+    background: var(--color-signal);
+    animation: sweep 1.6s linear infinite;
+  }
+
+  .select-chevron::before {
+    content: "";
+    position: absolute;
+    right: 13px;
+    top: 11px;
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--color-ink-muted);
+    border-bottom: 1.5px solid var(--color-ink-muted);
+    transform: rotate(45deg);
+    pointer-events: none;
+  }
+
+  .check-box:checked::before {
+    content: "";
+    width: 4px;
+    height: 8px;
+    margin-top: -2px;
+    border-right: 2px solid var(--color-on-signal);
+    border-bottom: 2px solid var(--color-on-signal);
+    transform: rotate(45deg);
+  }
+
+  .crosshair::before,
+  .crosshair::after {
+    content: "";
+    position: absolute;
+    background: var(--color-line-strong);
+  }
+
+  .crosshair::before {
+    left: calc(50% - 1px);
+    width: 2px;
+    height: 100%;
+  }
+
+  .crosshair::after {
+    top: calc(50% - 1px);
+    height: 2px;
+    width: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pending-mark::before,
+    .rec::before {
+      animation: none;
+    }
+
+    .sweep::after {
+      animation: none;
+      left: 0;
+      width: 100%;
+    }
+  }
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@keyframes sweep {
+  to {
+    transform: translateX(500%);
   }
 }
