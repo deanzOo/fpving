@@ -46,7 +46,7 @@ export const Confirm = ({ action, actionLabel, question, confirm, pending, onCon
           <button type="submit" className={button} autoFocus>Cancel</button>
           <button
             type="button"
-            className="rounded-md bg-critical px-3 py-1 font-medium text-on-action"
+            className="rounded-md bg-critical px-3 py-1 font-medium text-on-critical"
             onClick={() => {
               dialog.current?.close();
               onConfirm();

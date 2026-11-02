@@ -60,7 +60,7 @@ export const Watchlist = () => {
                   <td className={cell}><Sparkline trend={trend} /></td>
                   <td className={cell}>
                     {unreadAlerts > 0 && (
-                      <span className="whitespace-nowrap rounded-full bg-action px-2 text-sm text-on-action">
+                      <span className="whitespace-nowrap rounded-full bg-signal px-2 text-sm text-on-signal">
                         {unreadAlerts} unread
                       </span>
                     )}

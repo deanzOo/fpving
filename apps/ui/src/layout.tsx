@@ -20,7 +20,7 @@ const linkClass = "rounded-md px-3 py-2 font-medium text-ink-muted hover:text-in
 const activeClass = "rounded-md px-3 py-2 font-medium text-ink bg-surface";
 
 const UnreadBadge = ({ count }: { readonly count: number }) => (
-  <span className="ml-2 rounded-full bg-action px-2 text-sm text-on-action" aria-hidden="true">{count}</span>
+  <span className="ml-2 rounded-full bg-signal px-2 text-sm text-on-signal" aria-hidden="true">{count}</span>
 );
 
 /**

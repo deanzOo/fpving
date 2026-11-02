@@ -55,7 +55,7 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
       <button
         type="submit"
         aria-disabled={added.isPending}
-        className="rounded-md bg-action px-4 py-2 font-medium text-on-action aria-disabled:opacity-60"
+        className="rounded-md bg-signal px-4 py-2 font-medium text-on-signal aria-disabled:opacity-60"
       >
         {added.isPending ? pendingLabel : submitLabel}
       </button>

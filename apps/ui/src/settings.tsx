@@ -229,7 +229,7 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
         <button
           type="submit"
           aria-disabled={saving.isPending}
-          className="rounded-md bg-action px-4 py-2 font-medium text-on-action aria-disabled:opacity-60"
+          className="rounded-md bg-signal px-4 py-2 font-medium text-on-signal aria-disabled:opacity-60"
         >
           {saving.isPending ? "Saving…" : "Save settings"}
         </button>

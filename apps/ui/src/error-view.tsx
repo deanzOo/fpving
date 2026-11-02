@@ -21,7 +21,7 @@ export const ErrorView = ({ error, reset }: Pick<ErrorComponentProps, "error" | 
       </p>
       <button
         type="button"
-        className="mt-4 rounded-md bg-action px-4 py-2 font-medium text-on-action"
+        className="mt-4 rounded-md bg-signal px-4 py-2 font-medium text-on-signal"
         onClick={() => {
           queries.reset();
           reset();

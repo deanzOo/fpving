@@ -47,7 +47,7 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
     );
   };
   return (
-    <div className="text-series">
+    <div className="text-series-1">
       <LineChart width={WIDTH} height={HEIGHT} data={data} title={name} margin={MARGIN}>
         <XAxis dataKey={DAY} hide />
         <YAxis hide domain={["dataMin", "dataMax"]} />
