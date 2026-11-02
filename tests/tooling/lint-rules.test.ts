@@ -46,6 +46,7 @@ describe("Lint rules", () => {
     ["coverage-ignore-c8.ts", "no-warning-comments"],
     ["coverage-ignore-istanbul.ts", "no-warning-comments"],
     ["coverage-ignore-node.ts", "no-warning-comments"],
+    ["stryker-disable.ts", "no-warning-comments"],
     ["formatting.ts", "@stylistic/semi"],
     ["formatting.ts", "@stylistic/quotes"],
     ["formatting.ts", "@stylistic/object-curly-spacing"],
