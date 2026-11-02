@@ -1,5 +1,5 @@
 import { useId, useRef } from "react";
-import { unlessPending } from "./pending.ts";
+import { Button, ButtonVariant } from "./button.tsx";
 
 interface ConfirmProps {
   readonly action: string;
@@ -9,8 +9,6 @@ interface ConfirmProps {
   readonly pending: boolean;
   readonly onConfirm: () => void;
 }
-
-const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
 
 /**
  * A button that asks first in a modal dialog. Cancel, or Escape, closes it and the browser puts focus back on the
@@ -25,35 +23,33 @@ export const Confirm = ({ action, actionLabel, question, confirm, pending, onCon
   const questionId = useId();
   return (
     <>
-      <button
-        type="button"
-        className={button}
-        aria-disabled={pending}
+      <Button
+        pending={pending}
         aria-label={actionLabel}
-        onClick={unlessPending(pending, () => {
+        onClick={() => {
           dialog.current?.showModal();
-        })}
+        }}
       >
         {action}
-      </button>
+      </Button>
       <dialog
         ref={dialog}
         aria-labelledby={questionId}
-        className="m-auto rounded-lg border border-line bg-surface p-6 text-ink backdrop:bg-ink/40"
+        className={"m-auto max-w-[420px] rounded-2 border border-line-strong bg-surface-raised p-6 text-ink "
+          + "shadow-dialog backdrop:bg-scrim"}
       >
-        <p id={questionId}>{question}</p>
+        <p id={questionId} className="type-body">{question}</p>
         <form method="dialog" className="mt-4 flex gap-2">
-          <button type="submit" className={button} autoFocus>Cancel</button>
-          <button
-            type="button"
-            className="rounded-md bg-critical px-3 py-1 font-medium text-on-critical"
+          <Button type="submit" autoFocus>Cancel</Button>
+          <Button
+            variant={ButtonVariant.Danger}
             onClick={() => {
               dialog.current?.close();
               onConfirm();
             }}
           >
             {confirm}
-          </button>
+          </Button>
         </form>
       </dialog>
     </>

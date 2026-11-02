@@ -6,7 +6,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toFailure, useClient } from "./client.ts";
 import type { Client } from "./client.ts";
-import { Confirm } from "./confirm.tsx";
+import { Confirm } from "./ui/confirm.tsx";
 import { listingName } from "./listing-name.ts";
 import { formatMoney } from "./money.ts";
 import { PriceHistory } from "./price-history.tsx";
