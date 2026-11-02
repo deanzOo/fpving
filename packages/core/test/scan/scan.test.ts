@@ -553,6 +553,20 @@ describe("Scanning listings", () => {
       expect((await repository.products.get(P1))?.cheapestListingId).toBe(l2.id);
     });
 
+    it("keeps a fetched listing as the new cheapest when an older snapshot shares its observation time", async () => {
+      const tied = snapshot(l2, LOWER, { id: snapshotIdSchema.parse("zz-l2"), observedAt: NOW, inStock: false });
+      const { deps, repository } = await setup({
+        products: [product("p1", { cheapestListingId: l1.id })],
+        listings: [l1, l2],
+        bases: [tied],
+        answers: [[l2, fetched(LOWEST)]],
+      });
+      const report = await scanListings(deps);
+      const cheapest = report.alerts.filter((row) => row.kind === AlertKind.NewCheapest);
+      expect(cheapest.map((row) => row.listingId)).toEqual([l2.id]);
+      expect((await repository.products.get(P1))?.cheapestListingId).toBe(l2.id);
+    });
+
     it("stores the product's cheapest listing only when it changed", async () => {
       const calls: unknown[] = [];
       const wrap = (repository: Repository): Repository => ({

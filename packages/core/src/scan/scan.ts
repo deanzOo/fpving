@@ -219,9 +219,11 @@ const evaluateProduct = async (
     const input = { listing, history, incoming: snapshot, productListings, previousCheapestListingId };
     await raise(evaluate({ ...input, rates, settings, now }));
   }
-  await raise(
-    evaluateCheapest({ productId, productListings, previousCheapestListingId, rates, settings, now: clock.now() }),
-  );
+  if (rows.length === 0) {
+    await raise(
+      evaluateCheapest({ productId, productListings, previousCheapestListingId, rates, settings, now: clock.now() }),
+    );
+  }
   if (previousCheapestListingId !== product.cheapestListingId) {
     stored(await repository.products.setCheapest(productId, previousCheapestListingId), `product ${productId}`);
   }
