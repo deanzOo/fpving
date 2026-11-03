@@ -57,13 +57,11 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
           {submitLabel}
         </Button>
       </div>
-      {added.isError && (
-        <div className="mt-3">
-          <Refused error={added.error} id={errorId} />
-        </div>
-      )}
       <div className="has-[p]:mt-3">
         <Done>{added.isSuccess ? said(added.data) : ""}</Done>
+      </div>
+      <div className="has-[p]:mt-3">
+        <Refused error={added.error} id={errorId} />
       </div>
     </form>
   );

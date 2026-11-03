@@ -105,31 +105,35 @@ const Candidate = ({ candidate, product, featured, announce, reviewing }: Candid
         {" similar, on "}
         <span className="type-code">{candidate.pluginId}</span>
       </p>
-      <div className="flex gap-2">
-        <Button
-          size={ButtonSize.Small}
-          pending={busy}
-          pendingLabel={accept.isPending ? "Accepting…" : undefined}
-          aria-label={`${accept.isPending ? "Accepting" : "Accept"} ${candidate.title}`}
-          onClick={() => {
-            accept.mutate(params);
-          }}
-        >
-          Accept
-        </Button>
-        <Button
-          size={ButtonSize.Small}
-          pending={busy}
-          pendingLabel={reject.isPending ? "Rejecting…" : undefined}
-          aria-label={`${reject.isPending ? "Rejecting" : "Reject"} ${candidate.title}`}
-          onClick={() => {
-            reject.mutate(params);
-          }}
-        >
-          Reject
-        </Button>
+      <div>
+        <div className="flex gap-2">
+          <Button
+            size={ButtonSize.Small}
+            pending={busy}
+            pendingLabel={accept.isPending ? "Accepting…" : undefined}
+            aria-label={`${accept.isPending ? "Accepting" : "Accept"} ${candidate.title}`}
+            onClick={() => {
+              accept.mutate(params);
+            }}
+          >
+            Accept
+          </Button>
+          <Button
+            size={ButtonSize.Small}
+            pending={busy}
+            pendingLabel={reject.isPending ? "Rejecting…" : undefined}
+            aria-label={`${reject.isPending ? "Rejecting" : "Reject"} ${candidate.title}`}
+            onClick={() => {
+              reject.mutate(params);
+            }}
+          >
+            Reject
+          </Button>
+        </div>
+        <div className="has-[p]:mt-2">
+          <Refused error={failed} />
+        </div>
       </div>
-      {failed !== null && <Refused error={failed} />}
     </div>
   );
   return (
@@ -192,11 +196,9 @@ const Group = ({ product, candidates, featured }: GroupProps) => {
           <Notice {...said.look}>{said.text}</Notice>
         </div>
       )}
-      {find.isError && (
-        <div className="mt-2">
-          <Refused error={find.error} />
-        </div>
-      )}
+      <div className="has-[p]:mt-2">
+        <Refused error={find.error} />
+      </div>
       {candidates.length === 0
         ? <p className="mt-2 text-ink-muted type-body">No pending candidates.</p>
         : (

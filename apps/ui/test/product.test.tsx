@@ -13,7 +13,7 @@ import {
 } from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { hasBrackets, rgb, styleOf, token } from "./support/style.ts";
+import { expectSaidInPlace, hasBrackets, rgb, statusRegions, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 type Detail = z.output<typeof wire.detail>;
@@ -92,6 +92,8 @@ const open = async (api = scripted()) => {
   await expect.element(screen.getByRole("heading", { level: 1, name: "Acme X5 frame" })).toBeVisible();
   return screen;
 };
+
+const restarting = failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting");
 
 const cheapestAt = (listingId: string): Detail => {
   const shown = detail();
@@ -345,6 +347,26 @@ describe("Product detail", () => {
     await expect.element(other).toHaveTextContent("Remove");
     await expect.element(other).toHaveAttribute("aria-disabled", "true");
     removed.release();
+  });
+
+  it("says a restart on a rename in a status region that was already there", async () => {
+    const api = scripted();
+    api.on(at(apiRoutes.renameProduct, { productId: ID }), restarting);
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Rename" }).click();
+    const regions = statusRegions();
+    await screen.getByRole("button", { name: "Save name" }).click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
+  });
+
+  it("says a restart on a removal in a status region that was already there", async () => {
+    const api = scripted();
+    api.on(at(apiRoutes.removeListing, { productId: ID, listingId: "l2" }), restarting);
+    const screen = await open(api);
+    const regions = statusRegions();
+    await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
+    await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
   });
 
   it("shows a not found state for a product that is not watched", async () => {

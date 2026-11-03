@@ -12,7 +12,8 @@ const LOOK: Readonly<Record<NoticeTone, { readonly box: string; readonly tag: st
 
 /**
  * One sentence about what just happened, announced: an alert for a critical notice, a status otherwise. The live
- * region stays mounted while there is nothing to say, so the next message is announced; a new tone mounts a new one.
+ * region stays mounted while there is nothing to say, so the next message is announced; only a new role mounts a new
+ * one, so a status region can turn into a warning without losing that.
  *
  * @param props - The tone, the one-word tag, the message and its id, for a control the message describes.
  * @returns The notice.
@@ -22,19 +23,22 @@ export const Notice = ({ tone, tag, id, children }: {
   readonly id?: string | undefined;
   readonly tag: string;
   readonly children: ReactNode;
-}) => (
-  <div key={tone} role={tone === NoticeTone.Critical ? "alert" : "status"}>
-    {!children
-      ? null
-      : (
-          <p className={`flex items-baseline gap-3 rounded-2 border px-3 py-2 text-ink ${LOOK[tone].box}`}>
-            <span className={`flex-none type-label ${LOOK[tone].tag}`}>{tag}</span>
-            {" "}
-            <span id={id} className="type-body">{children}</span>
-          </p>
-        )}
-  </div>
-);
+}) => {
+  const role = tone === NoticeTone.Critical ? "alert" : "status";
+  return (
+    <div key={role} role={role}>
+      {!children
+        ? null
+        : (
+            <p className={`flex items-baseline gap-3 rounded-2 border px-3 py-2 text-ink ${LOOK[tone].box}`}>
+              <span className={`flex-none type-label ${LOOK[tone].tag}`}>{tag}</span>
+              {" "}
+              <span id={id} className="type-body">{children}</span>
+            </p>
+          )}
+    </div>
+  );
+};
 
 /**
  * The outcome of something the user did, tagged Done, in a live region that stays mounted for the next one.

@@ -133,6 +133,14 @@ describe("Notice", () => {
     await expect.element(screen.getByRole("textbox")).toHaveAccessibleDescription("No plugin handles this store.");
   });
 
+  it("keeps the same live region when a status notice becomes a warning, so the text is announced", async () => {
+    const screen = await render(<Notice tone={NoticeTone.Status} tag="Done">{""}</Notice>);
+    const region = screen.getByRole("status").element();
+    await screen.rerender(<Notice tone={NoticeTone.Warning} tag="Restarting">Try again in a moment.</Notice>);
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Restarting Try again in a moment.");
+    expect(region.isConnected).toBe(true);
+  });
+
   it("mounts a new live region when its tone changes, so the new role is announced", async () => {
     const screen = await render(<Notice tone={NoticeTone.Status} tag="Saving">Saving…</Notice>);
     const status = screen.getByRole("status").element();

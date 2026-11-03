@@ -74,7 +74,7 @@ export const ScanNow = () => {
       >
         {status === undefined ? "" : said}
       </ScanStatus>
-      {started.isError && <Refused error={started.error} />}
+      <Refused error={started.error} />
     </div>
   );
 };

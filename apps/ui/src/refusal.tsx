@@ -13,6 +13,8 @@ const FAILED: ReadonlySet<FailureKind> = new Set([
   ...Object.values(ClientErrorKind),
 ]);
 
+const QUIET = { tone: NoticeTone.Status, tag: "" } as const;
+
 const RESTARTING = "fpving is restarting its plugins for a settings change. Try again in a moment.";
 
 /**
@@ -78,12 +80,17 @@ export const noticeLook = ({ kind }: ApiFailure) => {
 };
 
 /**
- * A refused or failed request, explained in a notice under the control that sent it.
+ * A refused or failed request, explained in a notice under the control that sent it. With no error it holds an empty
+ * status region, so a restart or a startup arriving later is announced; a failure brings its own alert.
  *
- * @param props - The error, and an id for the explanation when the control is described by it.
+ * @param props - The error or null, and an id for the explanation when the control is described by it.
  * @returns The notice.
  */
 export const Refused = ({ error, id }: { readonly error: unknown; readonly id?: string | undefined }) => {
-  const failure = toFailure(error);
-  return <Notice {...noticeLook(failure)} id={id}>{explain(failure)}</Notice>;
+  const failure = error === null ? null : toFailure(error);
+  return (
+    <Notice {...(failure === null ? QUIET : noticeLook(failure))} id={id}>
+      {failure === null ? null : explain(failure)}
+    </Notice>
+  );
 };

@@ -31,3 +31,12 @@ export const expectBadge = async (word: Locator, glyph: string | undefined, ink:
   expect(word.element().previousElementSibling?.textContent).toBe(glyph);
   expect(getComputedStyle(word.element()).color).toBe(rgb(token(ink)));
 };
+
+/** The live status regions on the page now, to compare with where a later notice appears. */
+export const statusRegions = (): Element[] => [...document.querySelectorAll("[role=status]")];
+
+/** That `tag` showed up inside one of the status `regions` that were there before it had anything to say. */
+export const expectSaidInPlace = async (tag: Locator, regions: readonly Element[]): Promise<void> => {
+  await expect.element(tag).toBeVisible();
+  expect(regions).toContain(tag.element().closest("[role=status]"));
+};

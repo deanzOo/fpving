@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { emptyTrend, failWith, fakeApi, product, reply, wire, Role } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { styleOf } from "./support/style.ts";
+import { expectSaidInPlace, statusRegions, styleOf } from "./support/style.ts";
 import "../src/styles.css";
 
 type Status = z.output<typeof wire.scan>;
@@ -57,6 +57,17 @@ describe("Scan now", () => {
     const figure = screen.getByRole("status").getByText(count, { exact: true });
     await expect.element(figure).toBeVisible();
     expect(styleOf(figure).fontFamily).toContain("Martian Mono");
+  });
+
+  it("says a restart in a status region that was already there, so it is announced", async () => {
+    const api = scripted(idle);
+    api.on(apiRoutes.startScan, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await renderApp(api.client);
+    const scan = screen.getByRole("button", { name: "Scan now" });
+    await expect.element(screen.getByText("No scan has finished since fpving started.")).toBeVisible();
+    const regions = statusRegions();
+    await scan.click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
   });
 
   it("reads the watchlist once on first load, not again for a scan that finished before", async () => {

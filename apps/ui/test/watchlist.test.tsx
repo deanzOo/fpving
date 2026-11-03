@@ -12,7 +12,7 @@ import {
 } from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { rgb, styleOf, token } from "./support/style.ts";
+import { expectSaidInPlace, rgb, statusRegions, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 type Row = z.output<typeof wire.watchlist>[number];
@@ -245,6 +245,18 @@ describe("Adding a product by URL", () => {
     await expect.element(screen.getByRole(role).filter({ hasText: tagged })).toHaveTextContent(tagged);
     await expect.element(field).toHaveAttribute("aria-invalid", "true");
     await expect.element(field).toHaveAccessibleDescription(shown);
+  });
+
+  it("says a restart in a status region that was already there, so it is announced", async () => {
+    const api = scripted([]);
+    api.on(apiRoutes.addProduct, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await renderApp(api.client);
+    const field = screen.getByLabelText("Store URL");
+    await expect.element(field).toBeVisible();
+    const regions = statusRegions();
+    await field.fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
   });
 
   it("links an already_tracked refusal to the product that already watches the page", async () => {

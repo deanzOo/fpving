@@ -185,11 +185,9 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
       <div className="has-[p]:mt-4">
         <Done>{saving.isSuccess ? "Settings saved." : ""}</Done>
       </div>
-      {saving.isError && (
-        <div className="mt-4">
-          <Refused error={saving.error} />
-        </div>
-      )}
+      <div className="has-[p]:mt-4">
+        <Refused error={saving.error} />
+      </div>
     </form>
   );
 };

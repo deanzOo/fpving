@@ -128,11 +128,9 @@ const Header = ({ product }: { readonly product: Product }) => {
               />
             </div>
           )}
-      {failed !== null && (
-        <div className="mt-2">
-          <Refused error={failed} />
-        </div>
-      )}
+      <div className="has-[p]:mt-2">
+        <Refused error={failed} />
+      </div>
     </header>
   );
 };
@@ -151,11 +149,9 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
   return (
     <section className="mt-8">
       <h2 ref={heading} tabIndex={-1} className="type-heading">Listings</h2>
-      {remove.isError && (
-        <div className="mt-2">
-          <Refused error={remove.error} />
-        </div>
-      )}
+      <div className="has-[p]:mt-2">
+        <Refused error={remove.error} />
+      </div>
       <div className="mt-4">
         <DataTable
           caption="Listings, with each one's latest price and landed cost"

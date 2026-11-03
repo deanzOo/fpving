@@ -18,7 +18,7 @@ import {
   alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire, Role,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { expectBadge, rgb, styleOf, token } from "./support/style.ts";
+import { expectBadge, expectSaidInPlace, rgb, statusRegions, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const FRAME = "p1";
@@ -202,7 +202,8 @@ describe("Match review", () => {
     await expect.element(frame.getByRole("listitem")).toHaveFocus();
     await frame.getByRole("button", { name: "Reject Acme X5 c2" }).click();
     await expect.element(frame.getByRole("heading", { level: 2, name: "Acme X5 frame" })).toHaveFocus();
-    await expect.element(frame.getByRole("status")).toHaveTextContent("Done Rejected Acme X5 c2.");
+    await expect.element(frame.getByRole("status").filter({ hasText: "Rejected" }))
+      .toHaveTextContent("Done Rejected Acme X5 c2.");
     expect(styleOf(frame.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
   });
 
@@ -235,7 +236,7 @@ describe("Match review", () => {
       .toHaveAttribute("aria-disabled", "true");
     searched.release();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
-    await expect.element(frame.getByRole("status"))
+    await expect.element(frame.getByRole("status").filter({ hasText: "Saved" }))
       .toHaveTextContent("Partial Saved 1 candidates. The search failed on bazaar (blocked).");
   });
 
@@ -251,6 +252,40 @@ describe("Match review", () => {
     await frame.getByRole("button", { name: "Find matches" }).click();
     return frame;
   };
+
+  it.each([
+    ["find matches", at(apiRoutes.findMatches, { productId: FRAME }), "Find matches"],
+    ["accept", at(apiRoutes.acceptCandidate, { candidateId: "c1" }), "Accept Acme X5 c1"],
+    ["reject", at(apiRoutes.rejectCandidate, { candidateId: "c1" }), "Reject Acme X5 c1"],
+  ])("says a restart on %s in a status region that was already there", async (_action, route, name) => {
+    const api = scripted([candidate("c1", FRAME)]);
+    api.on(route, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await renderApp(api.client, "/matches");
+    const button = group(screen, "Acme X5 frame").getByRole("button", { name });
+    await expect.element(button).toBeVisible();
+    const regions = statusRegions();
+    await button.click();
+    await expectSaidInPlace(group(screen, "Acme X5 frame").getByText("Restarting", { exact: true }), regions);
+  });
+
+  it("keeps saying a later outcome in its status region after a failed search", async () => {
+    const api = scripted([candidate("c1", FRAME)]);
+    api.on(at(apiRoutes.findMatches, { productId: FRAME }), reply(wire.found, {
+      candidates: [],
+      failedSearches: [
+        { pluginId: pluginIdSchema.parse("bazaar"), error: { kind: StoreErrorKind.Blocked, detail: "no" } },
+      ],
+      foreignResults: [],
+    }));
+    rejectedLeaving(api, "c1");
+    const screen = await renderApp(api.client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    await frame.getByRole("button", { name: "Find matches" }).click();
+    await expect.element(frame.getByRole("alert")).toBeVisible();
+    const regions = statusRegions();
+    await frame.getByRole("button", { name: "Reject Acme X5 c1" }).click();
+    await expectSaidInPlace(frame.getByText("Done", { exact: true }), regions);
+  });
 
   it("says Done, in the status tone, when no search failed", async () => {
     const frame = await searchWith([candidate("c1", FRAME)], []);

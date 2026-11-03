@@ -89,11 +89,9 @@ export const Alerts = () => {
           {markAll.isSuccess ? `Marked ${String(markAll.data.marked)} alerts read.` : ""}
         </Done>
       </div>
-      {failed !== null && (
-        <div className="mt-4">
-          <Refused error={failed} />
-        </div>
-      )}
+      <div className="has-[p]:mt-4">
+        <Refused error={failed} />
+      </div>
       <div className="mt-6">
         {alerts === undefined && <p className="text-ink-muted type-body">Loading…</p>}
         {alerts?.length === 0 && (

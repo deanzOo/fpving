@@ -25,6 +25,24 @@ describe("Refused notice", () => {
     expect(styleOf(alert.getByText(tag, { exact: true })).color).toBe(rgb(token("--color-critical")));
   });
 
+  it("holds an empty status region with no error, and says a restart in that same region", async () => {
+    const screen = await render(<Refused error={null} />);
+    const region = screen.getByRole("status");
+    await expect.element(region).toBeEmptyDOMElement();
+    const before = region.element();
+    await screen.rerender(<Refused error={new ApiFailure(ApiErrorKind.Restarting, MESSAGE)} />);
+    await expect.element(region.getByText("Restarting", { exact: true })).toBeVisible();
+    expect(region.element()).toBe(before);
+  });
+
+  it("goes back to an empty status region once an alert is over", async () => {
+    const screen = await render(<Refused error={new ApiFailure(ApiErrorKind.Internal, MESSAGE)} />);
+    await expect.element(screen.getByRole("alert")).toBeVisible();
+    await screen.rerender(<Refused error={null} />);
+    await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
   it.each([
     [ApiErrorKind.Restarting, "Restarting"],
     [ApiErrorKind.Starting, "Starting"],

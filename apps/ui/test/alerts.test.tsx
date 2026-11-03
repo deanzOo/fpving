@@ -8,7 +8,7 @@ import {
   at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, unreadAlert, wire,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { expectBadge, rgb, styleOf, token } from "./support/style.ts";
+import { expectBadge, expectSaidInPlace, rgb, statusRegions, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const UNREAD = "?unread=true";
@@ -54,6 +54,20 @@ describe("Alerts", () => {
     const unread = screen.getByRole("listitem").getByText("Unread", { exact: true });
     await expect.element(unread).toBeVisible();
     expect(styleOf(unread).color).toBe(rgb(token("--color-signal")));
+  });
+
+  it.each([
+    ["mark all read", apiRoutes.markAllAlertsRead, /^Mark all read/u],
+    ["mark read", at(apiRoutes.markAlertRead, { alertId: "a2" }), /^Mark read: Price drop/u],
+  ])("says a restart on %s in a status region that was already there", async (_action, route, name) => {
+    const api = scripted([drop]);
+    api.on(route, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await renderApp(api.client, "/alerts");
+    const button = screen.getByRole("button", { name });
+    await expect.element(button).toBeVisible();
+    const regions = statusRegions();
+    await button.click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
   });
 
   it("says Marking… on the alert being marked read, holding the others meanwhile", async () => {
@@ -146,7 +160,8 @@ describe("Alerts", () => {
     });
     const screen = await renderApp(api.client, "/alerts");
     await screen.getByRole("button", { name: "Mark all read" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Done Marked 2 alerts read.");
+    await expect.element(screen.getByRole("status").filter({ hasText: "Marked" }))
+      .toHaveTextContent("Done Marked 2 alerts read.");
     expect(styleOf(screen.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
     await expect.element(screen.getByRole("link", { name: "Alerts", exact: true })).toBeVisible();
   });
