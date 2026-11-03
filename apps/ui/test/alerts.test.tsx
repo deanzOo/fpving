@@ -4,8 +4,12 @@ import { HttpStatus } from "@fpving/app/http-status";
 import { AlertKind } from "@fpving/core";
 import type { Alert } from "@fpving/core";
 import { describe, expect, it } from "vitest";
-import { at, emptyTrend, failWith, fakeApi, noContent, product, reply, unreadAlert, wire } from "./support/fake-api.ts";
+import {
+  at, emptyTrend, failWith, fakeApi, gate, noContent, product, reply, unreadAlert, wire,
+} from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { rgb, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 const UNREAD = "?unread=true";
 const READ_AT = new Date("2026-10-30T09:00:00.000Z");
@@ -34,6 +38,54 @@ describe("Alerts", () => {
     await expect.element(items.nth(1).getByText("Read", { exact: true })).toBeVisible();
     await expect.element(items.nth(0).getByRole("link", { name: "Acme X5 frame" }))
       .toHaveAttribute("href", "/products/p1");
+  });
+
+  it.each([
+    [AlertKind.PriceDrop, "Price drop", "▼", "--color-good"],
+    [AlertKind.BackInStock, "Back in stock", "✓", "--color-info"],
+    [AlertKind.NewCheapest, "New cheapest listing", "★", "--color-good"],
+  ])("shows a %s alert's kind as a badge: its words, its glyph and its colour", async (kind, words, glyph, ink) => {
+    const screen = await renderApp(scripted([{ ...drop, kind }]).client, "/alerts");
+    const badge = screen.getByRole("listitem").getByText(words, { exact: true });
+    await expect.element(badge).toBeVisible();
+    expect(badge.element().previousElementSibling?.textContent).toBe(glyph);
+    expect(styleOf(badge).color).toBe(rgb(token(ink)));
+  });
+
+  it("marks an unread alert as a live status in the signal colour", async () => {
+    const screen = await renderApp(scripted([drop]).client, "/alerts");
+    const unread = screen.getByRole("listitem").getByText("Unread", { exact: true });
+    await expect.element(unread).toBeVisible();
+    expect(styleOf(unread).color).toBe(rgb(token("--color-signal")));
+  });
+
+  it("says Marking… on the alert being marked read, holding the others meanwhile", async () => {
+    const api = scripted([drop, { ...unreadAlert("a4", "p1"), kind: AlertKind.BackInStock }]);
+    const marking = gate();
+    api.on(at(apiRoutes.markAlertRead, { alertId: "a2" }), async () => {
+      await marking.opened;
+      return noContent();
+    });
+    const screen = await renderApp(api.client, "/alerts");
+    await screen.getByRole("button", { name: /^Mark read: Price drop/u }).click();
+    await expect.element(screen.getByRole("button", { name: /^Mark read: Price drop/u })).toHaveTextContent("Marking…");
+    const other = screen.getByRole("button", { name: /^Mark read: Back in stock/u });
+    await expect.element(other).toHaveTextContent("Mark read");
+    await expect.element(other).toHaveAttribute("aria-disabled", "true");
+    marking.release();
+  });
+
+  it("says Marking… on mark all read while it is on its way", async () => {
+    const api = scripted([drop]);
+    const marking = gate();
+    api.on(apiRoutes.markAllAlertsRead, async () => {
+      await marking.opened;
+      return reply(wire.marked, { marked: 1 })();
+    });
+    const screen = await renderApp(api.client, "/alerts");
+    await screen.getByRole("button", { name: "Mark all read" }).click();
+    await expect.element(screen.getByRole("button", { name: "Marking…" })).toHaveAttribute("aria-disabled", "true");
+    marking.release();
   });
 
   it("names a product that is no longer watched without linking to it", async () => {
