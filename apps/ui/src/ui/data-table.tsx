@@ -31,8 +31,8 @@ export const DataTable = <Row extends object>({ caption, rows, rowKey, rowHeader
       <caption className="sr-only">{caption}</caption>
       <thead>
         <tr>
-          {[rowHeader, ...columns].map(({ header, numeric }) => (
-            <th key={header} scope="col" className={`${HEAD} ${numeric === true ? "text-right" : "text-left"}`}>
+          {[rowHeader, ...columns].map(({ header, numeric }, index) => (
+            <th key={index} scope="col" className={`${HEAD} ${numeric === true ? "text-right" : "text-left"}`}>
               {header}
             </th>
           ))}
@@ -45,8 +45,8 @@ export const DataTable = <Row extends object>({ caption, rows, rowKey, rowHeader
         {rows.map((row) => (
           <tr key={rowKey(row)} className="hover:bg-surface-raised">
             <th scope="row" className={`${CELL} font-medium ${face(rowHeader.numeric)}`}>{rowHeader.cell(row)}</th>
-            {columns.map(({ header, numeric, cell }) => (
-              <td key={header} className={`${CELL} ${face(numeric)}`}>{cell(row)}</td>
+            {columns.map(({ numeric, cell }, index) => (
+              <td key={index} className={`${CELL} ${face(numeric)}`}>{cell(row)}</td>
             ))}
             {actions === undefined ? null : <td className={CELL}>{actions(row)}</td>}
           </tr>

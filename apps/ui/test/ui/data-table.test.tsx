@@ -6,6 +6,7 @@ import { rgb, styleOf, token } from "../support/style.ts";
 import "../../src/styles.css";
 
 const ROW_HEIGHT = 36;
+const TWIN_COLUMNS = 2;
 const ROWS = [
   { id: "l1", name: "fpv-shop: Source One V5", landed: "€44.40", stock: "In stock" },
   { id: "l2", name: "quadparts: TBS Source One V5", landed: "€45.90", stock: "Out of stock" },
@@ -58,6 +59,23 @@ describe("Data table", () => {
     const screen = await table();
     await expect.element(screen.getByRole("columnheader", { name: "Actions" })).toBeInTheDocument();
     await expect.element(screen.getByRole("button", { name: "Remove quadparts: TBS Source One V5" })).toBeVisible();
+  });
+
+  it("keeps two columns that share a header apart", async () => {
+    const screen = await render(
+      <DataTable
+        caption="Prices"
+        rows={ROWS}
+        rowKey={({ id }) => id}
+        rowHeader={{ header: "Listing", cell: ({ name }) => name }}
+        columns={[
+          { header: "Cost", cell: ({ landed }) => landed },
+          { header: "Cost", cell: ({ stock }) => stock },
+        ]}
+      />,
+    );
+    await expect.element(screen.getByRole("cell", { name: "Out of stock" })).toBeVisible();
+    expect(screen.getByRole("columnheader", { name: "Cost" }).all()).toHaveLength(TWIN_COLUMNS);
   });
 
   it("has no actions column when rows have no actions", async () => {
