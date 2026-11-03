@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { z } from "zod";
 import {
-  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, product, reply, Role, wire,
+  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, product, reply, Role, wire,
 } from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
@@ -199,6 +199,22 @@ describe("Adding a product by URL", () => {
     const adding = screen.getByRole("button", { name: "Adding…" });
     await expect.element(adding).toHaveAttribute("aria-disabled", "true");
     await expect.element(adding).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    fetched.release();
+    await expect.element(screen.getByRole("button", { name: "Add product" })).toHaveAttribute("aria-disabled", "false");
+    expect(api.sent.filter(({ method }) => method === "POST")).toHaveLength(1);
+  });
+
+  it("ignores Enter from the field while the add is on its way", async () => {
+    const api = scripted([]);
+    const fetched = gate();
+    api.on(apiRoutes.addProduct, heldBy(fetched, reply(wire.added, added("Acme X5 kit"), HttpStatus.Created)));
+    const screen = await renderApp(api.client);
+    const field = screen.getByLabelText("Store URL");
+    await field.fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expect.element(screen.getByRole("button", { name: "Adding…" })).toHaveAttribute("aria-disabled", "true");
+    await expect.element(field).toHaveFocus();
     await userEvent.keyboard("{Enter}");
     fetched.release();
     await expect.element(screen.getByRole("button", { name: "Add product" })).toHaveAttribute("aria-disabled", "false");
