@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-page text-ink font-sans antialiased;
+    @apply bg-page text-ink font-sans antialiased type-body;
   }
 
   :focus-visible {

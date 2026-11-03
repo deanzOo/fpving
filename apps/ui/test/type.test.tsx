@@ -51,4 +51,10 @@ describe("Type styles", () => {
     expect(style.fontFamily).toContain("IBM Plex Sans");
     expect(style.lineHeight).toBe("20px");
   });
+
+  it("sets the page's own text in the body style, so a screen needs no size of its own", () => {
+    const style = getComputedStyle(document.body);
+    expect(style.fontSize).toBe("14px");
+    expect(style.lineHeight).toBe("20px");
+  });
 });
