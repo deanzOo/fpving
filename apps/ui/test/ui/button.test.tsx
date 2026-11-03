@@ -51,6 +51,11 @@ describe("Button", () => {
     expect(styleOf(button, "::before").animationName).toBe("blink");
   });
 
+  it("says it is available when it is not pending", async () => {
+    const screen = await render(<Button>Scan now</Button>);
+    await expect.element(screen.getByRole("button")).toHaveAttribute("aria-disabled", "false");
+  });
+
   it("keeps its label while pending when it has no progress label", async () => {
     const screen = await render(<Button pending>Stop watching</Button>);
     await expect.element(screen.getByRole("button", { name: "Stop watching" })).toHaveAttribute("aria-disabled");

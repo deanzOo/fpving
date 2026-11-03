@@ -14,11 +14,12 @@ const LOOK: Readonly<Record<NoticeTone, { readonly box: string; readonly tag: st
  * One sentence about what just happened, announced: an alert for a critical notice, a status otherwise. The live
  * region stays mounted while there is nothing to say, so the next message is announced; a new tone mounts a new one.
  *
- * @param props - The tone, the one-word tag and the message.
+ * @param props - The tone, the one-word tag, the message and its id, for a control the message describes.
  * @returns The notice.
  */
-export const Notice = ({ tone, tag, children }: {
+export const Notice = ({ tone, tag, id, children }: {
   readonly tone: NoticeTone;
+  readonly id?: string;
   readonly tag: string;
   readonly children: ReactNode;
 }) => (
@@ -29,7 +30,7 @@ export const Notice = ({ tone, tag, children }: {
           <p className={`flex items-baseline gap-3 rounded-2 border px-3 py-2 text-ink ${LOOK[tone].box}`}>
             <span className={`flex-none type-label ${LOOK[tone].tag}`}>{tag}</span>
             {" "}
-            <span className="type-body">{children}</span>
+            <span id={id} className="type-body">{children}</span>
           </p>
         )}
   </div>

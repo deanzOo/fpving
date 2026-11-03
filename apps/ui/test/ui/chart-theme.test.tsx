@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
-import { axisProps, ChartTooltip, gridProps, Legend, lineProps, SERIES } from "../../src/ui/chart-theme.tsx";
+import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+import { userEvent } from "vitest/browser";
+import {
+  axisProps, ChartTooltip, cursorProps, gridProps, Legend, lineProps, SERIES,
+} from "../../src/ui/chart-theme.tsx";
 import { rgb, styleOf, token } from "../support/style.ts";
 import "../../src/styles.css";
 
@@ -65,6 +68,22 @@ describe("Chart theme", () => {
     expect(tickStyle?.fontSize).toBe("11px");
     expect(tickStyle?.fontStretch).toBe("87.5%");
     expect(tickStyle?.fontVariantNumeric).toBe("tabular-nums slashed-zero");
+  });
+
+  it("marks the hovered day with a dashed crosshair in the strong line colour", async () => {
+    const data = VALUES.map((value, day) => ({ day, value }));
+    const screen = await render(
+      <LineChart width={WIDTH} height={HEIGHT} data={data}>
+        <XAxis dataKey="day" {...axisProps} />
+        <Tooltip cursor={cursorProps} content={() => null} isAnimationActive={false} />
+        <Line dataKey="value" {...lineProps(VALUES, SERIES[0], "test-dot")} />
+      </LineChart>,
+    );
+    await userEvent.hover(screen.container.querySelector(".recharts-surface") ?? screen.container);
+    await expect.poll(() => screen.container.querySelector(".recharts-tooltip-cursor")).not.toBeNull();
+    const cursor = screen.container.querySelector(".recharts-tooltip-cursor");
+    expect(cursor?.getAttribute("stroke")).toBe("var(--color-line-strong)");
+    expect(cursor?.getAttribute("stroke-dasharray")).not.toBeNull();
   });
 
   it("frames a tooltip on the raised surface, in the small type", async () => {

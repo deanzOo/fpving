@@ -52,7 +52,7 @@ export const Button = ({
   <button
     {...rest}
     type={type}
-    aria-disabled={pending || undefined}
+    aria-disabled={pending}
     className={`${BASE} ${VARIANT[variant]} ${SIZE[size]} ${className}`}
     onClick={pending
       ? (event) => {

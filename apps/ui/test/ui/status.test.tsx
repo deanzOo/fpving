@@ -116,6 +116,16 @@ describe("Notice", () => {
       await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
     });
 
+  it("gives its message the id it is given, so a control can be described by it", async () => {
+    const screen = await render(
+      <>
+        <input aria-label="Store URL" aria-describedby="refusal" />
+        <Notice tone={NoticeTone.Critical} tag="Refused" id="refusal">No plugin handles this store.</Notice>
+      </>,
+    );
+    await expect.element(screen.getByRole("textbox")).toHaveAccessibleDescription("No plugin handles this store.");
+  });
+
   it("mounts a new live region when its tone changes, so the new role is announced", async () => {
     const screen = await render(<Notice tone={NoticeTone.Status} tag="Saving">Saving…</Notice>);
     const status = screen.getByRole("status").element();

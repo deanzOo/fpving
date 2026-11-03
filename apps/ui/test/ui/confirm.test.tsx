@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { ButtonSize } from "../../src/ui/button.tsx";
 import { Confirm } from "../../src/ui/confirm.tsx";
 import { Theme } from "../../src/ui/theme.ts";
 import { rgb, styleOf, token } from "../support/style.ts";
 import "../../src/styles.css";
 
+const SMALL_HEIGHT = "28px";
 const QUESTION = "Stop watching TBS Source One V5? Its price history is kept.";
 
 const confirm = async (pending = false) => {
@@ -70,5 +72,36 @@ describe("Confirm", () => {
     await expect.element(trigger).toHaveAttribute("aria-disabled", "true");
     await trigger.click({ force: true });
     await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("says what it is doing on the trigger while pending", async () => {
+    const screen = await render(
+      <Confirm
+        action="Remove"
+        actionLabel="Remove fpv-shop: Source One V5"
+        question={QUESTION}
+        confirm="Remove"
+        pending
+        pendingLabel="Removing…"
+        onConfirm={() => undefined}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Remove fpv-shop: Source One V5" });
+    await expect.element(trigger).toHaveTextContent("Removing…");
+    await expect.element(trigger).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("takes a small trigger for a table row", async () => {
+    const screen = await render(
+      <Confirm
+        action="Remove"
+        question={QUESTION}
+        confirm="Remove"
+        pending={false}
+        size={ButtonSize.Small}
+        onConfirm={() => undefined}
+      />,
+    );
+    expect(styleOf(screen.getByRole("button", { name: "Remove" })).height).toBe(SMALL_HEIGHT);
   });
 });

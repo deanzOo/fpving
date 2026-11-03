@@ -1,5 +1,6 @@
 import { useId, useRef } from "react";
-import { Button, ButtonVariant } from "./button.tsx";
+import type { ReactNode } from "react";
+import { Button, ButtonSize, ButtonVariant } from "./button.tsx";
 
 interface ConfirmProps {
   readonly action: string;
@@ -7,24 +8,30 @@ interface ConfirmProps {
   readonly question: string;
   readonly confirm: string;
   readonly pending: boolean;
+  readonly pendingLabel?: ReactNode;
+  readonly size?: (typeof ButtonSize)[keyof typeof ButtonSize];
   readonly onConfirm: () => void;
 }
 
 /**
  * A button that asks first in a modal dialog. Cancel, or Escape, closes it and the browser puts focus back on the
- * button; the confirm button closes it and runs `onConfirm`. While `pending` the button stays focusable but does
- * nothing.
+ * button; the confirm button closes it and runs `onConfirm`. While `pending` the button stays focusable, shows
+ * `pendingLabel` when given and does nothing; `size` makes it small for a table row.
  *
- * @param props - The button's text and accessible name, the question, the confirm button's text and the action.
+ * @param props - The button's text, name, size and pending text, the question, the confirm text and the action.
  * @returns The button and its dialog.
  */
-export const Confirm = ({ action, actionLabel, question, confirm, pending, onConfirm }: ConfirmProps) => {
+export const Confirm = ({
+  action, actionLabel, question, confirm, pending, pendingLabel, size = ButtonSize.Regular, onConfirm,
+}: ConfirmProps) => {
   const dialog = useRef<HTMLDialogElement>(null);
   const questionId = useId();
   return (
     <>
       <Button
         pending={pending}
+        pendingLabel={pendingLabel}
+        size={size}
         aria-label={actionLabel}
         onClick={() => {
           dialog.current?.showModal();

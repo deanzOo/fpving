@@ -29,6 +29,9 @@ export const axisProps = {
   },
 } as const;
 
+/** Recharts tooltip cursor: a dashed crosshair at the hovered day, in the strong line colour. */
+export const cursorProps = { stroke: "var(--color-line-strong)", strokeDasharray: "4 4" } as const;
+
 /**
  * Recharts line props for one series: a 2px line in its colour that leaves gaps, and a 4px dot ringed in the surface
  * for a priced day with no priced neighbour.

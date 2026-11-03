@@ -32,6 +32,18 @@ describe("Text field", () => {
     await expect.element(screen.getByRole("textbox")).not.toHaveAttribute("aria-describedby");
   });
 
+  it("keeps a description and invalid mark the consumer wires, when it has no hint or error of its own", async () => {
+    const screen = await render(
+      <>
+        <TextField label="Store URL" aria-describedby="refusal" aria-invalid />
+        <p id="refusal">No plugin handles this store.</p>
+      </>,
+    );
+    const input = screen.getByRole("textbox", { name: "Store URL" });
+    await expect.element(input).toHaveAccessibleDescription("No plugin handles this store.");
+    await expect.element(input).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("types numbers in the readout face", async () => {
     const screen = await render(<TextField label="VAT (%)" numeric />);
     expect(styleOf(screen.getByRole("textbox")).fontFamily).toContain("Martian Mono");
