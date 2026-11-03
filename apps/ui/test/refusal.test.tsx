@@ -12,7 +12,6 @@ describe("Refused notice", () => {
   it.each([
     [ApiErrorKind.InvalidRequest, "Refused"],
     [ApiErrorKind.PluginUnavailable, "Refused"],
-    [ApiErrorKind.Starting, "Refused"],
     [ApiErrorKind.FetchFailed, "Failed"],
     [ApiErrorKind.SettingsNotApplied, "Failed"],
     [ApiErrorKind.Internal, "Failed"],
@@ -26,11 +25,14 @@ describe("Refused notice", () => {
     expect(styleOf(alert.getByText(tag, { exact: true })).color).toBe(rgb(token("--color-critical")));
   });
 
-  it("says a restart politely, as a warning tagged Restarting", async () => {
-    const screen = await render(<Refused error={new ApiFailure(ApiErrorKind.Restarting, MESSAGE)} />);
+  it.each([
+    [ApiErrorKind.Restarting, "Restarting"],
+    [ApiErrorKind.Starting, "Starting"],
+  ])("says %s politely, as a warning tagged %s", async (kind, tag) => {
+    const screen = await render(<Refused error={new ApiFailure(kind, MESSAGE)} />);
     const status = screen.getByRole("status");
-    await expect.element(status.getByText("Restarting", { exact: true })).toBeVisible();
-    expect(styleOf(status.getByText("Restarting", { exact: true })).color).toBe(rgb(token("--color-warning")));
+    await expect.element(status.getByText(tag, { exact: true })).toBeVisible();
+    expect(styleOf(status.getByText(tag, { exact: true })).color).toBe(rgb(token("--color-warning")));
     await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ import { ApiFailure, ClientErrorKind } from "../src/client.ts";
 import { takeLogged } from "./support/console-guard.ts";
 import { at, failWith, fakeApi, product, reply, unreadAlert, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { rgb, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const UNREAD = "?unread=true";
@@ -93,9 +94,11 @@ describe("App shell", () => {
     const starting = failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Starting, "fpving is starting");
     api.on(apiRoutes.listProducts, starting);
     const screen = await renderApp(api.client);
-    const alert = screen.getByRole("main").getByRole("alert");
-    await expect.element(alert.getByText("fpving is starting")).toBeVisible();
-    await expect.element(alert.getByText(ApiErrorKind.Starting, { exact: true })).toBeVisible();
+    const notice = screen.getByRole("main").getByRole("status");
+    await expect.element(notice.getByText("fpving is starting")).toBeVisible();
+    await expect.element(notice.getByText(ApiErrorKind.Starting, { exact: true })).toBeVisible();
+    await expect.element(notice.getByText("Starting", { exact: true })).toBeVisible();
+    expect(styleOf(notice.getByText("Starting", { exact: true })).color).toBe(rgb(token("--color-warning")));
     await expect.element(screen.getByRole("navigation", { name: "Main" })).toBeVisible();
     api.on(apiRoutes.listProducts, reply(wire.watchlist, []));
     await screen.getByRole("button", { name: "Try again" }).click();

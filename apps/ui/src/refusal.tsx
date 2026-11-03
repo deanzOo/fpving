@@ -61,8 +61,8 @@ export const explain = (failure: ApiFailure): ReactNode => {
 };
 
 /**
- * How a failure's notice looks: a restart is a passing warning; anything else is critical, tagged Failed when it went
- * wrong and Refused when fpving turned the request down.
+ * How a failure's notice looks: a restart or a startup clears by itself, so it is a passing warning; anything else is
+ * critical, tagged Failed when it went wrong and Refused when fpving turned the request down.
  *
  * @param failure - The failure.
  * @returns The notice's tone and tag.
@@ -70,6 +70,9 @@ export const explain = (failure: ApiFailure): ReactNode => {
 export const noticeLook = ({ kind }: ApiFailure) => {
   if (kind === ApiErrorKind.Restarting) {
     return { tone: NoticeTone.Warning, tag: "Restarting" };
+  }
+  if (kind === ApiErrorKind.Starting) {
+    return { tone: NoticeTone.Warning, tag: "Starting" };
   }
   return { tone: NoticeTone.Critical, tag: FAILED.has(kind) ? "Failed" : "Refused" };
 };
