@@ -1,28 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
+import tokens from "../design/tokens.json" with { type: "json" };
 import "../src/styles.css";
 
 const SIZE = "13px";
+const STYLES = tokens.type.groups.flatMap(({ family, styles }) => styles.map((style) => ({ ...style, family })));
 
 describe("Type faces", () => {
-  it.each([
-    ["IBM Plex Sans", "400"],
-    ["IBM Plex Sans", "500"],
-    ["IBM Plex Sans", "600"],
-    ["Martian Mono", "400"],
-    ["Martian Mono", "500"],
-  ])("bundles %s at weight %s with the app", async (family, weight) => {
-    const faces = await document.fonts.load(`${weight} ${SIZE} "${family}"`, "0");
-    expect(faces.map((face) => face.family.replaceAll("\"", ""))).toContain(family);
+  it.each(["400", "500", "600"])("bundles IBM Plex Sans at weight %s with the app", async (weight) => {
+    const faces = await document.fonts.load(`${weight} ${SIZE} "IBM Plex Sans"`, "0");
+    expect(faces.map((face) => face.weight)).toEqual([weight]);
   });
 
-  it("loads the mono face with its width axis, so 87.5% narrows it", async () => {
+  it("bundles Martian Mono with its weight and width axes, so 87.5% narrows it", async () => {
     const [face] = await document.fonts.load(`400 ${SIZE} "Martian Mono"`, "0");
+    expect(face?.family).toBe("Martian Mono");
+    expect(face?.weight).toBe("100 800");
     expect(face?.stretch).toBe("75% 112.5%");
   });
 });
 
 describe("Type styles", () => {
+  it.each(STYLES)("sets $name in its face, size, line height and weight", async (style) => {
+    const screen = await render(<span className={`type-${style.name}`}>{style.sample}</span>);
+    const computed = getComputedStyle(screen.getByText(style.sample).element());
+    expect(computed.fontFamily).toBe(tokens.type.families[style.family === "mono" ? "mono" : "sans"]);
+    expect(computed.fontSize).toBe(style.fontSize);
+    expect(computed.lineHeight).toBe(style.lineHeight);
+    expect(computed.fontWeight).toBe(String(style.fontWeight));
+  });
+
   it("sets readouts in the narrowed mono face with tabular, slashed-zero figures", async () => {
     const screen = await render(<span className="type-readout">€42.15</span>);
     const style = getComputedStyle(screen.getByText("€42.15").element());
