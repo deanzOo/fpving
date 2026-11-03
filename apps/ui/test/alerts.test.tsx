@@ -148,7 +148,7 @@ describe("Alerts", () => {
     });
     const screen = await renderApp(api.client, "/alerts");
     await screen.getByRole("button", { name: "Mark all read" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Marked 2 alerts read.");
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Done Marked 2 alerts read.");
     await expect.element(screen.getByRole("link", { name: "Alerts", exact: true })).toBeVisible();
   });
 

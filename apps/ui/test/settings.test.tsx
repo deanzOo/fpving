@@ -76,7 +76,7 @@ describe("Settings", () => {
     await screen.getByLabelText("Duty-free threshold", { exact: true }).fill("150");
     await screen.getByLabelText("Threshold applies to").selectOptions(ThresholdBasis.ItemAndShipping);
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Done Settings saved.");
     const expected: Settings = {
       ...saved, displayCurrency: "USD", shipToCountry: "DE", scanIntervalHours: SIX_HOURS,
       importTax: {
@@ -96,7 +96,7 @@ describe("Settings", () => {
       screen.queryClient.setQueryData(key, []);
     }
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Done Settings saved.");
     const stale = dependent.map((key) => screen.queryClient.getQueryState(key)?.isInvalidated);
     expect(stale).toEqual([true, true, true]);
   });
@@ -136,7 +136,7 @@ describe("Settings", () => {
     await screen.getByRole("button", { name: "Save settings" }).click();
     await expect.element(screen.getByRole(role).filter({ hasText: said })).toHaveTextContent(said);
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Done Settings saved.");
     await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
   });
 });

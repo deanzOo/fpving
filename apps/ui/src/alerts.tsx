@@ -12,6 +12,7 @@ import { Button, ButtonSize } from "./ui/button.tsx";
 import { Checkbox } from "./ui/checkbox.tsx";
 import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 import { LINK } from "./ui/link.ts";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
 
 const KIND = {
   [AlertKind.PriceDrop]: { label: "Price drop", tone: BadgeTone.Good, glyph: "▼" },
@@ -82,9 +83,11 @@ export const Alerts = () => {
         >
           Mark all read
         </Button>
-        <p role="status" className="text-ink-muted type-small">
+      </div>
+      <div className="has-[p]:mt-4">
+        <Notice tone={NoticeTone.Status} tag="Done">
           {markAll.isSuccess ? `Marked ${String(markAll.data.marked)} alerts read.` : ""}
-        </p>
+        </Notice>
       </div>
       {failed !== null && (
         <div className="mt-4">

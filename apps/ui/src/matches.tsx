@@ -11,6 +11,7 @@ import { Button, ButtonSize } from "./ui/button.tsx";
 import { Checkbox } from "./ui/checkbox.tsx";
 import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 import { LINK } from "./ui/link.ts";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { Panel } from "./ui/panel.tsx";
 
 const PERCENT = 100;
@@ -163,8 +164,14 @@ const Group = ({ product, candidates, featured }: GroupProps) => {
           Find matches
         </Button>
       </div>
-      <p role="status" className="mt-2 text-ink-muted type-small">{said}</p>
-      {find.isError && <Refused error={find.error} />}
+      <div className="has-[p]:mt-2">
+        <Notice tone={NoticeTone.Status} tag="Done">{said}</Notice>
+      </div>
+      {find.isError && (
+        <div className="mt-2">
+          <Refused error={find.error} />
+        </div>
+      )}
       {candidates.length === 0
         ? <p className="mt-2 text-ink-muted type-body">No pending candidates.</p>
         : (

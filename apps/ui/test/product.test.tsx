@@ -249,7 +249,7 @@ describe("Product detail", () => {
     await screen.getByLabelText("Store URL").fill(PAGE);
     await screen.getByRole("button", { name: "Add listing" }).click();
     await expect.element(screen.getByRole("status").filter({ hasText: "Now also" }))
-      .toHaveTextContent("Now also watching Acme X5 frame at l3");
+      .toHaveTextContent("Done Now also watching Acme X5 frame at l3");
     await expect.element(screen.getByRole("link", { name: "Acme X5 frame at l3" })).toBeVisible();
     expect(api.sent).toContainEqual({ method: "POST", path: `/api/products/${ID}/listings`, body: { url: PAGE } });
   });

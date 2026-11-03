@@ -167,7 +167,7 @@ describe("Adding a product by URL", () => {
     await field.fill(PAGE);
     await screen.getByRole("button", { name: "Add product" }).click();
     await expect.element(screen.getByRole("status").filter({ hasText: "Now watching" }))
-      .toHaveTextContent("Now watching Acme X5 kit");
+      .toHaveTextContent("Done Now watching Acme X5 kit");
     await expect.element(screen.getByRole("link", { name: "Acme X5 kit" })).toBeVisible();
     await expect.element(field).toHaveValue("");
     expect(api.sent).toContainEqual({ method: "POST", path: apiRoutes.addProduct.url, body: { url: PAGE } });
@@ -183,7 +183,7 @@ describe("Adding a product by URL", () => {
     expect(region).toBeInstanceOf(HTMLElement);
     await field.fill(PAGE);
     await userEvent.keyboard("{Enter}");
-    await expect.poll(() => region?.textContent).toBe("Now watching Acme X5 kit");
+    await expect.poll(() => region?.textContent).toBe("Done Now watching Acme X5 kit");
   });
 
   it("marks the button unavailable while fetching, keeps focus on it and ignores another press", async () => {

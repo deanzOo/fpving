@@ -176,7 +176,7 @@ describe("Match review", () => {
     const screen = await renderApp(api.client, "/matches");
     await screen.getByRole("button", { name: "Accept Acme X5 c1" }).click();
     await expect.element(screen.getByRole("status").filter({ hasText: "Added" }))
-      .toHaveTextContent("Added Acme X5 c1 to Acme X5 frame.");
+      .toHaveTextContent("Done Added Acme X5 c1 to Acme X5 frame.");
     await expect.element(screen.getByRole("link", { name: "Acme X5 c1" })).not.toBeInTheDocument();
   });
 
@@ -193,7 +193,7 @@ describe("Match review", () => {
     await expect.element(frame.getByRole("listitem")).toHaveFocus();
     await frame.getByRole("button", { name: "Reject Acme X5 c2" }).click();
     await expect.element(frame.getByRole("heading", { level: 2, name: "Acme X5 frame" })).toHaveFocus();
-    await expect.element(frame.getByRole("status")).toHaveTextContent("Rejected Acme X5 c2.");
+    await expect.element(frame.getByRole("status")).toHaveTextContent("Done Rejected Acme X5 c2.");
   });
 
   it("rejects a candidate and drops it from the queue", async () => {
@@ -226,7 +226,7 @@ describe("Match review", () => {
     searched.release();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
     await expect.element(frame.getByRole("status"))
-      .toHaveTextContent("Saved 1 candidates. The search failed on bazaar (blocked).");
+      .toHaveTextContent("Done Saved 1 candidates. The search failed on bazaar (blocked).");
   });
 
   it("says when no candidate is waiting for review", async () => {

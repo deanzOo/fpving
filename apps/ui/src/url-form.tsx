@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Refused } from "./refusal.tsx";
 import { Button, ButtonVariant } from "./ui/button.tsx";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { TextField } from "./ui/text-field.tsx";
 
 interface UrlFormProps<T> {
@@ -31,35 +32,39 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
   });
   return (
     <form
-      className="mt-4 flex flex-wrap items-end gap-3"
+      className="mt-4"
       onSubmit={(event) => {
         event.preventDefault();
         added.mutate(url);
       }}
     >
-      <div className="min-w-72 flex-1">
-        <TextField
-          label="Store URL"
-          type="url"
-          required
-          value={url}
-          onChange={(event) => {
-            setUrl(event.target.value);
-          }}
-          placeholder="https://"
-          aria-invalid={added.isError}
-          aria-describedby={added.isError ? errorId : undefined}
-        />
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-72 flex-1">
+          <TextField
+            label="Store URL"
+            type="url"
+            required
+            value={url}
+            onChange={(event) => {
+              setUrl(event.target.value);
+            }}
+            placeholder="https://"
+            aria-invalid={added.isError}
+            aria-describedby={added.isError ? errorId : undefined}
+          />
+        </div>
+        <Button type="submit" variant={ButtonVariant.Primary} pending={added.isPending} pendingLabel={pendingLabel}>
+          {submitLabel}
+        </Button>
       </div>
-      <Button type="submit" variant={ButtonVariant.Primary} pending={added.isPending} pendingLabel={pendingLabel}>
-        {submitLabel}
-      </Button>
       {added.isError && (
-        <div className="w-full">
+        <div className="mt-3">
           <Refused error={added.error} id={errorId} />
         </div>
       )}
-      <p role="status" className="w-full text-ink-muted type-small">{added.isSuccess ? said(added.data) : ""}</p>
+      <div className="has-[p]:mt-3">
+        <Notice tone={NoticeTone.Status} tag="Done">{added.isSuccess ? said(added.data) : ""}</Notice>
+      </div>
     </form>
   );
 };
