@@ -223,6 +223,19 @@ describe("Adding a product by URL", () => {
     expect(adds).toHaveLength(1);
   });
 
+  it("does not call the URL invalid while fpving is starting, and still describes it with the notice", async () => {
+    const api = scripted([]);
+    api.on(apiRoutes.addProduct, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Starting, "fpving is starting"));
+    const screen = await renderApp(api.client);
+    const field = screen.getByLabelText("Store URL");
+    await field.fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expect.element(screen.getByText("Starting", { exact: true })).toBeVisible();
+    await expect.element(field).toHaveAttribute("aria-invalid", "false");
+    await expect.element(field).toHaveAccessibleDescription("fpving is starting");
+    expect(styleOf(field).borderTopColor).not.toBe(rgb(token("--color-critical")));
+  });
+
   it.each([
     [ApiErrorKind.NoPluginForDomain, HttpStatus.UnprocessableContent, "no plugin handles shop-mirror.example",
       Role.Alert, "Refused",
@@ -243,7 +256,7 @@ describe("Adding a product by URL", () => {
     await userEvent.keyboard("{Enter}");
     const tagged = `${tag} ${shown}`;
     await expect.element(screen.getByRole(role).filter({ hasText: tagged })).toHaveTextContent(tagged);
-    await expect.element(field).toHaveAttribute("aria-invalid", "true");
+    await expect.element(field).toHaveAttribute("aria-invalid", role === Role.Alert ? "true" : "false");
     await expect.element(field).toHaveAccessibleDescription(shown);
   });
 

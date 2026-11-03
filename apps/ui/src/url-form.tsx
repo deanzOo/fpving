@@ -1,8 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { Refused } from "./refusal.tsx";
+import { toFailure } from "./client.ts";
+import { noticeLook, Refused } from "./refusal.tsx";
 import { Button, ButtonVariant } from "./ui/button.tsx";
-import { Done } from "./ui/notice.tsx";
+import { Done, NoticeTone } from "./ui/notice.tsx";
 import { TextField } from "./ui/text-field.tsx";
 
 interface UrlFormProps<T> {
@@ -49,7 +50,7 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
               setUrl(event.target.value);
             }}
             placeholder="https://"
-            aria-invalid={added.isError}
+            aria-invalid={added.isError && noticeLook(toFailure(added.error)).tone !== NoticeTone.Warning}
             aria-describedby={added.isError ? errorId : undefined}
           />
         </div>
