@@ -11,7 +11,7 @@ import { Button, ButtonSize } from "./ui/button.tsx";
 import { Checkbox } from "./ui/checkbox.tsx";
 import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 import { LINK } from "./ui/link.ts";
-import { Done } from "./ui/notice.tsx";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { Panel } from "./ui/panel.tsx";
 
 const PERCENT = 100;
@@ -22,6 +22,19 @@ const VERDICT = {
   [LlmVerdict.Different]: { label: "Different product", tone: BadgeTone.Neutral, glyph: "≠" },
   [LlmVerdict.Unjudged]: { label: "Not judged yet", tone: BadgeTone.Pending, glyph: "?" },
 } as const;
+
+const OUTCOME = {
+  Done: { tone: NoticeTone.Status, tag: "Done" },
+  Partial: { tone: NoticeTone.Warning, tag: "Partial" },
+  Failed: { tone: NoticeTone.Critical, tag: "Failed" },
+} as const;
+
+const searchOutcome = (saved: number, failed: number) => {
+  if (failed === 0) {
+    return OUTCOME.Done;
+  }
+  return saved === 0 ? OUTCOME.Failed : OUTCOME.Partial;
+};
 
 const useReviewed = (productId: string) => {
   const queryClient = useQueryClient();
@@ -136,17 +149,24 @@ const Group = ({ product, candidates, featured }: GroupProps) => {
   const client = useClient();
   const headingId = useId();
   const queryClient = useQueryClient();
-  const [said, announce] = useState("");
+  const [said, say] = useState<{
+    readonly look: (typeof OUTCOME)[keyof typeof OUTCOME];
+    readonly text: string;
+  }>({ look: OUTCOME.Done, text: "" });
+  const failed = said.look === OUTCOME.Failed;
   const { list, heading, track } = useFocusAfterRemoval(
     (candidateId) => candidates.some(({ id }) => id === candidateId),
   );
   const find = useMutation({
     mutationFn: client.findMatches,
     onSuccess: async (found) => {
-      announce([
-        `Saved ${String(found.candidates.length)} candidates.`,
-        ...found.failedSearches.map(({ pluginId, error }) => `The search failed on ${pluginId} (${error.kind}).`),
-      ].join(" "));
+      say({
+        look: searchOutcome(found.candidates.length, found.failedSearches.length),
+        text: [
+          `Saved ${String(found.candidates.length)} candidates.`,
+          ...found.failedSearches.map(({ pluginId, error }) => `The search failed on ${pluginId} (${error.kind}).`),
+        ].join(" "),
+      });
       await queryClient.invalidateQueries({ queryKey: [...QueryKey.Candidates, product.id] });
     },
   });
@@ -165,8 +185,13 @@ const Group = ({ product, candidates, featured }: GroupProps) => {
         </Button>
       </div>
       <div className="has-[p]:mt-2">
-        <Done>{said}</Done>
+        <Notice {...(failed ? OUTCOME.Done : said.look)}>{failed ? "" : said.text}</Notice>
       </div>
+      {failed && (
+        <div className="mt-2">
+          <Notice {...said.look}>{said.text}</Notice>
+        </div>
+      )}
       {find.isError && (
         <div className="mt-2">
           <Refused error={find.error} />
@@ -182,7 +207,9 @@ const Group = ({ product, candidates, featured }: GroupProps) => {
                   candidate={candidate}
                   product={product}
                   featured={candidate.id === featured}
-                  announce={announce}
+                  announce={(text) => {
+                    say({ look: OUTCOME.Done, text });
+                  }}
                   reviewing={(underway) => {
                     track(underway ? { id: candidate.id, index } : null);
                   }}

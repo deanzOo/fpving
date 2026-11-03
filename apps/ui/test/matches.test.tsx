@@ -236,7 +236,44 @@ describe("Match review", () => {
     searched.release();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
     await expect.element(frame.getByRole("status"))
-      .toHaveTextContent("Done Saved 1 candidates. The search failed on bazaar (blocked).");
+      .toHaveTextContent("Partial Saved 1 candidates. The search failed on bazaar (blocked).");
+  });
+
+  const blocked = { pluginId: pluginIdSchema.parse("bazaar"), error: { kind: StoreErrorKind.Blocked, detail: "no" } };
+
+  const searchWith = async (saved: MatchCandidate[], failedSearches: (typeof blocked)[]) => {
+    const api = scripted([]);
+    api.on(at(apiRoutes.findMatches, { productId: FRAME }), reply(wire.found, {
+      candidates: saved, failedSearches, foreignResults: [],
+    }));
+    const screen = await renderApp(api.client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    await frame.getByRole("button", { name: "Find matches" }).click();
+    return frame;
+  };
+
+  it("says Done, in the status tone, when no search failed", async () => {
+    const frame = await searchWith([candidate("c1", FRAME)], []);
+    await expect.element(frame.getByRole("status").filter({ hasText: "Saved" })).toHaveTextContent(
+      "Done Saved 1 candidates.",
+    );
+    expect(styleOf(frame.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
+  });
+
+  it("says Partial, as a warning, when some candidates were saved and a search failed", async () => {
+    const frame = await searchWith([candidate("c1", FRAME)], [blocked]);
+    await expect.element(frame.getByRole("status").filter({ hasText: "Saved" })).toHaveTextContent(
+      "Partial Saved 1 candidates. The search failed on bazaar (blocked).",
+    );
+    expect(styleOf(frame.getByText("Partial", { exact: true })).color).toBe(rgb(token("--color-warning")));
+  });
+
+  it("says Failed, as an alert, when nothing was saved and a search failed", async () => {
+    const frame = await searchWith([], [blocked]);
+    await expect.element(frame.getByRole("alert")).toHaveTextContent(
+      "Failed Saved 0 candidates. The search failed on bazaar (blocked).",
+    );
+    expect(styleOf(frame.getByText("Failed", { exact: true })).color).toBe(rgb(token("--color-critical")));
   });
 
   it("says when no candidate is waiting for review", async () => {
