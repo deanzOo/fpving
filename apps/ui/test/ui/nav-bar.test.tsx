@@ -36,6 +36,13 @@ describe("Nav bar", () => {
     expect(hasBrackets(screen.getByRole("link", { name: "Matches" }))).toBe(false);
   });
 
+  it("sets the current screen in ink and the others in muted ink", async () => {
+    const screen = await renderApp(scripted().client);
+    await expect.element(screen.getByRole("link", { name: "Watchlist" })).toHaveAttribute("aria-current", "page");
+    expect(styleOf(screen.getByRole("link", { name: "Watchlist" })).color).toBe(rgb(token("--color-ink")));
+    expect(styleOf(screen.getByRole("link", { name: "Matches" })).color).toBe(rgb(token("--color-ink-muted")));
+  });
+
   it("draws keyboard focus brackets in the signal colour, on the current item too", async () => {
     const screen = await renderApp(scripted().client);
     await expect.element(screen.getByRole("heading", { level: 1, name: "Watchlist" })).toBeVisible();

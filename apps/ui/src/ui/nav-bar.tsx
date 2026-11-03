@@ -14,7 +14,7 @@ const ALERTS = "/alerts";
 
 const SKIP = "sr-only rounded-1 bg-surface-raised px-3 py-2 type-control focus:not-sr-only focus:absolute focus:left-4 "
   + "focus:top-4";
-const LINK = "inline-flex h-(--control-height) items-center gap-2 px-3 text-ink-muted type-control hover:text-ink";
+const LINK = "inline-flex h-(--control-height) items-center gap-2 px-3 type-control hover:text-ink";
 
 /**
  * The app's top bar: a skip link to `main`, the wordmark, the five screens in their fixed order with the current one
@@ -35,7 +35,8 @@ export const NavBar = ({ unread, mainId }: { readonly unread: number; readonly m
               key={to}
               to={to}
               className={LINK}
-              activeProps={{ className: `${LINK} reticle reticle-muted text-ink` }}
+              activeProps={{ className: "reticle reticle-muted text-ink" }}
+              inactiveProps={{ className: "text-ink-muted" }}
               activeOptions={{ exact: true }}
               aria-label={to === ALERTS && unread > 0 ? `${label}, ${String(unread)} unread` : undefined}
             >
