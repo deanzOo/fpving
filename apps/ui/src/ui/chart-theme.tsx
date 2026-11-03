@@ -50,20 +50,27 @@ export const lineProps = (values: readonly unknown[], color: string, dotClass: s
   isAnimationActive: false,
 } as const);
 
-const Swatch = ({ color }: { readonly color: string }) => (
+/**
+ * A series' 16 × 2 swatch, beside its name in a legend or a tooltip line.
+ *
+ * @param props - The series colour.
+ * @returns The swatch.
+ */
+export const Swatch = ({ color }: { readonly color: string }) => (
   <span aria-hidden="true" className="inline-block h-0.5 w-4 flex-none" style={{ backgroundColor: color }} />
 );
 
 /**
  * The legend for two or more series, above the plot: a swatch and the name in muted ink, never in the series colour.
- * A single series has none; the chart's title names it.
+ * A single series has none, as the chart's title names it, unless `single` asks for one because the title does not.
  *
- * @param props - The series.
- * @returns The legend, or nothing for fewer than two series.
+ * @param props - The series, and whether a single series gets a legend.
+ * @returns The legend, or nothing for fewer than two series unless `single`.
  */
-export const Legend = ({ series }: {
+export const Legend = ({ series, single = false }: {
   readonly series: readonly { readonly key: string; readonly name: string; readonly color: string }[];
-}) => series.length < LEGEND_FROM
+  readonly single?: boolean;
+}) => series.length < (single ? 1 : LEGEND_FROM)
   ? null
   : (
       <ul aria-label="Legend" className="mb-2 flex flex-wrap gap-4 text-ink-muted type-small">

@@ -45,6 +45,11 @@ describe("Chart theme", () => {
     await expect.element(screen.getByRole("list")).not.toBeInTheDocument();
   });
 
+  it("draws a legend for a single series when asked, for a chart whose title does not name it", async () => {
+    const screen = await render(<Legend series={two.slice(0, 1)} single />);
+    await expect.element(screen.getByRole("list", { name: "Legend" })).toHaveTextContent("fpv-shop: Source One V5");
+  });
+
   it("dresses a line chart: horizontal grid, axis, 2px lines with gaps and ringed lone dots", async () => {
     const data = VALUES.map((value, day) => ({ day, value }));
     const screen = await render(
