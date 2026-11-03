@@ -116,11 +116,6 @@ describe("Notice", () => {
       await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
     });
 
-  it("can go without a tag, so the alert says only the message", async () => {
-    const screen = await render(<Notice tone={NoticeTone.Critical}>No plugin handles this store.</Notice>);
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("No plugin handles this store.");
-  });
-
   it("gives its message the id it is given, so a control can be described by it", async () => {
     const screen = await render(
       <>

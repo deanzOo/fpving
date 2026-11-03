@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, settingsSchema, ThresholdBasis } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { describe, expect, it } from "vitest";
 import { QueryKey } from "../src/queries.ts";
-import { failWith, fakeApi, reply, wire } from "./support/fake-api.ts";
+import { failWith, fakeApi, reply, wire, Role } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 import { styleOf } from "./support/style.ts";
 import "../src/styles.css";
@@ -119,11 +119,14 @@ describe("Settings", () => {
   });
 
   it.each([
-    [ApiErrorKind.SettingsNotApplied, "The settings were not applied and the old ones still hold. See the log, then "
-    + "try again."],
-    [ApiErrorKind.Restarting, "fpving is restarting its plugins for a settings change. Try again in a moment."],
-    [ApiErrorKind.ShuttingDown, "fpving is shutting down."],
-  ] satisfies [PlainErrorKind, string][])("explains a %s refusal and saves on retry", async (kind, said) => {
+    [ApiErrorKind.SettingsNotApplied, Role.Alert, "Failed The settings were not applied and the old ones still hold. "
+    + "See the log, then try again."],
+    [ApiErrorKind.Restarting, Role.Status,
+      "Restarting fpving is restarting its plugins for a settings change. Try again in a moment."],
+    [ApiErrorKind.ShuttingDown, Role.Alert, "Refused fpving is shutting down."],
+  ] satisfies [PlainErrorKind, Role, string][])("explains a %s refusal and saves on retry", async (
+    kind, role, said,
+  ) => {
     const api = scripted();
     api.on(apiRoutes.putSettings, () => {
       saveWith(api);
@@ -131,7 +134,7 @@ describe("Settings", () => {
     });
     const screen = await open(api);
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent(said);
+    await expect.element(screen.getByRole(role).filter({ hasText: said })).toHaveTextContent(said);
     await screen.getByRole("button", { name: "Save settings" }).click();
     await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
     await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();

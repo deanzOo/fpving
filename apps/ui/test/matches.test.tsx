@@ -15,7 +15,7 @@ import type { MatchCandidate } from "@fpving/core";
 import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import {
-  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire,
+  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire, Role,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 import { rgb, styleOf, token } from "./support/style.ts";
@@ -257,7 +257,7 @@ describe("Match review", () => {
     const screen = await renderApp(api.client, "/matches");
     const button = screen.getByRole("button", { name: `${action === "accept" ? "Accept" : "Reject"} Acme X5 c1` });
     await button.click();
-    await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(said);
+    await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(`Refused ${said}`);
     await expect.element(button).toHaveFocus();
   });
 
@@ -271,20 +271,23 @@ describe("Match review", () => {
   });
 
   it.each([
-    [HttpStatus.Conflict, ApiErrorKind.AlreadySuggested,
-      "Another search saved candidates for this product meanwhile. Search again."],
-    [HttpStatus.Conflict, ApiErrorKind.NoSourceListing,
-      "This product has no listing added by URL to search from. Add one first."],
-    [HttpStatus.NotFound, ApiErrorKind.ProductNotFound, "This product is not watched any more."],
-    [HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting,
-      "fpving is restarting its plugins for a settings change. Try again in a moment."],
-  ] satisfies [number, PlainErrorKind, string][])("explains a refused search: %d %s", async (status, kind, said) => {
+    [HttpStatus.Conflict, ApiErrorKind.AlreadySuggested, Role.Alert,
+      "Refused Another search saved candidates for this product meanwhile. Search again."],
+    [HttpStatus.Conflict, ApiErrorKind.NoSourceListing, Role.Alert,
+      "Refused This product has no listing added by URL to search from. Add one first."],
+    [HttpStatus.NotFound, ApiErrorKind.ProductNotFound, Role.Alert, "Refused This product is not watched any more."],
+    [HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, Role.Status,
+      "Restarting fpving is restarting its plugins for a settings change. Try again in a moment."],
+  ] satisfies [number, PlainErrorKind, Role, string][])("explains a refused search: %d %s", async (
+    status, kind, role, said,
+  ) => {
     const api = scripted([]);
     api.on(at(apiRoutes.findMatches, { productId: FRAME }), failWith(status, kind, "refused"));
     const screen = await renderApp(api.client, "/matches");
     const find = group(screen, "Acme X5 frame").getByRole("button", { name: "Find matches" });
     await find.click();
-    await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(said);
+    const told = group(screen, "Acme X5 frame").getByRole(role).filter({ hasText: said });
+    await expect.element(told).toHaveTextContent(said);
     await expect.element(find).toHaveFocus();
   });
 });

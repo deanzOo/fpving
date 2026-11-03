@@ -158,7 +158,7 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByRole("button", { name: "Rename" }).click();
     await screen.getByRole("button", { name: "Save name" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("body/name too long");
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("Refused body/name too long");
   });
 
   it("asks before it stops watching, and keeps watching on cancel with focus back on the action", async () => {
@@ -193,7 +193,7 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByRole("button", { name: "Stop watching" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Stop watching" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("This product is not watched any more.");
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("Refused This product is not watched any more.");
   });
 
   it("removes a listing once confirmed and moves focus to the listings heading", async () => {
@@ -230,7 +230,8 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("the product has no listing with this id");
+    await expect.element(screen.getByRole("alert"))
+      .toHaveTextContent("Refused the product has no listing with this id");
   });
 
   it("adds a listing by URL and shows it", async () => {
@@ -263,7 +264,7 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByLabelText("Store URL").fill(PAGE);
     await userEvent.keyboard("{Enter}");
-    await expect.element(screen.getByRole("alert")).toHaveTextContent(said);
+    await expect.element(screen.getByRole("alert")).toHaveTextContent(`Refused ${said}`);
   });
 
   it("features the cheapest listing's landed cost in the one framed panel", async () => {

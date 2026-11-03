@@ -1,9 +1,9 @@
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { toFailure } from "./client.ts";
-import { explain } from "./refusal.tsx";
+import { explain, noticeLook } from "./refusal.tsx";
 import { Button, ButtonVariant } from "./ui/button.tsx";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
+import { Notice } from "./ui/notice.tsx";
 
 /**
  * The one error boundary's view: what failed, with the error kind, and a retry.
@@ -17,7 +17,7 @@ export const ErrorView = ({ error, reset }: Pick<ErrorComponentProps, "error" | 
   return (
     <section className="mx-auto flex max-w-xl flex-col items-start gap-4">
       <h1 className="type-title">Something went wrong</h1>
-      <Notice tone={NoticeTone.Critical} tag="Failed">
+      <Notice {...noticeLook(failure)}>
         <span>{explain(failure)}</span>
         {" "}
         <span className="text-ink-muted">

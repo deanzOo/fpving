@@ -7,7 +7,9 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { z } from "zod";
-import { alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, product, reply, wire } from "./support/fake-api.ts";
+import {
+  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, product, reply, Role, wire,
+} from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
 import { rgb, styleOf, token } from "./support/style.ts";
@@ -205,22 +207,24 @@ describe("Adding a product by URL", () => {
 
   it.each([
     [ApiErrorKind.NoPluginForDomain, HttpStatus.UnprocessableContent, "no plugin handles shop-mirror.example",
+      Role.Alert, "Refused",
       "No installed plugin handles this store (no plugin handles shop-mirror.example). List one in plugins.json, "
       + "then check Plugins."],
     [ApiErrorKind.PluginUnavailable, HttpStatus.UnprocessableContent, "the plugin is not loaded",
-      "The plugin for this store is installed but not loaded. Check Plugins."],
+      Role.Alert, "Refused", "The plugin for this store is installed but not loaded. Check Plugins."],
     [ApiErrorKind.Restarting, HttpStatus.ServiceUnavailable, "restarting",
-      "fpving is restarting its plugins for a settings change. Try again in a moment."],
+      Role.Status, "Restarting", "fpving is restarting its plugins for a settings change. Try again in a moment."],
     [ApiErrorKind.FetchFailed, HttpStatus.BadGateway, "the store could not fetch the page: network",
-      "the store could not fetch the page: network"],
-  ])("explains a %s refusal next to the URL field", async (kind, status, message, shown) => {
+      Role.Alert, "Failed", "the store could not fetch the page: network"],
+  ])("explains a %s refusal next to the URL field", async (kind, status, message, role, tag, shown) => {
     const api = scripted([]);
     api.on(apiRoutes.addProduct, failWith(status, kind, message));
     const screen = await renderApp(api.client);
     const field = screen.getByLabelText("Store URL");
     await field.fill(PAGE);
     await userEvent.keyboard("{Enter}");
-    await expect.element(screen.getByRole("alert")).toHaveTextContent(shown);
+    const tagged = `${tag} ${shown}`;
+    await expect.element(screen.getByRole(role).filter({ hasText: tagged })).toHaveTextContent(tagged);
     await expect.element(field).toHaveAttribute("aria-invalid", "true");
     await expect.element(field).toHaveAccessibleDescription(shown);
   });
@@ -232,7 +236,7 @@ describe("Adding a product by URL", () => {
     await screen.getByLabelText("Store URL").fill(PAGE);
     await userEvent.keyboard("{Enter}");
     const alert = screen.getByRole("alert");
-    await expect.element(alert).toHaveTextContent("Already watched as Acme X5 frame");
+    await expect.element(alert).toHaveTextContent("Refused Already watched as Acme X5 frame");
     await expect.element(alert.getByRole("link", { name: "Acme X5 frame" })).toHaveAttribute("href", "/products/p1");
   });
 });
