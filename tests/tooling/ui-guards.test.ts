@@ -36,6 +36,14 @@ describe("Design system guards", () => {
       ["rgba() in a screen", "export const c = \"rgba(1, 2, 3, 0.5)\";\n", SCREEN_TS],
       ["hsl() in a screen", "export const c = \"hsl(1 2% 3%)\";\n", SCREEN_TS],
       ["oklch() in a screen", "export const c = \"oklch(0.5 0.1 200)\";\n", SCREEN_TS],
+      ["uppercase hex in a screen", "export const c = \"#FFFFFF\";\n", SCREEN_TS],
+      ["uppercase RGB() in a screen", "export const c = \"RGB(1, 2, 3)\";\n", SCREEN_TS],
+      ["lab() in a screen", "export const c = \"lab(1 1 1)\";\n", SCREEN_TS],
+      ["lch() in a screen", "export const c = \"lch(1 1 1)\";\n", SCREEN_TS],
+      ["oklab() in a screen", "export const c = \"oklab(1 1 1)\";\n", SCREEN_TS],
+      ["hwb() in a screen", "export const c = \"hwb(1 1% 1%)\";\n", SCREEN_TS],
+      ["color() in a screen", "export const c = \"color(srgb 1 1 1)\";\n", SCREEN_TS],
+      ["color-mix() in a screen", "export const c = \"color-mix(in srgb, red, blue)\";\n", SCREEN_TS],
       ["a hex value in a template", "export const c = (n: number) => `#ff0000 ${n}`;\n", SCREEN_TS],
       ["a hex value in a JSX attribute", "export const v = <path fill=\"#000000\" />;\n", SCREEN_TSX],
       ["a hex value in a primitive", "export const c = \"#ff0000\";\n", PRIMITIVE_TS],
@@ -249,6 +257,11 @@ describe("Design system guards", () => {
       const findings = await rawColourFindings(STYLESHEET_FIXTURES);
       expect(findings.find((finding) => finding.startsWith("raw.css: #fff: "))).toContain("Design system rule 1");
       expect(findings.find((finding) => finding.startsWith("raw.css: oklch("))).toContain("tokens.json");
+    });
+
+    it.each(["RGB(", "lab(", "lch(", "oklab(", "hwb(", "color(", "color-mix("])("reports %s", async (colour) => {
+      const findings = await rawColourFindings(STYLESHEET_FIXTURES);
+      expect(findings.some((finding) => finding.startsWith(`raw.css: ${colour}`))).toBe(true);
     });
 
     it("reports a stylesheet in a subfolder even when it is named tokens.css", async () => {

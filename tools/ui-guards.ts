@@ -1,5 +1,6 @@
 /** The pattern of a raw colour: hex, `rgb()`, `hsl()` or `oklch()`. */
-export const RAW_COLOUR = String.raw`#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b|\b(?:rgba?|hsla?|oklch)\(`;
+export const RAW_COLOUR = String.raw`#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b|\b`
+  + String.raw`(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color|color-mix)\(`;
 /** What a raw colour breaks and what to use instead. */
 export const RAW_COLOUR_MESSAGE = "Design system rule 1 (only tokens): raw colour. "
   + "Use a token from apps/ui/design/tokens.json, through a utility such as text-ink or var(--color-ink).";
