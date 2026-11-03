@@ -5,24 +5,57 @@ import type { z } from "zod";
 import { useClient } from "./client.ts";
 import { QueryKey } from "./queries.ts";
 import { fromNow } from "./time.ts";
+import { Badge, BadgeTone } from "./ui/badge.tsx";
+import { DataTable } from "./ui/data-table.tsx";
+import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 
 type Row = z.output<(typeof apiRoutes.listPlugins.schema.response)[typeof HttpStatus.Ok]>[number];
 
 const rowSchema = apiRoutes.listPlugins.schema.response[HttpStatus.Ok].element.shape;
 const { Loaded } = rowSchema.status.enum;
 const { ConfigInvalid } = rowSchema.issues.element.shape.kind.enum;
-const cell = "border-b border-line px-3 py-2";
 
-const state = ({ status, issues, backoffUntil }: Row): string[] => [
-  ...(status === Loaded ? ["Loaded"] : []),
+const Trouble = {
+  Failed: { ink: "text-critical", glyph: "✕" },
+  Warning: { ink: "text-warning", glyph: "▲" },
+  BackingOff: { ink: "text-warning", glyph: "↻" },
+} as const;
+type Trouble = (typeof Trouble)[keyof typeof Trouble];
+
+const troubles = ({ status, issues, backoffUntil }: Row): { readonly text: string; readonly look: Trouble }[] => [
   ...issues.map(({ kind, detail }) => {
     if (kind === ConfigInvalid) {
-      return `plugins.json is unusable: ${detail}`;
+      return { text: `plugins.json is unusable: ${detail}`, look: Trouble.Failed };
     }
-    return status === Loaded ? `Warning (${kind}): ${detail}` : `Disabled (${kind}): ${detail}`;
+    return status === Loaded
+      ? { text: `Warning (${kind}): ${detail}`, look: Trouble.Warning }
+      : { text: `Disabled (${kind}): ${detail}`, look: Trouble.Failed };
   }),
-  ...(backoffUntil === null ? [] : [`Backing off, retrying ${fromNow(backoffUntil)}`]),
+  ...(backoffUntil === null
+    ? []
+    : [{ text: `Backing off, retrying ${fromNow(backoffUntil)}`, look: Trouble.BackingOff }]),
 ];
+
+const State = ({ row }: { readonly row: Row }) => (
+  <div className="flex flex-col items-start gap-1">
+    {row.status === Loaded ? <Badge tone={BadgeTone.Live}>Loaded</Badge> : null}
+    {troubles(row).map(({ text, look }) => (
+      <p key={text} className={`flex gap-2 type-small ${look.ink}`}>
+        <span aria-hidden="true" className="type-code">{look.glyph}</span>
+        <span>{text}</span>
+      </p>
+    ))}
+  </div>
+);
+
+const Stale = ({ count }: { readonly count: number }) => count === 0
+  ? count
+  : (
+      <span className="text-warning">
+        <span aria-hidden="true">▲ </span>
+        <span>{count}</span>
+      </span>
+    );
 
 /**
  * The plugins screen: one row per `plugins.json` entry, rejected entry or unusable file, with the plugin's name and
@@ -39,46 +72,40 @@ export const Plugins = () => {
   }).data;
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Plugins</h1>
-      {rows === undefined && <p className="mt-6 text-ink-muted">Loading…</p>}
-      {rows?.length === 0 && (
-        <p className="mt-6 text-ink-muted">No plugin is listed in plugins.json. List one, then restart fpving.</p>
-      )}
-      {rows !== undefined && rows.length > 0 && (
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <caption className="sr-only">Plugins</caption>
-            <thead>
-              <tr className="text-sm text-ink-muted">
-                <th scope="col" className={cell}>Plugin</th>
-                <th scope="col" className={cell}>State</th>
-                <th scope="col" className={cell}>Domains</th>
-                <th scope="col" className={cell}>Stale listings</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.source}>
-                  <th scope="row" className={`${cell} font-medium`}>
-                    {row.manifest === null
-                      ? <code>{row.source}</code>
-                      : (
-                          <>
-                            {row.manifest.displayName} <code className="text-sm text-ink-muted">{row.manifest.id}</code>
-                          </>
-                        )}
-                  </th>
-                  <td className={cell}>
-                    {state(row).map((line) => <p key={line}>{line}</p>)}
-                  </td>
-                  <td className={cell}>{row.manifest?.domains.join(", ") ?? ""}</td>
-                  <td className={`${cell} tabular-nums`}>{row.staleListings}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <h1 className="type-title">Plugins</h1>
+      <div className="mt-6">
+        {rows === undefined && <p className="text-ink-muted type-body">Loading…</p>}
+        {rows?.length === 0 && (
+          <EmptyState tag={EmptyTag.NoSignal}>
+            No plugin is listed in plugins.json. List one, then restart fpving.
+          </EmptyState>
+        )}
+        {rows !== undefined && rows.length > 0 && (
+          <DataTable
+            caption="Plugins"
+            rows={rows}
+            rowKey={({ source }) => source}
+            rowHeader={{
+              header: "Plugin",
+              cell: ({ source, manifest }) => (manifest === null
+                ? <code className="type-code">{source}</code>
+                : (
+                    <>
+                      {manifest.displayName} <code className="text-ink-muted type-code">{manifest.id}</code>
+                    </>
+                  )),
+            }}
+            columns={[
+              { header: "State", cell: (row) => <State row={row} /> },
+              {
+                header: "Domains",
+                cell: ({ manifest }) => <span className="type-code">{manifest?.domains.join(", ") ?? ""}</span>,
+              },
+              { header: "Stale listings", numeric: true, cell: ({ staleListings }) => <Stale count={staleListings} /> },
+            ]}
+          />
+        )}
+      </div>
     </section>
   );
 };

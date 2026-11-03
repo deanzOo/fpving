@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { fakeApi, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { rgb, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 type Row = z.output<typeof wire.plugins>[number];
 
@@ -89,6 +91,43 @@ describe("Plugins", () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     await expect.element(screen.getByRole("row", { name: /^plugins\.json\b(?!\[)/u })
       .getByText("plugins.json is unusable: not JSON")).toBeVisible();
+  });
+
+  it("shows a loaded plugin as a live status in the signal colour", async () => {
+    const screen = await renderApp(scripted(rows()).client, "/plugins");
+    const loaded = screen.getByRole("row", { name: /^Shop shop/u }).getByText("Loaded", { exact: true });
+    await expect.element(loaded).toBeVisible();
+    expect(styleOf(loaded).color).toBe(rgb(token("--color-signal")));
+  });
+
+  it.each([
+    [/^Old old/u, "Disabled (sdk_incompatible): needs sdk >=2.0.0", "✕", "--color-critical"],
+    [/^plugins\.json\b(?!\[)/u, "plugins.json is unusable: not JSON", "✕", "--color-critical"],
+    [/^Mall mall/u, "Backing off, retrying in 2 hours", "↻", "--color-warning"],
+  ])("marks a troubled plugin's line with a glyph and its colour: %s", async (name, line, glyph, ink) => {
+    const screen = await renderApp(scripted(rows()).client, "/plugins");
+    const text = screen.getByRole("row", { name }).getByText(line, { exact: true });
+    await expect.element(text).toBeVisible();
+    expect(text.element().previousElementSibling?.textContent).toBe(glyph);
+    expect(styleOf(text).color).toBe(rgb(token(ink)));
+  });
+
+  it("marks a loaded plugin's warning with a glyph in the warning colour", async () => {
+    const warned = plugin({ issues: [{ kind: DomainConflict, detail: "shop.example is also declared by mall" }] });
+    const screen = await renderApp(scripted([warned]).client, "/plugins");
+    const text = screen.getByText("Warning (domain_conflict): shop.example is also declared by mall", { exact: true });
+    await expect.element(text).toBeVisible();
+    expect(text.element().previousElementSibling?.textContent).toBe("▲");
+    expect(styleOf(text).color).toBe(rgb(token("--color-warning")));
+  });
+
+  it("marks stale listings in the warning colour, and none in plain ink", async () => {
+    const screen = await renderApp(scripted(rows()).client, "/plugins");
+    const stale = screen.getByRole("row", { name: /^Shop shop/u }).getByText("3", { exact: true });
+    await expect.element(stale).toBeVisible();
+    expect(styleOf(stale).color).toBe(rgb(token("--color-warning")));
+    const none = screen.getByRole("row", { name: /^Mall mall/u }).getByRole("cell", { name: "0", exact: true });
+    expect(styleOf(none).color).toBe(rgb(token("--color-ink")));
   });
 
   it("says when no plugin is listed", async () => {
