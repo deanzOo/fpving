@@ -81,6 +81,16 @@ describe("Select", () => {
     await expect.element(select).toHaveValue("EUR");
   });
 
+  it("draws its chevron inside the select's own box, focused or not", async () => {
+    const screen = await render(<Select label="Ship to"><option>DE</option></Select>);
+    const select = screen.getByRole("combobox", { name: "Ship to" });
+    const frame = select.element().parentElement;
+    const box = select.element().getBoundingClientRect();
+    const chevron = frame === null ? null : getComputedStyle(frame, "::before");
+    expect(frame === null ? "" : getComputedStyle(frame).position).toBe("relative");
+    expect(Number.parseFloat(chevron?.right ?? "")).toBeLessThan(box.width);
+  });
+
   it("marks the select invalid with its error", async () => {
     const screen = await render(<Select label="Ship to" error="Choose a country."><option>DE</option></Select>);
     const select = screen.getByRole("combobox", { name: "Ship to" });

@@ -52,7 +52,7 @@ export const Field = ({ label, id, frame = "", children, description }: {
 }) => (
   <div className="flex min-w-0 flex-col gap-1">
     <label htmlFor={id} className="type-control text-ink">{label}</label>
-    <span className={`focus-frame flex ${frame}`}>{children}</span>
+    <span className={`focus-frame relative flex ${frame}`}>{children}</span>
     {description}
   </div>
 );
