@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { emptyTrend, failWith, fakeApi, product, reply, wire, Role } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { styleOf } from "./support/style.ts";
+import "../src/styles.css";
 
 type Status = z.output<typeof wire.scan>;
 
@@ -48,6 +50,13 @@ describe("Scan now", () => {
     await expect.element(screen.getByRole("status").getByText(
       "Last scan finished 5 minutes ago: 3 listings fetched, 1 failed, 2 alerts",
     )).toBeVisible();
+  });
+
+  it.each(["3", "1", "2"])("sets the last scan's count %s in the readout face", async (count) => {
+    const screen = await renderApp(scripted(finished(FIVE)).client);
+    const figure = screen.getByRole("status").getByText(count, { exact: true });
+    await expect.element(figure).toBeVisible();
+    expect(styleOf(figure).fontFamily).toContain("Martian Mono");
   });
 
   it("reads the watchlist once on first load, not again for a scan that finished before", async () => {

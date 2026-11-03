@@ -9,6 +9,8 @@ import { ScanStatus } from "./ui/scan-status.tsx";
 
 const POLL_MS = 1000;
 
+const Figure = ({ children }: { readonly children: number }) => <span className="type-readout">{children}</span>;
+
 /**
  * The scan now control and the scan status: running, or when the last scan finished with how many listings it
  * fetched, how many failed and how many alerts it raised. While a scan runs the status is polled, and when a scan
@@ -50,9 +52,17 @@ export const ScanNow = () => {
     ? "Scanning every listing…"
     : last === null || last === undefined
       ? "No scan has finished since fpving started."
-      : `Last scan finished ${fromNow(last.finishedAt)}: `
-        + `${String(last.plugins.reduce((sum, { succeeded }) => sum + succeeded, 0))} listings fetched, `
-        + `${String(last.plugins.reduce((sum, { failed }) => sum + failed, 0))} failed, ${String(last.alerts)} alerts`;
+      : (
+          <>
+            {`Last scan finished ${fromNow(last.finishedAt)}: `}
+            <Figure>{last.plugins.reduce((sum, { succeeded }) => sum + succeeded, 0)}</Figure>
+            {" listings fetched, "}
+            <Figure>{last.plugins.reduce((sum, { failed }) => sum + failed, 0)}</Figure>
+            {" failed, "}
+            <Figure>{last.alerts}</Figure>
+            {" alerts"}
+          </>
+        );
   return (
     <div className="flex flex-col items-end gap-2">
       <ScanStatus
