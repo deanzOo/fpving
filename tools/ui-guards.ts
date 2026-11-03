@@ -4,16 +4,20 @@ export const RAW_COLOUR = String.raw`#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\
 export const RAW_COLOUR_MESSAGE = "Design system rule 1 (only tokens): raw colour. "
   + "Use a token from apps/ui/design/tokens.json, through a utility such as text-ink or var(--color-ink).";
 
-const COLOUR_UTILITY = "(?:bg|text|border|ring|outline|fill|stroke|decoration|accent|caret|divide|placeholder|shadow"
-  + "|from|via|to)";
+const COLOUR_UTILITY = "(?:bg|text|border(?:-[xytblrse])?|ring(?:-offset)?|outline|fill|stroke|decoration|accent|caret"
+  + "|divide|placeholder|shadow|from|via|to)";
 const PALETTE = "(?:(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink"
   + String.raw`|rose|slate|gray|zinc|neutral|stone)-\d{2,3}|black|white)`;
 const PALETTE_CLASS = String.raw`\b${COLOUR_UTILITY}-${PALETTE}\b`;
 const PALETTE_MESSAGE = "Design system rule 1 (only tokens): Tailwind palette class, which compiles to nothing here. "
   + "Use a token utility such as text-ink or bg-surface.";
-const ARBITRARY_COLOUR_CLASS = String.raw`\b${COLOUR_UTILITY}-\[`;
+const ARBITRARY_COLOUR_CLASS = String.raw`\b${COLOUR_UTILITY}-[\[(]`;
 const ARBITRARY_MESSAGE = "Design system rule 1 (only tokens): arbitrary value on a colour utility. "
   + "Use a token utility such as text-ink or bg-surface.";
+
+const ARBITRARY_PROPERTY_CLASS = String.raw`(?:^|[\s:!])\[-{0,2}[a-z][a-z-]*:(?:\S|$)`;
+const ARBITRARY_PROPERTY_MESSAGE = "Design system rule 1 (only tokens): arbitrary property class. "
+  + "Use a token or type-* utility, or extend a primitive.";
 
 const OPACITY_CLASS = String.raw`\bopacity-`;
 const OPACITY_MESSAGE = "Design system rule 7 (pending): opacity class. "
@@ -45,6 +49,7 @@ export const uiScreenGuards = [
   ...uiSourceGuards,
   ...stringGuard(PALETTE_CLASS, PALETTE_MESSAGE),
   ...stringGuard(ARBITRARY_COLOUR_CLASS, ARBITRARY_MESSAGE),
+  ...stringGuard(ARBITRARY_PROPERTY_CLASS, ARBITRARY_PROPERTY_MESSAGE),
   ...stringGuard(OPACITY_CLASS, OPACITY_MESSAGE),
   ...stringGuard(RAW_TYPE_CLASS, RAW_TYPE_MESSAGE),
   ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({

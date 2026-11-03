@@ -66,6 +66,13 @@ describe("Design system guards", () => {
       ["an arbitrary named colour", "bg-[red]"],
       ["an arbitrary variable colour", "ring-[var(--other)]"],
       ["an arbitrary hex colour", "text-[#123456]"],
+      ["an arbitrary colour on a border side", "border-x-[red]"],
+      ["a palette colour on a border side", "border-t-red-500"],
+      ["a palette colour on a ring offset", "ring-offset-red-500"],
+      ["an arbitrary colour on a ring offset", "ring-offset-[red]"],
+      ["a variable text colour", "text-(--x)"],
+      ["a variable fill", "bg-(--my-colour)"],
+      ["a variable colour on a border side", "border-t-(--x)"],
     ])("rejects %s in a screen and names the rule and what to use", async (_case, classes) => {
       const messages = await guardMessages(classOn(classes), SCREEN_TSX);
       expect(messages.join()).toContain("Design system rule 1");
@@ -88,6 +95,43 @@ describe("Design system guards", () => {
 
     it("does not apply to a primitive", async () => {
       expect(await guardMessages(classOn("text-red-500"), PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
+  describe("Arbitrary property classes", () => {
+    it.each([
+      ["a colour", "[color:red]"],
+      ["an opacity", "[opacity:0.5]"],
+      ["a font size", "[font-size:13px]"],
+      ["a custom property", "[--x:1px]"],
+      ["a property behind a variant", "hover:[color:red]"],
+      ["an important property", "![color:red]"],
+    ])("rejects %s in a screen and names the rule and what to use", async (_case, classes) => {
+      const [message] = await guardMessages(classOn(classes), SCREEN_TSX);
+      expect(message).toContain("Design system rule 1");
+      expect(message).toContain("arbitrary property");
+    });
+
+    it("rejects a property whose value comes from a template", async () => {
+      const code = "export const c = (n: string) => `[color:${n}]`;\n";
+      expect(await guardMessages(code, SCREEN_TS)).toHaveLength(1);
+    });
+
+    it.each([
+      ["a variant with an arbitrary selector", "has-[p]:mt-2"],
+      ["a variant with a pseudo-class", "has-[:checked]:mt-2"],
+      ["an arbitrary variant", "[&>p]:mt-2"],
+      ["an arbitrary layout size", "w-[137px]"],
+    ])("accepts %s in a screen", async (_case, classes) => {
+      expect(await guardMessages(classOn(classes), SCREEN_TSX)).toEqual([]);
+    });
+
+    it("accepts a sentence that opens with a bracketed note", async () => {
+      expect(await guardMessages("export const c = \"[note: see the log]\";\n", SCREEN_TS)).toEqual([]);
+    });
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages(classOn("[color:red]"), PRIMITIVE_TSX)).toEqual([]);
     });
   });
 
