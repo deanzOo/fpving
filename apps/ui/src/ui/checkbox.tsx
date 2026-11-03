@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { useDescription } from "./field.tsx";
 import type { Described } from "./field.tsx";
 
-interface CheckboxProps extends Described, Omit<ComponentProps<"input">, "type"> {
+interface CheckboxProps extends Described, Omit<ComponentProps<"input">, "type" | "className"> {
   readonly label: ReactNode;
 }
 
