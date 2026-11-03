@@ -13,7 +13,7 @@ The UI had a hand-written Tailwind `@theme` with a handful of colours, system fo
 ## Considered options
 
 - Token source: copy values into `styles.css` by hand, or commit `tokens.json` and generate the CSS. Chosen: generate. A hand copy drifts from the design system on the next change; a committed source and a check that the generated file is current cannot.
-- Dark theme mechanism: the CSS `light-dark()` function behind `color-scheme`, or the dark values written out under a `prefers-color-scheme: dark` rule and again for an explicit choice. Chosen: the written-out values. `light-dark()` takes colours only, and the dialog shadow is themed too.
+- Dark theme mechanism: the CSS `light-dark()` function behind `color-scheme`, or the dark values written out under a `prefers-color-scheme: dark` rule and again for an explicit choice. Chosen: the written-out values. `light-dark()` would work, the dialog shadow included, since only its colour differs (`0 16px 40px light-dark(…, …)`), but it would mean splitting the shadow token into a geometry and a colour that `tokens.json` does not have, and the written-out blocks keep each token's value readable as `tokens.json` states it.
 - Fonts: Google Fonts, which the CSP forbids; copied font files; or the `@fontsource` packages bundled by Vite. Chosen: `@fontsource`, pinned, so the files come from the lockfile and Vite serves them from the app's own origin.
 - Theme choice: follow the operating system only, or a System, Light and Dark switch remembered per browser. Chosen: the switch, with System as the default.
 
@@ -21,21 +21,25 @@ The UI had a hand-written Tailwind `@theme` with a handful of colours, system fo
 
 `apps/ui/design/tokens.json` is the design system's file, committed verbatim. `pnpm tokens` runs `tools/design-tokens.ts`, which writes `apps/ui/src/tokens.css`:
 
+- `--color-*: initial`, so Tailwind's stock palette does not exist and only token colours can be used;
 - the light colours, the shadow, the font stacks, `--spacing: 4px` (the `space-1` step) and the radii in Tailwind's `@theme static`, so every token is a CSS variable whether a utility uses it or not, even though `tokens.json` lists dark first;
 - the size tokens (`hairline`, the reticle bracket measures, `control-height`, `row-height`, `content-max`) as plain variables on `:root`;
 - the dark colours and shadow under `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` and again under `:root[data-theme="dark"]`, each with the matching `color-scheme`;
-- an alias such as `{line}` as `var(--color-line)`, once, since it follows its target in both themes;
-- one `type-*` utility per type style (`title`, `heading`, `body`, `control`, `small`, `readout-lg`, `readout`, `label`, `code`); the mono ones add `font-stretch: 87.5%` and tabular, slashed-zero figures, and `label` is uppercase.
+- an alias such as `{line}` as `var(--color-line)`, once, since it follows its target in both themes; an alias to a token that does not exist fails the generator;
+- one `type-*` utility per type style (`title`, `heading`, `body`, `control`, `small`, `readout-lg`, `readout`, `label`, `code`); the mono ones add `font-stretch: 87.5%` and tabular, slashed-zero figures, and `label` is uppercase. A `mono-figures` utility carries the mono face with those settings alone, for chart ticks. An `@source inline(…)` line makes Tailwind emit all of these even before a source file names them.
 
-`styles.css` imports `tokens.css` and keeps only base and component-layer rules: the focus reticle, the motion marks and the pseudo-element pieces of the primitives. A tooling test fails when the committed `tokens.css` differs from what the generator writes now. The old `action`, `on-action` and `focus` colours are gone; `signal` and `on-signal` replace them. The generated file is left out of the duplication check, because its two dark blocks repeat by design.
+`styles.css` imports `tokens.css` and keeps only base and component-layer rules: the focus reticle, the motion marks and the pseudo-element pieces of the primitives. A tooling test fails when the committed `tokens.css` differs from what the generator writes now. The old `action`, `on-action` and `focus` colours are gone; `signal` and `on-signal` replace them. Tailwind copies a `--shadow-*` theme value into its `shadow-*` utility at build time, so the dark redefinition would never reach `shadow-dialog`; the dialog uses `shadow-(--shadow-dialog)`, which reads the variable at run time. The generated file is left out of the duplication check, because its two dark blocks repeat by design.
 
 The faces are `@fontsource/ibm-plex-sans` 5.3.0 (weights 400, 500 and 600) and `@fontsource-variable/martian-mono` 5.3.0 (the width and weight axes), both OFL-1.1, which is compatible with AGPL-3.0 for bundled fonts. The variable package names its family "Martian Mono Variable" while the tokens name "Martian Mono", so `fonts.css` declares the latin and latin-ext faces itself under the tokens' name, pointing at the package's files; knip cannot see a dependency used only from a CSS `url()`, so `knip.json` names it. The built CSS refers only to font files under `/assets/`.
 
-The theme switch is a radio group in the nav bar. Light and Dark set `data-theme` on `<html>` and are stored in `localStorage`; System removes both and leaves the choice to the operating system. A browser that blocks storage gets System on load and a choice that lasts for the page. `main.tsx` applies the stored theme before React renders. The CSP forbids inline scripts, so it cannot run before the stylesheet paints: a viewer whose choice differs from the operating system can see the page background in the system's theme for the moment before the module script runs.
+The theme switch is a radio group in the nav bar. Light and Dark set `data-theme` on `<html>` and are stored in `localStorage`; System removes both and leaves the choice to the operating system. A browser that blocks storage gets System on load and a choice that lasts for the page.
+
+The stored choice is applied by `apps/ui/public/theme-boot.js`, a classic script linked in `<head>` before the stylesheet. A classic script without `async` or `defer` blocks parsing and rendering, so it sets `data-theme` before the first frame and there is no flash of the other theme. The CSP needs no change: `default-src 'self'` allows a same-origin script file, and nothing is inline. The file repeats the storage key and the two theme names from `theme.ts`; a browser test runs it beside `applyTheme(readTheme())` for every stored value and a blocked store, so the two cannot drift, and another loads `index.html` in a fresh page and checks that a stored dark theme is on `<html>` at the first animation frame.
 
 ## Consequences
 
 - Good: a design system change is a new `tokens.json` and `pnpm tokens`; a stale stylesheet fails the tests.
 - Good: the faces load from the app's origin and the CSP stays `default-src 'self'`; the fallback stacks keep the layout if they fail.
-- Bad: the possible first-paint flash of the system theme for a viewer who chose the other one.
+- Good: a chosen theme is in place at the first frame, under the unchanged CSP.
+- Bad: the boot script duplicates the key and the theme names, held in step by a test rather than by an import.
 - Bad: two font packages to keep current, and a hand-kept pair of `@font-face` rules for the mono face's family name.
