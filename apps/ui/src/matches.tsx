@@ -2,16 +2,15 @@ import { LlmVerdict } from "@fpving/core";
 import type { MatchCandidate, Product } from "@fpving/core";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { toFailure, useClient } from "./client.ts";
+import { useClient } from "./client.ts";
 import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { Badge, BadgeTone } from "./ui/badge.tsx";
 import { Button, ButtonSize } from "./ui/button.tsx";
 import { Checkbox } from "./ui/checkbox.tsx";
 import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 import { LINK } from "./ui/link.ts";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { Panel } from "./ui/panel.tsx";
 
 const PERCENT = 100;
@@ -116,7 +115,7 @@ const Candidate = ({ candidate, product, featured, announce, reviewing }: Candid
           Reject
         </Button>
       </div>
-      {failed !== null && <Notice tone={NoticeTone.Critical}>{explain(toFailure(failed))}</Notice>}
+      {failed !== null && <Refused error={failed} />}
     </div>
   );
   return (
@@ -165,7 +164,7 @@ const Group = ({ product, candidates, featured }: GroupProps) => {
         </Button>
       </div>
       <p role="status" className="mt-2 text-ink-muted type-small">{said}</p>
-      {find.isError && <Notice tone={NoticeTone.Critical}>{explain(toFailure(find.error))}</Notice>}
+      {find.isError && <Refused error={find.error} />}
       {candidates.length === 0
         ? <p className="mt-2 text-ink-muted type-body">No pending candidates.</p>
         : (

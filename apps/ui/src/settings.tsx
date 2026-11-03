@@ -4,12 +4,11 @@ import { CURRENCY_MINOR_UNITS } from "@fpving/plugin-sdk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import type { z } from "zod";
-import { toFailure, useClient } from "./client.ts";
+import { useClient } from "./client.ts";
 import { fromDecimal, toDecimal } from "./money.ts";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { Button, ButtonVariant } from "./ui/button.tsx";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { Panel } from "./ui/panel.tsx";
 import { Select } from "./ui/select.tsx";
 import { TextField } from "./ui/text-field.tsx";
@@ -185,7 +184,7 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
       </div>
       {saving.isError && (
         <div className="mt-4">
-          <Notice tone={NoticeTone.Critical}>{explain(toFailure(saving.error))}</Notice>
+          <Refused error={saving.error} />
         </div>
       )}
     </form>

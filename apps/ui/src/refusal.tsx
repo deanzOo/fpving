@@ -1,9 +1,10 @@
 import { ApiErrorKind } from "@fpving/app/errors";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { AlreadyTrackedFailure } from "./client.ts";
+import { AlreadyTrackedFailure, toFailure } from "./client.ts";
 import type { ApiFailure } from "./client.ts";
 import { LINK } from "./ui/link.ts";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
 
 const RESTARTING = "fpving is restarting its plugins for a settings change. Try again in a moment.";
 
@@ -51,3 +52,13 @@ export const explain = (failure: ApiFailure): ReactNode => {
       return failure.message;
   }
 };
+
+/**
+ * A refused or failed request, explained in a critical notice under the control that sent it.
+ *
+ * @param props - The error, and an id for the explanation when the control is described by it.
+ * @returns The notice.
+ */
+export const Refused = ({ error, id }: { readonly error: unknown; readonly id?: string | undefined }) => (
+  <Notice tone={NoticeTone.Critical} id={id}>{explain(toFailure(error))}</Notice>
+);

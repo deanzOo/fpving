@@ -19,7 +19,7 @@ const LOOK: Readonly<Record<NoticeTone, { readonly box: string; readonly tag: st
  */
 export const Notice = ({ tone, tag, id, children }: {
   readonly tone: NoticeTone;
-  readonly id?: string;
+  readonly id?: string | undefined;
   readonly tag?: string;
   readonly children: ReactNode;
 }) => (

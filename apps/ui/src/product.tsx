@@ -10,13 +10,12 @@ import type { Client } from "./client.ts";
 import { listingName } from "./listing-name.ts";
 import { PriceHistory } from "./price-history.tsx";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { Badge, BadgeTone } from "./ui/badge.tsx";
 import { Button, ButtonSize, ButtonVariant } from "./ui/button.tsx";
 import { Confirm } from "./ui/confirm.tsx";
 import { DataTable } from "./ui/data-table.tsx";
 import { LINK } from "./ui/link.ts";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { Panel } from "./ui/panel.tsx";
 import { Price } from "./ui/price.tsx";
 import { TextField } from "./ui/text-field.tsx";
@@ -132,7 +131,7 @@ const Header = ({ product }: { readonly product: Product }) => {
           )}
       {failed !== null && (
         <div className="mt-2">
-          <Notice tone={NoticeTone.Critical}>{explain(toFailure(failed))}</Notice>
+          <Refused error={failed} />
         </div>
       )}
     </header>
@@ -155,7 +154,7 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
       <h2 ref={heading} tabIndex={-1} className="type-heading">Listings</h2>
       {remove.isError && (
         <div className="mt-2">
-          <Notice tone={NoticeTone.Critical}>{explain(toFailure(remove.error))}</Notice>
+          <Refused error={remove.error} />
         </div>
       )}
       <div className="mt-4">

@@ -3,9 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { toFailure, useClient } from "./client.ts";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { ScanStatus } from "./ui/scan-status.tsx";
 
 const POLL_MS = 1000;
@@ -65,7 +64,7 @@ export const ScanNow = () => {
       >
         {status === undefined ? "" : said}
       </ScanStatus>
-      {started.isError && <Notice tone={NoticeTone.Critical}>{explain(toFailure(started.error))}</Notice>}
+      {started.isError && <Refused error={started.error} />}
     </div>
   );
 };

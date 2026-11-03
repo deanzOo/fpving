@@ -2,17 +2,16 @@ import { AlertKind } from "@fpving/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { toFailure, useClient } from "./client.ts";
+import { useClient } from "./client.ts";
 import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
 import { Badge, BadgeTone } from "./ui/badge.tsx";
 import { Button, ButtonSize } from "./ui/button.tsx";
 import { Checkbox } from "./ui/checkbox.tsx";
 import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 import { LINK } from "./ui/link.ts";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
 
 const KIND = {
   [AlertKind.PriceDrop]: { label: "Price drop", tone: BadgeTone.Good, glyph: "▼" },
@@ -89,7 +88,7 @@ export const Alerts = () => {
       </div>
       {failed !== null && (
         <div className="mt-4">
-          <Notice tone={NoticeTone.Critical}>{explain(toFailure(failed))}</Notice>
+          <Refused error={failed} />
         </div>
       )}
       <div className="mt-6">

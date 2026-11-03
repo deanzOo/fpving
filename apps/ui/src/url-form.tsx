@@ -1,9 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { toFailure } from "./client.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { Button, ButtonVariant } from "./ui/button.tsx";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
 import { TextField } from "./ui/text-field.tsx";
 
 interface UrlFormProps<T> {
@@ -31,7 +29,6 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
       await done(result);
     },
   });
-  const error = added.isError ? explain(toFailure(added.error)) : null;
   return (
     <form
       className="mt-4 flex flex-wrap items-end gap-3"
@@ -50,16 +47,16 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
             setUrl(event.target.value);
           }}
           placeholder="https://"
-          aria-invalid={error !== null}
-          aria-describedby={error === null ? undefined : errorId}
+          aria-invalid={added.isError}
+          aria-describedby={added.isError ? errorId : undefined}
         />
       </div>
       <Button type="submit" variant={ButtonVariant.Primary} pending={added.isPending} pendingLabel={pendingLabel}>
         {submitLabel}
       </Button>
-      {error !== null && (
+      {added.isError && (
         <div className="w-full">
-          <Notice tone={NoticeTone.Critical} id={errorId}>{error}</Notice>
+          <Refused error={added.error} id={errorId} />
         </div>
       )}
       <p role="status" className="w-full text-ink-muted type-small">{added.isSuccess ? said(added.data) : ""}</p>
