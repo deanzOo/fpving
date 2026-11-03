@@ -17,6 +17,10 @@ const ARBITRARY_COLOUR_CLASS = String.raw`\b${COLOUR_UTILITY}-\[`;
 const ARBITRARY_MESSAGE = "Design system rule 1 (only tokens): arbitrary value on a colour utility. "
   + "Use a token utility such as text-ink or bg-surface.";
 
+const OPACITY_CLASS = String.raw`\bopacity-`;
+const OPACITY_MESSAGE = "Design system rule 7 (pending): opacity class. "
+  + "Pending is aria-disabled and a changed label: use Button's pending and pendingLabel props.";
+
 const PRIMITIVE_FOR_NATIVE = {
   button: "Button",
   input: "TextField or Checkbox",
@@ -39,6 +43,7 @@ export const uiScreenGuards = [
   ...uiSourceGuards,
   ...stringGuard(PALETTE_CLASS, PALETTE_MESSAGE),
   ...stringGuard(ARBITRARY_COLOUR_CLASS, ARBITRARY_MESSAGE),
+  ...stringGuard(OPACITY_CLASS, OPACITY_MESSAGE),
   ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({
     selector: `JSXOpeningElement[name.name="${element}"]`,
     message: `Design system rule 2 (shared primitives): native <${element}> outside apps/ui/src/ui. Use ${primitive}.`,

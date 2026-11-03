@@ -116,6 +116,30 @@ describe("Design system guards", () => {
     });
   });
 
+  describe("Opacity for pending", () => {
+    it.each(["opacity-50", "disabled:opacity-40", "aria-disabled:opacity-60"])(
+      "rejects %s in a screen and names the rule and what to use",
+      async (classes) => {
+        const [message] = await guardMessages(classOn(classes), SCREEN_TSX);
+        expect(message).toContain("Design system rule 7");
+        expect(message).toContain("aria-disabled");
+      },
+    );
+
+    it("rejects an opacity class in a template in a screen", async () => {
+      const code = "export const c = (n: string) => `opacity-50 ${n}`;\n";
+      expect(await guardMessages(code, SCREEN_TS)).toHaveLength(1);
+    });
+
+    it("accepts a pending style that keeps its opacity", async () => {
+      expect(await guardMessages(classOn("aria-disabled:cursor-progress"), SCREEN_TSX)).toEqual([]);
+    });
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages(classOn("opacity-50"), PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
   describe("Raw colours in stylesheets", () => {
     it("reports every raw colour with its file, the rule and the token to use", async () => {
       const findings = await rawColourFindings(STYLESHEET_FIXTURES);
