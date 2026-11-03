@@ -6,6 +6,17 @@ const RAW_COLOUR_MESSAGE = "Design system rule 1 (only tokens): raw colour. "
   + "Use a token from apps/ui/design/tokens.json, through a utility such as text-ink or var(--color-ink).";
 const GENERATED_TOKENS = "tokens.css";
 
+const COLOUR_UTILITY = "(?:bg|text|border|ring|outline|fill|stroke|decoration|accent|caret|divide|placeholder|shadow"
+  + "|from|via|to)";
+const PALETTE = "(?:(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink"
+  + String.raw`|rose|slate|gray|zinc|neutral|stone)-\d{2,3}|black|white)`;
+const PALETTE_CLASS = String.raw`\b${COLOUR_UTILITY}-${PALETTE}\b`;
+const PALETTE_MESSAGE = "Design system rule 1 (only tokens): Tailwind palette class, which compiles to nothing here. "
+  + "Use a token utility such as text-ink or bg-surface.";
+const ARBITRARY_COLOUR_CLASS = String.raw`\b${COLOUR_UTILITY}-\[`;
+const ARBITRARY_MESSAGE = "Design system rule 1 (only tokens): arbitrary value on a colour utility. "
+  + "Use a token utility such as text-ink or bg-surface.";
+
 const stringGuard = (pattern: string, message: string) => [
   { selector: `Literal[value=/${pattern}/i]`, message },
   { selector: `TemplateElement[value.raw=/${pattern}/i]`, message },
@@ -13,6 +24,13 @@ const stringGuard = (pattern: string, message: string) => [
 
 /** The `no-restricted-syntax` entries for all of `apps/ui/src`, primitives included. */
 export const uiSourceGuards = stringGuard(RAW_COLOUR, RAW_COLOUR_MESSAGE);
+
+/** The `no-restricted-syntax` entries for `apps/ui/src` outside the primitives in `apps/ui/src/ui`. */
+export const uiScreenGuards = [
+  ...uiSourceGuards,
+  ...stringGuard(PALETTE_CLASS, PALETTE_MESSAGE),
+  ...stringGuard(ARBITRARY_COLOUR_CLASS, ARBITRARY_MESSAGE),
+];
 
 /**
  * Finds the raw colours in the stylesheets under a folder, where lint cannot reach. The generated `tokens.css` at the

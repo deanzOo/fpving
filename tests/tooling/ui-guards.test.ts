@@ -56,6 +56,41 @@ describe("Design system guards", () => {
     });
   });
 
+  describe("Tailwind palette and arbitrary colour classes", () => {
+    it.each([
+      ["a palette text colour", "text-red-500"],
+      ["a palette fill behind a variant", "hover:bg-slate-100"],
+      ["a palette colour with an alpha", "border-zinc-700/50"],
+      ["white", "text-white"],
+      ["black", "bg-black"],
+      ["an arbitrary named colour", "bg-[red]"],
+      ["an arbitrary variable colour", "ring-[var(--other)]"],
+      ["an arbitrary hex colour", "text-[#123456]"],
+    ])("rejects %s in a screen and names the rule and what to use", async (_case, classes) => {
+      const messages = await guardMessages(classOn(classes), SCREEN_TSX);
+      expect(messages.join()).toContain("Design system rule 1");
+      expect(messages.join()).toContain("token utility");
+    });
+
+    it("rejects a palette class in a plain string in a screen's module", async () => {
+      expect(await guardMessages("export const c = \"text-red-500\";\n", SCREEN_TS)).toHaveLength(1);
+    });
+
+    it.each([
+      ["token utilities", "text-ink bg-surface border-line-strong text-on-signal"],
+      ["a transparent border", "border-transparent"],
+      ["a variant with an arbitrary selector", "has-[p]:mt-2"],
+      ["an arbitrary width", "max-w-[calc(var(--content-max)/2)]"],
+      ["a size token by variable", "min-h-(--row-height)"],
+    ])("accepts %s in a screen", async (_case, classes) => {
+      expect(await guardMessages(classOn(classes), SCREEN_TSX)).toEqual([]);
+    });
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages(classOn("text-red-500"), PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
   describe("Raw colours in stylesheets", () => {
     it("reports every raw colour with its file, the rule and the token to use", async () => {
       const findings = await rawColourFindings(STYLESHEET_FIXTURES);

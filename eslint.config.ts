@@ -7,7 +7,7 @@ import jsdoc from "eslint-plugin-jsdoc";
 import tsdoc from "eslint-plugin-tsdoc";
 import tseslint from "typescript-eslint";
 import { maxOneLineComment } from "./tools/eslint-rules/max-one-line-comment.ts";
-import { uiSourceGuards } from "./tools/ui-guards.ts";
+import { uiScreenGuards, uiSourceGuards } from "./tools/ui-guards.ts";
 
 export default defineConfig(
   {
@@ -132,5 +132,10 @@ export default defineConfig(
   {
     files: ["apps/ui/src/**/*.{ts,tsx}"],
     rules: { "no-restricted-syntax": ["error", ...uiSourceGuards] },
+  },
+  {
+    files: ["apps/ui/src/**/*.{ts,tsx}"],
+    ignores: ["apps/ui/src/ui/**"],
+    rules: { "no-restricted-syntax": ["error", ...uiScreenGuards] },
   },
 );
