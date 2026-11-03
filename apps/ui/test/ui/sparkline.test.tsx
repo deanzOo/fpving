@@ -16,6 +16,7 @@ describe("Sparkline", () => {
     const curve = screen.container.querySelector(".recharts-line-curve");
     expect(curve?.getAttribute("stroke")).toBe("var(--color-series-1)");
     expect(curve?.getAttribute("stroke-linejoin")).toBe("round");
+    expect(curve?.getAttribute("stroke-width")).toBe("2");
   });
 
   it("shows the day's price in the readout face on the raised tooltip", async () => {

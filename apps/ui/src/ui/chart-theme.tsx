@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import tokens from "../../design/tokens.json" with { type: "json" };
 import { loneDot } from "./lone-dot.tsx";
 
 /** The chart series colours, assigned in this order to the charted listings and never cycled. */
@@ -16,6 +17,8 @@ export const SERIES = [
 const STROKE = 2;
 const LEGEND_FROM = 2;
 const SURFACE = "var(--color-surface)";
+const TICK_STYLE = "label";
+const TICK_SIZE = tokens.type.groups.flatMap(({ styles }) => styles).find(({ name }) => name === TICK_STYLE)?.fontSize;
 
 /** Recharts grid props: horizontal gridlines only, in the grid token. */
 export const gridProps = { vertical: false, stroke: "var(--color-chart-grid)" } as const;
@@ -25,7 +28,8 @@ export const axisProps = {
   stroke: "var(--color-chart-axis)",
   tick: {
     fill: "var(--color-ink-muted)",
-    className: "font-mono text-[11px] tabular-nums slashed-zero [font-stretch:87.5%]",
+    fontSize: TICK_SIZE,
+    className: "mono-figures",
   },
 } as const;
 

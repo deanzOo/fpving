@@ -60,7 +60,11 @@ describe("Chart theme", () => {
     expect(dot?.getAttribute("stroke")).toBe("var(--color-surface)");
     expect(container.querySelectorAll(".test-dot")).toHaveLength(1);
     const tick = container.querySelector(".recharts-cartesian-axis-tick-value");
-    expect(tick === null ? "" : getComputedStyle(tick).fontFamily).toContain("Martian Mono");
+    const tickStyle = tick === null ? null : getComputedStyle(tick);
+    expect(tickStyle?.fontFamily).toContain("Martian Mono");
+    expect(tickStyle?.fontSize).toBe("11px");
+    expect(tickStyle?.fontStretch).toBe("87.5%");
+    expect(tickStyle?.fontVariantNumeric).toBe("tabular-nums slashed-zero");
   });
 
   it("frames a tooltip on the raised surface, in the small type", async () => {
