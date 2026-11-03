@@ -54,15 +54,20 @@ const stringGuard = (pattern: string, message: string) => [
 /** The `no-restricted-syntax` entries for all of `apps/ui/src`, primitives included. */
 export const uiSourceGuards = stringGuard(RAW_COLOUR, RAW_COLOUR_MESSAGE);
 
+/** The class patterns banned outside the primitives, each with what it breaks and what to use instead. */
+export const UI_CLASS_RULES = [
+  { pattern: PALETTE_CLASS, message: PALETTE_MESSAGE },
+  { pattern: ARBITRARY_COLOUR_CLASS, message: ARBITRARY_MESSAGE },
+  { pattern: ARBITRARY_PROPERTY_CLASS, message: ARBITRARY_PROPERTY_MESSAGE },
+  { pattern: OPACITY_CLASS, message: OPACITY_MESSAGE },
+  { pattern: RAW_TYPE_CLASS, message: RAW_TYPE_MESSAGE },
+  { pattern: SHAPE_CLASS, message: SHAPE_MESSAGE },
+] as const;
+
 /** The `no-restricted-syntax` entries for `apps/ui/src` outside the primitives in `apps/ui/src/ui`. */
 export const uiScreenGuards = [
   ...uiSourceGuards,
-  ...stringGuard(PALETTE_CLASS, PALETTE_MESSAGE),
-  ...stringGuard(ARBITRARY_COLOUR_CLASS, ARBITRARY_MESSAGE),
-  ...stringGuard(ARBITRARY_PROPERTY_CLASS, ARBITRARY_PROPERTY_MESSAGE),
-  ...stringGuard(OPACITY_CLASS, OPACITY_MESSAGE),
-  ...stringGuard(RAW_TYPE_CLASS, RAW_TYPE_MESSAGE),
-  ...stringGuard(SHAPE_CLASS, SHAPE_MESSAGE),
+  ...UI_CLASS_RULES.flatMap(({ pattern, message }) => stringGuard(pattern, message)),
   { selector: "JSXAttribute[name.name=\"style\"]", message: INLINE_STYLE_MESSAGE },
   ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({
     selector: `JSXOpeningElement[name.name="${element}"]`,

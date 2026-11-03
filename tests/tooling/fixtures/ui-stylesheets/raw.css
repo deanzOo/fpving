@@ -9,3 +9,7 @@
   accent-color: color(srgb 1 1 1);
   text-decoration-color: color-mix(in srgb, red, blue);
 }
+
+.applied {
+  @apply text-sm font-bold opacity-50 text-red-500 bg-[red] [color:red] rounded-full;
+}

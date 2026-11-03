@@ -1,4 +1,5 @@
 .clean {
+  @apply bg-page type-body font-sans;
   color: var(--color-ink);
 }
 

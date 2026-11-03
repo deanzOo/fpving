@@ -3,3 +3,7 @@
 }
 
 /* tokens.css is only exempt at the root */
+
+.primitive {
+  @apply text-xs;
+}
