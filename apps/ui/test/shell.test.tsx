@@ -3,7 +3,7 @@ import { ApiErrorKind } from "@fpving/app/errors";
 import { HttpStatus } from "@fpving/app/http-status";
 import { DEFAULT_SETTINGS, settingsSchema } from "@fpving/core";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { ErrorView } from "../src/error-view.tsx";
@@ -11,7 +11,7 @@ import { ApiFailure, ClientErrorKind } from "../src/client.ts";
 import { takeLogged } from "./support/console-guard.ts";
 import { at, failWith, fakeApi, product, reply, unreadAlert, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { hasBrackets, rgb, styleOf, token } from "./support/style.ts";
+import { expectEmptyRegionsTakeNoRoom, hasBrackets, rgb, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const UNREAD = "?unread=true";
@@ -109,7 +109,7 @@ describe("App shell", () => {
     expect(logged).toContain("Warning: Error in route match: //");
   });
 
-  it("focuses the error heading when a screen fails, again after a failed retry, and resets on success", async () => {
+  it("focuses the error heading on a failure and a failed retry, and main once a retry succeeds", async () => {
     const api = scripted();
     const internal = failWith(HttpStatus.InternalServerError, ApiErrorKind.Internal, "broken");
     api.on(apiRoutes.listProducts, internal);
@@ -122,7 +122,28 @@ describe("App shell", () => {
     await screen.getByRole("button", { name: "Try again" }).click();
     await expect.element(screen.getByRole("heading", { level: 1, name: "Watchlist" })).toBeVisible();
     await expect.element(heading).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("main")).toHaveFocus();
     takeLogged();
+  });
+
+  it("focuses the error heading, not main, when a screen just navigated to fails", async () => {
+    const api = scripted();
+    api.on(apiRoutes.listPlugins, failWith(HttpStatus.InternalServerError, ApiErrorKind.Internal, "broken"));
+    const screen = await renderApp(api.client);
+    await screen.getByRole("link", { name: "Plugins" }).click();
+    await expect.element(screen.getByRole("heading", { level: 1, name: "Something went wrong" })).toHaveFocus();
+    takeLogged();
+  });
+
+  it.each([
+    ["/", "Add product"],
+    ["/products/p1", "Add listing"],
+    ["/alerts", "Mark all read"],
+    ["/settings", "Save settings"],
+  ])("leaves no gap for the empty notice regions on %s", async (path, name) => {
+    const screen = await renderApp(scripted().client, path);
+    await expect.element(screen.getByRole("button", { name })).toBeVisible();
+    expectEmptyRegionsTakeNoRoom();
   });
 
   it("draws no outline on main or a focus heading after a keyboard navigation", async () => {
@@ -179,6 +200,13 @@ describe("Error view", () => {
     expect(heading.element().matches(":focus-visible")).toBe(true);
     expect(hasBrackets(heading)).toBe(false);
     expect(styleOf(heading).outlineStyle).toBe("none");
+  });
+
+  it("still retries when it is shown outside the app's main element", async () => {
+    const reset = vi.fn();
+    const screen = await render(<ErrorView error={new Error("boom")} reset={reset} />);
+    await screen.getByRole("button", { name: "Try again" }).click();
+    expect(reset).toHaveBeenCalledOnce();
   });
 
   it("names an error that did not come from the API unexpected", async () => {

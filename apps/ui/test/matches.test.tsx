@@ -14,11 +14,14 @@ import {
 import type { MatchCandidate } from "@fpving/core";
 import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import {
   alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire, Role,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { expectBadge, expectSaidInPlace, rgb, statusRegions, styleOf, token } from "./support/style.ts";
+import {
+  expectBadge, expectEmptyRegionsTakeNoRoom, expectSaidInPlace, rgb, statusRegions, styleOf, token,
+} from "./support/style.ts";
 import "../src/styles.css";
 
 const FRAME = "p1";
@@ -266,6 +269,39 @@ describe("Match review", () => {
     const regions = statusRegions();
     await button.click();
     await expectSaidInPlace(group(screen, "Acme X5 frame").getByText("Restarting", { exact: true }), regions);
+  });
+
+  it("after a keyboard review, outlines the row it lands on but not the heading", async () => {
+    const api = scripted([candidate("c1", FRAME), candidate("c2", FRAME)]);
+    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), () => {
+      api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, [candidate("c2", FRAME)]));
+      return noContent();
+    });
+    rejectedLeaving(api, "c2");
+    const screen = await renderApp(api.client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    const press = async (name: string) => {
+      const button = frame.getByRole("button", { name });
+      await expect.element(button).toBeVisible();
+      button.element().focus();
+      await userEvent.keyboard("{Enter}");
+    };
+    await press("Reject Acme X5 c1");
+    const row = frame.getByRole("listitem");
+    await expect.element(row).toHaveFocus();
+    expect(row.element().matches(":focus-visible")).toBe(true);
+    expect(styleOf(row).outlineStyle).toBe("solid");
+    await press("Reject Acme X5 c2");
+    const heading = frame.getByRole("heading", { level: 2, name: "Acme X5 frame" });
+    await expect.element(heading).toHaveFocus();
+    expect(heading.element().matches(":focus-visible")).toBe(true);
+    expect(styleOf(heading).outlineStyle).toBe("none");
+  });
+
+  it("leaves no gap for the empty notice regions around a candidate", async () => {
+    const screen = await renderApp(scripted([candidate("c1", FRAME)]).client, "/matches");
+    await expect.element(screen.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
+    expectEmptyRegionsTakeNoRoom();
   });
 
   it("keeps saying a later outcome in its status region after a failed search", async () => {

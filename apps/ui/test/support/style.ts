@@ -40,3 +40,11 @@ export const expectSaidInPlace = async (tag: Locator, regions: readonly Element[
   await expect.element(tag).toBeVisible();
   expect(regions).toContain(tag.element().closest("[role=status]"));
 };
+
+/** That every live region on the page with nothing to say takes no room: no margin waits around it. */
+export const expectEmptyRegionsTakeNoRoom = (): void => {
+  const empty = [...document.querySelectorAll("[role=status]:empty")];
+  expect(empty.length).toBeGreaterThan(0);
+  expect(empty.map((region) => region.parentElement && getComputedStyle(region.parentElement).marginTop))
+    .toEqual(empty.map(() => "0px"));
+};

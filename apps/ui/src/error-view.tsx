@@ -8,7 +8,8 @@ import { Notice } from "./ui/notice.tsx";
 
 /**
  * The one error boundary's view: what failed, with the error kind, and a retry. Focus goes to its heading when it
- * appears, so a screen reader hears the failure whatever its kind.
+ * appears, so a screen reader hears the failure whatever its kind. A retry hands focus to `main`, as a navigation
+ * does; if it fails again, the view comes back and takes focus to its heading.
  *
  * @param props - The error and the boundary's reset.
  * @returns The error view.
@@ -36,6 +37,7 @@ export const ErrorView = ({ error, reset }: Pick<ErrorComponentProps, "error" | 
         onClick={() => {
           queries.reset();
           reset();
+          heading.current?.closest("main")?.focus();
         }}
       >
         Try again
