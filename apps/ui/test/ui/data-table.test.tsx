@@ -45,6 +45,7 @@ describe("Data table", () => {
     const words = styleOf(screen.getByRole("cell", { name: "In stock" }));
     expect(words.textAlign).toBe("left");
     expect(words.fontFamily).toContain("IBM Plex Sans");
+    expect(styleOf(screen.getByRole("rowheader", { name: "fpv-shop: Source One V5" })).fontWeight).toBe("500");
   });
 
   it("puts uppercase label headers over a strong rule, rows at least 36px", async () => {
