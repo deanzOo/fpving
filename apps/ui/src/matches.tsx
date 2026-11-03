@@ -6,18 +6,22 @@ import { toFailure, useClient } from "./client.ts";
 import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
-import { unlessPending } from "./pending.ts";
+import { Badge, BadgeTone } from "./ui/badge.tsx";
+import { Button, ButtonSize } from "./ui/button.tsx";
+import { Checkbox } from "./ui/checkbox.tsx";
+import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
+import { LINK } from "./ui/link.ts";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
+import { Panel } from "./ui/panel.tsx";
 
 const PERCENT = 100;
 
-const VERDICT_LABEL = {
-  [LlmVerdict.Same]: "Same product",
-  [LlmVerdict.Variant]: "A variant",
-  [LlmVerdict.Different]: "Different product",
-  [LlmVerdict.Unjudged]: "Not judged yet",
+const VERDICT = {
+  [LlmVerdict.Same]: { label: "Same product", tone: BadgeTone.Good, glyph: "✓" },
+  [LlmVerdict.Variant]: { label: "A variant", tone: BadgeTone.Info, glyph: "≈" },
+  [LlmVerdict.Different]: { label: "Different product", tone: BadgeTone.Neutral, glyph: "≠" },
+  [LlmVerdict.Unjudged]: { label: "Not judged yet", tone: BadgeTone.Pending, glyph: "?" },
 } as const;
-
-const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
 
 const useReviewed = (productId: string) => {
   const queryClient = useQueryClient();
@@ -31,11 +35,12 @@ const useReviewed = (productId: string) => {
 interface CandidateProps {
   readonly candidate: MatchCandidate;
   readonly product: Product;
+  readonly featured: boolean;
   readonly announce: (said: string) => void;
   readonly reviewing: (underway: boolean) => void;
 }
 
-const Candidate = ({ candidate, product, announce, reviewing }: CandidateProps) => {
+const Candidate = ({ candidate, product, featured, announce, reviewing }: CandidateProps) => {
   const client = useClient();
   const reviewed = useReviewed(product.id);
   const tracked = {
@@ -65,41 +70,58 @@ const Candidate = ({ candidate, product, announce, reviewing }: CandidateProps) 
   const failed = accept.error ?? reject.error;
   const params = { candidateId: candidate.id };
   const busy = accept.isPending || reject.isPending;
-  return (
-    <li tabIndex={-1} className="flex flex-col gap-1 rounded-md border border-line px-3 py-2">
-      <a href={candidate.url} target="_blank" rel="noreferrer" className="font-medium underline">{candidate.title}</a>
-      <p>
-        {VERDICT_LABEL[candidate.llmVerdict]}
-        {candidate.llmReason === null ? "" : `: ${candidate.llmReason}`}
+  const { label, tone, glyph } = VERDICT[candidate.llmVerdict];
+  const review = (
+    <div className="flex flex-col gap-2">
+      <a href={candidate.url} target="_blank" rel="noreferrer" className={`self-start type-body ${LINK}`}>
+        {candidate.title}
+      </a>
+      <p className="flex flex-wrap items-center gap-2 type-body">
+        <Badge tone={tone} glyph={glyph}>{label}</Badge>
+        {candidate.llmReason === null
+          ? null
+          : (
+              <>
+                <span className="sr-only">: </span>
+                <span>{candidate.llmReason}</span>
+              </>
+            )}
       </p>
-      <p className="text-sm text-ink-muted">
-        {Math.round(candidate.similarityScore * PERCENT)}% similar, on {candidate.pluginId}
+      <p className="text-ink-muted type-small">
+        <span className="type-readout">{Math.round(candidate.similarityScore * PERCENT)}%</span>
+        {" similar, on "}
+        <span className="type-code">{candidate.pluginId}</span>
       </p>
       <div className="flex gap-2">
-        <button
-          type="button"
-          className={button}
-          aria-disabled={busy}
+        <Button
+          size={ButtonSize.Small}
+          pending={busy}
+          pendingLabel={accept.isPending ? "Accepting…" : undefined}
           aria-label={`Accept ${candidate.title}`}
-          onClick={unlessPending(busy, () => {
+          onClick={() => {
             accept.mutate(params);
-          })}
+          }}
         >
           Accept
-        </button>
-        <button
-          type="button"
-          className={button}
-          aria-disabled={busy}
+        </Button>
+        <Button
+          size={ButtonSize.Small}
+          pending={busy}
+          pendingLabel={reject.isPending ? "Rejecting…" : undefined}
           aria-label={`Reject ${candidate.title}`}
-          onClick={unlessPending(busy, () => {
+          onClick={() => {
             reject.mutate(params);
-          })}
+          }}
         >
           Reject
-        </button>
+        </Button>
       </div>
-      {failed !== null && <p role="alert" className="text-critical">{explain(toFailure(failed))}</p>}
+      {failed !== null && <Notice tone={NoticeTone.Critical}>{explain(toFailure(failed))}</Notice>}
+    </div>
+  );
+  return (
+    <li tabIndex={-1} className={featured ? "py-3" : "border-b border-line py-3"}>
+      {featured ? <Panel featured>{review}</Panel> : review}
     </li>
   );
 };
@@ -107,9 +129,10 @@ const Candidate = ({ candidate, product, announce, reviewing }: CandidateProps) 
 interface GroupProps {
   readonly product: Product;
   readonly candidates: readonly MatchCandidate[];
+  readonly featured: string | undefined;
 }
 
-const Group = ({ product, candidates }: GroupProps) => {
+const Group = ({ product, candidates, featured }: GroupProps) => {
   const client = useClient();
   const headingId = useId();
   const queryClient = useQueryClient();
@@ -128,31 +151,31 @@ const Group = ({ product, candidates }: GroupProps) => {
     },
   });
   return (
-    <section aria-labelledby={headingId} className="mt-6">
+    <section aria-labelledby={headingId} className="mt-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 ref={heading} id={headingId} tabIndex={-1} className="text-xl font-semibold">{product.name}</h2>
-        <button
-          type="button"
-          className={button}
-          aria-disabled={find.isPending}
-          onClick={unlessPending(find.isPending, () => {
+        <h2 ref={heading} id={headingId} tabIndex={-1} className="type-heading">{product.name}</h2>
+        <Button
+          pending={find.isPending}
+          pendingLabel="Searching the other stores…"
+          onClick={() => {
             find.mutate({ productId: product.id });
-          })}
+          }}
         >
-          {find.isPending ? "Searching the other stores…" : "Find matches"}
-        </button>
+          Find matches
+        </Button>
       </div>
-      <p role="status" className="mt-2 text-sm text-ink-muted">{said}</p>
-      {find.isError && <p role="alert" className="text-critical">{explain(toFailure(find.error))}</p>}
+      <p role="status" className="mt-2 text-ink-muted type-small">{said}</p>
+      {find.isError && <Notice tone={NoticeTone.Critical}>{explain(toFailure(find.error))}</Notice>}
       {candidates.length === 0
-        ? <p className="mt-2 text-ink-muted">No pending candidates.</p>
+        ? <p className="mt-2 text-ink-muted type-body">No pending candidates.</p>
         : (
-            <ul ref={list} className="mt-2 flex flex-col gap-2">
+            <ul ref={list} className="mt-2 flex flex-col">
               {candidates.map((candidate, index) => (
                 <Candidate
                   key={candidate.id}
                   candidate={candidate}
                   product={product}
+                  featured={candidate.id === featured}
                   announce={announce}
                   reviewing={(underway) => {
                     track(underway ? { id: candidate.id, index } : null);
@@ -192,28 +215,30 @@ export const Matches = () => {
     candidates: group.candidates.filter(({ llmVerdict }) => showDifferent || llmVerdict !== LlmVerdict.Different),
   }));
   const loaded = groups.length === products?.length;
+  const [featured] = groups.flatMap(({ candidates }) => candidates.map(({ id }) => id));
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Matches</h1>
-      <label className="mt-4 flex items-center gap-2">
-        <input
-          type="checkbox"
+      <h1 className="type-title">Matches</h1>
+      <div className="mt-4">
+        <Checkbox
+          label="Show candidates judged different"
           checked={showDifferent}
           onChange={(event) => {
             setShowDifferent(event.target.checked);
           }}
         />
-        Show candidates judged different
-      </label>
-      {!loaded && <p className="mt-6 text-ink-muted">Loading…</p>}
-      {products?.length === 0 && (
-        <p className="mt-6 text-ink-muted">Nothing is watched yet. Add a product on the Watchlist first.</p>
-      )}
-      {loaded && groups.length > 0 && groups.every(({ candidates }) => candidates.length === 0) && (
-        <p className="mt-6 text-ink-muted">No match candidates are waiting for review.</p>
-      )}
+      </div>
+      <div className="mt-6">
+        {!loaded && <p className="text-ink-muted type-body">Loading…</p>}
+        {products?.length === 0 && (
+          <EmptyState tag={EmptyTag.NoSignal}>Nothing is watched yet. Add a product on the Watchlist first.</EmptyState>
+        )}
+        {loaded && groups.length > 0 && featured === undefined && (
+          <EmptyState tag={EmptyTag.Clear}>No match candidates are waiting for review.</EmptyState>
+        )}
+      </div>
       {loaded && groups.map(({ product, candidates }) => (
-        <Group key={product.id} product={product} candidates={candidates} />
+        <Group key={product.id} product={product} candidates={candidates} featured={featured} />
       ))}
     </section>
   );

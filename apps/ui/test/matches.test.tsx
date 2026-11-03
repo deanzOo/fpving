@@ -18,10 +18,13 @@ import {
   alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, noContent, product, reply, wire,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { rgb, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 const FRAME = "p1";
 const KIT = "p2";
 const SIMILAR = 0.87;
+const NONE = "none";
 
 const candidate = (id: string, productId: string, overrides: Partial<MatchCandidate> = {}): MatchCandidate => ({
   id: matchCandidateIdSchema.parse(id),
@@ -78,9 +81,74 @@ describe("Match review", () => {
     const frame = group(screen, "Acme X5 frame");
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" }))
       .toHaveAttribute("href", "https://mall.example/c1");
-    await expect.element(frame.getByText("Same product: same model and size")).toBeVisible();
+    await expect.element(frame.getByText("Same product", { exact: true })).toBeVisible();
+    await expect.element(frame.getByText("same model and size", { exact: true })).toBeVisible();
     await expect.element(frame.getByText("87% similar, on mall")).toBeVisible();
     await expect.element(group(screen, "Acme X5 kit").getByText("Not judged yet")).toBeVisible();
+  });
+
+  it.each([
+    [LlmVerdict.Same, "Same product", "✓", "--color-good"],
+    [LlmVerdict.Variant, "A variant", "≈", "--color-info"],
+    [LlmVerdict.Different, "Different product", "≠", "--color-ink-muted"],
+    [LlmVerdict.Unjudged, "Not judged yet", "?", "--color-ink-muted"],
+  ])("shows a %s verdict as a badge: its words, its glyph and its colour", async (llmVerdict, words, glyph, ink) => {
+    const llmReason = llmVerdict === LlmVerdict.Unjudged ? null : "same model and size";
+    const screen = await renderApp(scripted([candidate("c1", FRAME, { llmVerdict, llmReason })]).client, "/matches");
+    await screen.getByRole("checkbox", { name: "Show candidates judged different" }).click();
+    const verdict = group(screen, "Acme X5 frame").getByText(words, { exact: true });
+    await expect.element(verdict).toBeVisible();
+    expect(verdict.element().previousElementSibling?.textContent).toBe(glyph);
+    expect(styleOf(verdict).color).toBe(rgb(token(ink)));
+  });
+
+  it("frames the first candidate waiting for review, and only that one", async () => {
+    const screen = await renderApp(
+      scripted([candidate("c1", FRAME), candidate("c2", FRAME)], [candidate("c3", KIT)]).client, "/matches",
+    );
+    const framed = (name: string) => {
+      const item = screen.getByRole("listitem").filter({ hasText: name });
+      const parts = [...item.element().querySelectorAll("*")];
+      return parts.some((part) => getComputedStyle(part, "::after").content !== NONE);
+    };
+    await expect.element(screen.getByRole("link", { name: "Acme X5 c3" })).toBeVisible();
+    expect([framed("Acme X5 c1"), framed("Acme X5 c2"), framed("Acme X5 c3")]).toEqual([true, false, false]);
+  });
+
+  it("says Accepting… on the accepted candidate while it is on its way, holding its reject button", async () => {
+    const api = scripted([candidate("c1", FRAME)]);
+    const accepting = gate();
+    api.on(at(apiRoutes.acceptCandidate, { candidateId: "c1" }), async () => {
+      await accepting.opened;
+      return reply(wire.addedListing, accepted, HttpStatus.Created)();
+    });
+    const screen = await renderApp(api.client, "/matches");
+    await screen.getByRole("button", { name: "Accept Acme X5 c1" }).click();
+    await expect.element(screen.getByRole("button", { name: "Accept Acme X5 c1" })).toHaveTextContent("Accepting…");
+    const reject = screen.getByRole("button", { name: "Reject Acme X5 c1" });
+    await expect.element(reject).toHaveTextContent("Reject");
+    await expect.element(reject).toHaveAttribute("aria-disabled", "true");
+    accepting.release();
+  });
+
+  it("says Rejecting… on the rejected candidate while it is on its way", async () => {
+    const api = scripted([candidate("c1", FRAME)]);
+    const rejecting = gate();
+    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), async () => {
+      await rejecting.opened;
+      return noContent();
+    });
+    const screen = await renderApp(api.client, "/matches");
+    await screen.getByRole("button", { name: "Reject Acme X5 c1" }).click();
+    await expect.element(screen.getByRole("button", { name: "Reject Acme X5 c1" })).toHaveTextContent("Rejecting…");
+    rejecting.release();
+  });
+
+  it("sets the similarity in the readout face", async () => {
+    const screen = await renderApp(scripted([candidate("c1", FRAME)]).client, "/matches");
+    const similar = group(screen, "Acme X5 frame").getByText("87%", { exact: true });
+    await expect.element(similar).toBeVisible();
+    expect(styleOf(similar).fontFamily).toContain("Martian Mono");
   });
 
   it("hides candidates judged different until asked to show them", async () => {
@@ -92,7 +160,8 @@ describe("Match review", () => {
     const toggle = screen.getByRole("checkbox", { name: "Show candidates judged different" });
     await expect.element(toggle).not.toBeChecked();
     await toggle.click();
-    await expect.element(frame.getByText("Different product: another frame size")).toBeVisible();
+    await expect.element(frame.getByText("Different product", { exact: true })).toBeVisible();
+    await expect.element(frame.getByText("another frame size", { exact: true })).toBeVisible();
     await toggle.click();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c2" })).not.toBeInTheDocument();
   });
