@@ -31,12 +31,12 @@ Write the missing failing test, scan the codebase for the same bug class, fix ev
 - Rules:
   1. Only tokens. No hex, rgb or Tailwind palette colours; a missing role gets a token first.
   2. Shared primitives, not restyled native elements.
-  3. Mono for money and every compared number, with tabular figures. Sans for words.
-  4. Brackets only for focus, the current nav item or the one featured element on a screen.
-  5. One primary button per form or header. Danger fill only inside Confirm.
-  6. Status is a word plus a glyph plus a colour, never colour alone. Status colours are never chart series.
-  7. Pending is `aria-disabled` and a changed label, never `opacity`.
-  8. Text meets 4.5:1 and borders, focus and marks 3:1 in both themes.
+  3. Money and compared numbers are mono with tabular figures; words are sans.
+  4. Reticle brackets mark focus, the current nav item or a screen's one featured element, nothing else.
+  5. A form or header has one primary button; only Confirm has a danger fill.
+  6. Status carries a word, a glyph and a colour, and its colours are not used for chart series.
+  7. Show pending with `aria-disabled` and a changed label, not `opacity`.
+  8. Contrast in both themes: 4.5:1 for text, 3:1 for borders, focus and marks.
 - Agreed exceptions:
   - Back in stock, gone and removed badges have no glyph: word and colour only, so each glyph keeps one meaning.
   - Refusal notices are tagged REFUSED or FAILED. A restart is a warning tagged RESTARTING, the startup 503 a warning tagged STARTING, a partial Find matches result a warning tagged PARTIAL.
