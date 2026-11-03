@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 import { QueryKey } from "../src/queries.ts";
 import { failWith, fakeApi, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { styleOf } from "./support/style.ts";
+import "../src/styles.css";
 
 const saved = settingsSchema.parse(DEFAULT_SETTINGS);
 const SIX_HOURS = 6;
@@ -45,6 +47,13 @@ describe("Settings", () => {
     await expect.element(screen.getByLabelText("Threshold applies to")).toHaveValue(ThresholdBasis.Item);
     await expect.element(screen.getByLabelText("Price drop alert from (%)")).toHaveValue("5.00");
   });
+
+  it.each(["Duty-free threshold", "VAT (%)", "Scan every (hours)", "Price drop alert from (%)"])(
+    "types %s in the readout face", async (label) => {
+      const screen = await open();
+      expect(styleOf(screen.getByLabelText(label, { exact: true })).fontFamily).toContain("Martian Mono");
+    },
+  );
 
   it("offers exactly the values the settings schema allows in each select", async () => {
     const screen = await open();
