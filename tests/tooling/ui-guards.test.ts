@@ -140,6 +140,30 @@ describe("Design system guards", () => {
     });
   });
 
+  describe("Raw typography", () => {
+    it.each(["text-xs", "text-sm", "text-base", "text-lg", "text-xl", "text-2xl", "text-9xl", "md:text-lg", "text-sm/6",
+      "font-bold"])("rejects %s in a screen and names the rule and what to use", async (classes) => {
+      const [message] = await guardMessages(classOn(classes), SCREEN_TSX);
+      expect(message).toContain("Design system type rule");
+      expect(message).toContain("type-");
+    });
+
+    it("rejects a raw size in a plain string in a screen's module", async () => {
+      expect(await guardMessages("export const c = \"text-sm\";\n", SCREEN_TS)).toHaveLength(1);
+    });
+
+    it.each(["type-body", "type-readout-lg", "text-ink-muted", "text-left", "font-medium", "font-mono"])(
+      "accepts %s in a screen",
+      async (classes) => {
+        expect(await guardMessages(classOn(classes), SCREEN_TSX)).toEqual([]);
+      },
+    );
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages(classOn("text-sm font-bold"), PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
   describe("Raw colours in stylesheets", () => {
     it("reports every raw colour with its file, the rule and the token to use", async () => {
       const findings = await rawColourFindings(STYLESHEET_FIXTURES);

@@ -21,6 +21,10 @@ const OPACITY_CLASS = String.raw`\bopacity-`;
 const OPACITY_MESSAGE = "Design system rule 7 (pending): opacity class. "
   + "Pending is aria-disabled and a changed label: use Button's pending and pendingLabel props.";
 
+const RAW_TYPE_CLASS = String.raw`\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b|\bfont-bold\b`;
+const RAW_TYPE_MESSAGE = "Design system type rule: raw text size or font-bold. "
+  + "Use a type-* utility such as type-body, type-heading or type-readout.";
+
 const PRIMITIVE_FOR_NATIVE = {
   button: "Button",
   input: "TextField or Checkbox",
@@ -44,6 +48,7 @@ export const uiScreenGuards = [
   ...stringGuard(PALETTE_CLASS, PALETTE_MESSAGE),
   ...stringGuard(ARBITRARY_COLOUR_CLASS, ARBITRARY_MESSAGE),
   ...stringGuard(OPACITY_CLASS, OPACITY_MESSAGE),
+  ...stringGuard(RAW_TYPE_CLASS, RAW_TYPE_MESSAGE),
   ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({
     selector: `JSXOpeningElement[name.name="${element}"]`,
     message: `Design system rule 2 (shared primitives): native <${element}> outside apps/ui/src/ui. Use ${primitive}.`,
