@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Confirm } from "../../src/ui/confirm.tsx";
+import { Theme } from "../../src/ui/theme.ts";
 import { rgb, styleOf, token } from "../support/style.ts";
 import "../../src/styles.css";
 
@@ -31,7 +32,18 @@ describe("Confirm", () => {
     const style = styleOf(dialog);
     expect(style.backgroundColor).toBe(rgb(token("--color-surface-raised")));
     expect(style.boxShadow).not.toBe("none");
-    expect(styleOf(dialog, "::backdrop").backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(styleOf(dialog, "::backdrop").backgroundColor).toBe(rgb(token("--color-scrim")));
+  });
+
+  it("casts the dark theme's shadow in the dark theme", async () => {
+    document.documentElement.dataset["theme"] = Theme.Dark;
+    try {
+      const { screen, trigger } = await confirm();
+      await trigger.click();
+      expect(styleOf(screen.getByRole("dialog")).boxShadow).toContain("rgba(0, 0, 0, 0.55)");
+    } finally {
+      delete document.documentElement.dataset["theme"];
+    }
   });
 
   it("closes on Escape and gives focus back to the trigger without acting", async () => {

@@ -36,7 +36,7 @@ export const Confirm = ({ action, actionLabel, question, confirm, pending, onCon
         ref={dialog}
         aria-labelledby={questionId}
         className={"m-auto max-w-[420px] rounded-2 border border-line-strong bg-surface-raised p-6 text-ink "
-          + "shadow-dialog backdrop:bg-scrim"}
+          + "shadow-(--shadow-dialog) backdrop:bg-scrim"}
       >
         <p id={questionId} className="type-body">{question}</p>
         <form method="dialog" className="mt-4 flex gap-2">
