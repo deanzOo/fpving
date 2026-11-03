@@ -2,6 +2,7 @@ import type { Money } from "@fpving/plugin-sdk";
 import { Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import { ChartTooltip, lineProps, SERIES } from "./chart-theme.tsx";
+import { loneDot } from "./lone-dot.tsx";
 import { formatMoney } from "../money.ts";
 
 const WIDTH = 128;
@@ -9,6 +10,7 @@ const HEIGHT = 32;
 const INSET = 3;
 const DAY = "day";
 const [SPARK] = SERIES;
+const DOT = "sparkline-dot";
 const MARGIN = { top: INSET, right: INSET, bottom: INSET, left: INSET } as const;
 
 const relativeDay = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
@@ -63,7 +65,8 @@ export const Sparkline = ({ trend }: { readonly trend: readonly (Money | null)[]
         />
         <Line
           dataKey="amountMinor"
-          {...lineProps(trend, SPARK, "sparkline-dot")}
+          {...lineProps(trend, SPARK, DOT)}
+          dot={loneDot(trend, { className: DOT, fill: SPARK })}
         />
       </LineChart>
     </div>

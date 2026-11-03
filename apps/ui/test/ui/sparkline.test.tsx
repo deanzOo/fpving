@@ -19,6 +19,15 @@ describe("Sparkline", () => {
     expect(curve?.getAttribute("stroke-width")).toBe("2");
   });
 
+  it("draws a lone priced day as a plain dot in the series colour, with no ring", async () => {
+    const trend = Array.from({ length: TREND_DAYS }, (_none, day) => (day === TREND_DAYS - 1 ? PRICE : null));
+    const screen = await render(<Sparkline trend={trend} />);
+    await expect.element(screen.getByRole("application")).toBeVisible();
+    const dot = screen.container.querySelector(".sparkline-dot");
+    expect(dot?.getAttribute("fill")).toBe("var(--color-series-1)");
+    expect(dot?.hasAttribute("stroke")).toBe(false);
+  });
+
   it("shows the day's price in the readout face on the raised tooltip", async () => {
     const screen = await render(<Sparkline trend={Array.from({ length: TREND_DAYS }, () => PRICE)} />);
     await userEvent.hover(screen.getByRole("application"));

@@ -321,6 +321,8 @@ describe("Price history chart", () => {
     const screen = await open(scripted(charted([[LANDED_MINOR, null, LANDED_MINOR, null, null, null]])));
     await expect.element(chartOf(screen)).toBeVisible();
     expect(chartOf(screen).element().querySelectorAll(".history-dot")).toHaveLength(TWO_DAYS);
+    const dot = chartOf(screen).element().querySelector(".history-dot");
+    expect(dot?.getAttribute("stroke")).toBe("var(--color-surface)");
   });
 
   it("lets the keyboard reach the chart and step through the days to read every listing's cost", async () => {
