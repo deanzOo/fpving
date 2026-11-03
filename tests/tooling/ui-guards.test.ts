@@ -186,17 +186,21 @@ describe("Design system guards", () => {
 
   describe("Raw typography", () => {
     it.each(["text-xs", "text-sm", "text-base", "text-lg", "text-xl", "text-2xl", "text-9xl", "md:text-lg", "text-sm/6",
-      "font-bold"])("rejects %s in a screen and names the rule and what to use", async (classes) => {
-      const [message] = await guardMessages(classOn(classes), SCREEN_TSX);
-      expect(message).toContain("Design system type rule");
-      expect(message).toContain("type-");
-    });
+      "font-thin", "font-extralight", "font-light", "font-normal", "font-medium", "font-semibold", "font-bold",
+      "font-extrabold", "font-black", "font-[700]", "leading-3", "leading-[1.1]", "tracking-wide", "tracking-[.2em]"])(
+      "rejects %s in a screen and names the rule and what to use",
+      async (classes) => {
+        const [message] = await guardMessages(classOn(classes), SCREEN_TSX);
+        expect(message).toContain("Design system type rule");
+        expect(message).toContain("type-");
+      },
+    );
 
     it("rejects a raw size in a plain string in a screen's module", async () => {
       expect(await guardMessages("export const c = \"text-sm\";\n", SCREEN_TS)).toHaveLength(1);
     });
 
-    it.each(["type-body", "type-readout-lg", "text-ink-muted", "text-left", "font-medium", "font-mono"])(
+    it.each(["type-body", "type-readout-lg", "text-ink-muted", "text-left", "font-sans", "font-mono"])(
       "accepts %s in a screen",
       async (classes) => {
         expect(await guardMessages(classOn(classes), SCREEN_TSX)).toEqual([]);
@@ -205,6 +209,22 @@ describe("Design system guards", () => {
 
     it("does not apply to a primitive", async () => {
       expect(await guardMessages(classOn("text-sm font-bold"), PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
+  describe("Inline styles", () => {
+    it.each([
+      ["a colour", "{ color: \"red\" }"],
+      ["an opacity", "{ opacity: 0.5 }"],
+      ["a font size", "{ fontSize: 13 }"],
+    ])("rejects %s in a screen and names the rule and what to use", async (_case, style) => {
+      const [message] = await guardMessages(`export const v = <div style={${style}} />;\n`, SCREEN_TSX);
+      expect(message).toContain("Design system rule 1");
+      expect(message).toContain("type-*");
+    });
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages("export const v = <div style={{ color: \"red\" }} />;\n", PRIMITIVE_TSX)).toEqual([]);
     });
   });
 

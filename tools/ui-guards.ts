@@ -23,9 +23,14 @@ const OPACITY_CLASS = String.raw`\bopacity-`;
 const OPACITY_MESSAGE = "Design system rule 7 (pending): opacity class. "
   + "Pending is aria-disabled and a changed label: use Button's pending and pendingLabel props.";
 
-const RAW_TYPE_CLASS = String.raw`\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b|\bfont-bold\b`;
-const RAW_TYPE_MESSAGE = "Design system type rule: raw text size or font-bold. "
+const RAW_TYPE_CLASS = String.raw`\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b`
+  + String.raw`|\bfont-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b|\bfont-[\[(]`
+  + String.raw`|\bleading-|\btracking-`;
+const RAW_TYPE_MESSAGE = "Design system type rule: raw text size, font weight, leading or tracking. "
   + "Use a type-* utility such as type-body, type-heading or type-readout.";
+
+const INLINE_STYLE_MESSAGE = "Design system rule 1 (only tokens): inline style outside apps/ui/src/ui. "
+  + "Use a token or type-* utility, or extend a primitive.";
 
 const PRIMITIVE_FOR_NATIVE = {
   button: "Button",
@@ -52,6 +57,7 @@ export const uiScreenGuards = [
   ...stringGuard(ARBITRARY_PROPERTY_CLASS, ARBITRARY_PROPERTY_MESSAGE),
   ...stringGuard(OPACITY_CLASS, OPACITY_MESSAGE),
   ...stringGuard(RAW_TYPE_CLASS, RAW_TYPE_MESSAGE),
+  { selector: "JSXAttribute[name.name=\"style\"]", message: INLINE_STYLE_MESSAGE },
   ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({
     selector: `JSXOpeningElement[name.name="${element}"]`,
     message: `Design system rule 2 (shared primitives): native <${element}> outside apps/ui/src/ui. Use ${primitive}.`,
