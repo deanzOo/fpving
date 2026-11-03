@@ -64,7 +64,7 @@ export const ScanNow = () => {
           </>
         );
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex flex-col items-end">
       <ScanStatus
         running={running}
         starting={started.isPending}
@@ -74,7 +74,9 @@ export const ScanNow = () => {
       >
         {status === undefined ? "" : said}
       </ScanStatus>
-      <Refused error={started.error} />
+      <div className="has-[p]:mt-2">
+        <Refused error={started.error} />
+      </div>
     </div>
   );
 };

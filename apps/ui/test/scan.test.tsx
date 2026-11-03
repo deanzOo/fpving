@@ -70,6 +70,15 @@ describe("Scan now", () => {
     await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
   });
 
+  it("takes no room for its empty refusal region", async () => {
+    const screen = await renderApp(scripted(idle).client);
+    const scan = screen.getByRole("button", { name: "Scan now" });
+    await expect.element(scan).toBeVisible();
+    const control = scan.element().parentElement;
+    const block = control?.parentElement;
+    expect(block?.getBoundingClientRect().height).toBe(control?.getBoundingClientRect().height);
+  });
+
   it("reads the watchlist once on first load, not again for a scan that finished before", async () => {
     const api = scripted(finished(FIVE));
     api.on(apiRoutes.startScan, failWith(HttpStatus.Conflict, ApiErrorKind.ScanRunning, "refused"));
