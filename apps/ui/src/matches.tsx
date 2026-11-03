@@ -11,7 +11,7 @@ import { Button, ButtonSize } from "./ui/button.tsx";
 import { Checkbox } from "./ui/checkbox.tsx";
 import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 import { LINK } from "./ui/link.ts";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
+import { Done } from "./ui/notice.tsx";
 import { Panel } from "./ui/panel.tsx";
 
 const PERCENT = 100;
@@ -165,7 +165,7 @@ const Group = ({ product, candidates, featured }: GroupProps) => {
         </Button>
       </div>
       <div className="has-[p]:mt-2">
-        <Notice tone={NoticeTone.Status} tag="Done">{said}</Notice>
+        <Done>{said}</Done>
       </div>
       {find.isError && (
         <div className="mt-2">

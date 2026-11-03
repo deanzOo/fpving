@@ -18,7 +18,7 @@ import {
   alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire, Role,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { rgb, styleOf, token } from "./support/style.ts";
+import { expectBadge, rgb, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const FRAME = "p1";
@@ -95,10 +95,7 @@ describe("Match review", () => {
     const llmReason = llmVerdict === LlmVerdict.Unjudged ? null : "same model and size";
     const screen = await renderApp(scripted([candidate("c1", FRAME, { llmVerdict, llmReason })]).client, "/matches");
     await screen.getByRole("checkbox", { name: "Show candidates judged different" }).click();
-    const verdict = group(screen, "Acme X5 frame").getByText(words, { exact: true });
-    await expect.element(verdict).toBeVisible();
-    expect(verdict.element().previousElementSibling?.textContent).toBe(glyph);
-    expect(styleOf(verdict).color).toBe(rgb(token(ink)));
+    await expectBadge(group(screen, "Acme X5 frame").getByText(words, { exact: true }), glyph, ink);
   });
 
   it("dashes the not judged badge, and only that one", async () => {

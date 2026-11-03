@@ -9,7 +9,7 @@ import { fromDecimal, toDecimal } from "./money.ts";
 import { QueryKey } from "./queries.ts";
 import { Refused } from "./refusal.tsx";
 import { Button, ButtonVariant } from "./ui/button.tsx";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
+import { Done } from "./ui/notice.tsx";
 import { Panel } from "./ui/panel.tsx";
 import { Select } from "./ui/select.tsx";
 import { TextField } from "./ui/text-field.tsx";
@@ -183,7 +183,7 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
         </Button>
       </div>
       <div className="has-[p]:mt-4">
-        <Notice tone={NoticeTone.Status} tag="Done">{saving.isSuccess ? "Settings saved." : ""}</Notice>
+        <Done>{saving.isSuccess ? "Settings saved." : ""}</Done>
       </div>
       {saving.isError && (
         <div className="mt-4">

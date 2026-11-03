@@ -218,8 +218,9 @@ describe("Adding a product by URL", () => {
     await expect.element(field).toHaveFocus();
     await userEvent.keyboard("{Enter}");
     fetched.release();
-    await expect.element(screen.getByRole("button", { name: "Add product" })).toHaveAttribute("aria-disabled", "false");
-    expect(api.sent.filter(({ method }) => method === "POST")).toHaveLength(1);
+    await expect.element(screen.getByRole("status").filter({ hasText: "Now watching" })).toBeVisible();
+    const adds = api.sent.filter(({ method, path }) => method === "POST" && path === apiRoutes.addProduct.url);
+    expect(adds).toHaveLength(1);
   });
 
   it.each([

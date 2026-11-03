@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { fakeApi, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { rgb, styleOf, token } from "./support/style.ts";
+import { expectBadge, rgb, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 type Row = z.output<typeof wire.plugins>[number];
@@ -106,19 +106,13 @@ describe("Plugins", () => {
     [/^Mall mall/u, "Backing off", "↻", "--color-warning"],
   ])("shows a troubled plugin's state as a badge: %s", async (name, word, glyph, ink) => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
-    const badge = screen.getByRole("row", { name }).getByText(word, { exact: true });
-    await expect.element(badge).toBeVisible();
-    expect(badge.element().previousElementSibling?.textContent).toBe(glyph);
-    expect(styleOf(badge).color).toBe(rgb(token(ink)));
+    await expectBadge(screen.getByRole("row", { name }).getByText(word, { exact: true }), glyph, ink);
   });
 
   it("shows a loaded plugin's warning as a warning badge with the detail beside it", async () => {
     const warned = plugin({ issues: [{ kind: DomainConflict, detail: "shop.example is also declared by mall" }] });
     const screen = await renderApp(scripted([warned]).client, "/plugins");
-    const badge = screen.getByText("Warning", { exact: true });
-    await expect.element(badge).toBeVisible();
-    expect(badge.element().previousElementSibling?.textContent).toBe("▲");
-    expect(styleOf(badge).color).toBe(rgb(token("--color-warning")));
+    await expectBadge(screen.getByText("Warning", { exact: true }), "▲", "--color-warning");
     expect(styleOf(screen.getByText("domain_conflict", { exact: true })).fontFamily).toContain("Martian Mono");
   });
 

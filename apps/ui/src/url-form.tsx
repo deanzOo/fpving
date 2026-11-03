@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Refused } from "./refusal.tsx";
 import { Button, ButtonVariant } from "./ui/button.tsx";
-import { Notice, NoticeTone } from "./ui/notice.tsx";
+import { Done } from "./ui/notice.tsx";
 import { TextField } from "./ui/text-field.tsx";
 
 interface UrlFormProps<T> {
@@ -63,7 +63,7 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
         </div>
       )}
       <div className="has-[p]:mt-3">
-        <Notice tone={NoticeTone.Status} tag="Done">{added.isSuccess ? said(added.data) : ""}</Notice>
+        <Done>{added.isSuccess ? said(added.data) : ""}</Done>
       </div>
     </form>
   );

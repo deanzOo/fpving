@@ -35,3 +35,13 @@ export const Notice = ({ tone, tag, id, children }: {
         )}
   </div>
 );
+
+/**
+ * The outcome of something the user did, tagged Done, in a live region that stays mounted for the next one.
+ *
+ * @param props - The sentence, or nothing yet.
+ * @returns The notice.
+ */
+export const Done = ({ children }: { readonly children: ReactNode }) => (
+  <Notice tone={NoticeTone.Status} tag="Done">{children}</Notice>
+);

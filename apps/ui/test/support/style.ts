@@ -1,3 +1,4 @@
+import { expect } from "vitest";
 import type { Locator } from "vitest/browser";
 
 const NO_CONTENT = "none";
@@ -22,4 +23,11 @@ export const rgb = (hex: string): string => {
   const { color } = getComputedStyle(probe);
   probe.remove();
   return color;
+};
+
+/** That `word`, a badge's word, shows beside `glyph` (or none, with undefined) in the `ink` colour token. */
+export const expectBadge = async (word: Locator, glyph: string | undefined, ink: string): Promise<void> => {
+  await expect.element(word).toBeVisible();
+  expect(word.element().previousElementSibling?.textContent).toBe(glyph);
+  expect(getComputedStyle(word.element()).color).toBe(rgb(token(ink)));
 };

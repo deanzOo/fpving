@@ -8,7 +8,7 @@ import {
   at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, unreadAlert, wire,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { rgb, styleOf, token } from "./support/style.ts";
+import { expectBadge, rgb, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const UNREAD = "?unread=true";
@@ -46,10 +46,7 @@ describe("Alerts", () => {
     [AlertKind.NewCheapest, "New cheapest listing", "★", "--color-good"],
   ])("shows a %s alert's kind as a badge: its words, any glyph and its colour", async (kind, words, glyph, ink) => {
     const screen = await renderApp(scripted([{ ...drop, kind }]).client, "/alerts");
-    const badge = screen.getByRole("listitem").getByText(words, { exact: true });
-    await expect.element(badge).toBeVisible();
-    expect(badge.element().previousElementSibling?.textContent).toBe(glyph);
-    expect(styleOf(badge).color).toBe(rgb(token(ink)));
+    await expectBadge(screen.getByRole("listitem").getByText(words, { exact: true }), glyph, ink);
   });
 
   it("marks an unread alert as a live status in the signal colour", async () => {

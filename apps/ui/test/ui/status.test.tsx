@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 import { Badge, BadgeTone, Count } from "../../src/ui/badge.tsx";
 import { EmptyState, EmptyTag } from "../../src/ui/empty-state.tsx";
-import { Notice, NoticeTone } from "../../src/ui/notice.tsx";
+import { Done, Notice, NoticeTone } from "../../src/ui/notice.tsx";
 import { Panel } from "../../src/ui/panel.tsx";
 import { hasBrackets, rgb, styleOf, token } from "../support/style.ts";
 import "../../src/styles.css";
@@ -115,6 +115,13 @@ describe("Notice", () => {
       const screen = await render(<Notice tone={NoticeTone.Status} tag="Done">{nothing}</Notice>);
       await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
     });
+
+  it("says an outcome in a status notice tagged Done, mounted and empty until then", async () => {
+    const screen = await render(<Done>{""}</Done>);
+    await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
+    await screen.rerender(<Done>Settings saved.</Done>);
+    await expect.element(screen.getByRole("status")).toHaveTextContent("Done Settings saved.");
+  });
 
   it("gives its message the id it is given, so a control can be described by it", async () => {
     const screen = await render(
