@@ -15,7 +15,7 @@ export const ErrorView = ({ error, reset }: Pick<ErrorComponentProps, "error" | 
   const queries = useQueryErrorResetBoundary();
   const failure = toFailure(error);
   return (
-    <section className="mx-auto flex max-w-xl flex-col items-start gap-4">
+    <section className="flex flex-col gap-4">
       <h1 className="type-title">Something went wrong</h1>
       <Notice {...noticeLook(failure)}>
         <span>{explain(failure)}</span>
@@ -26,6 +26,7 @@ export const ErrorView = ({ error, reset }: Pick<ErrorComponentProps, "error" | 
       </Notice>
       <Button
         variant={ButtonVariant.Primary}
+        className="self-start"
         onClick={() => {
           queries.reset();
           reset();

@@ -10,8 +10,10 @@ import { ApiFailure, ClientErrorKind } from "../src/client.ts";
 import { takeLogged } from "./support/console-guard.ts";
 import { at, failWith, fakeApi, product, reply, unreadAlert, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import "../src/styles.css";
 
 const UNREAD = "?unread=true";
+const ROW_WIDTH = 900;
 
 const scripted = () => {
   const api = fakeApi();
@@ -109,6 +111,18 @@ describe("Error view", () => {
     const restarting = new ApiFailure(ApiErrorKind.Restarting, "restarting");
     const screen = await render(<ErrorView error={restarting} reset={() => undefined} />);
     await expect.element(screen.getByText("fpving is restarting its plugins", { exact: false })).toBeVisible();
+  });
+
+  it("starts at the content edge, with its notice across the whole row", async () => {
+    const failure = new ApiFailure(ApiErrorKind.Internal, "boom");
+    const screen = await render(
+      <div style={{ width: ROW_WIDTH }}><ErrorView error={failure} reset={() => undefined} /></div>,
+    );
+    const heading = screen.getByRole("heading", { level: 1 });
+    await expect.element(heading).toBeVisible();
+    const row = screen.container.firstElementChild?.getBoundingClientRect();
+    expect(heading.element().getBoundingClientRect().left).toBe(row?.left);
+    expect(screen.getByRole("alert").element().getBoundingClientRect().width).toBe(row?.width);
   });
 
   it("names an error that did not come from the API unexpected", async () => {

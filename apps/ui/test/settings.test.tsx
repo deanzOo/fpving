@@ -8,11 +8,12 @@ import { describe, expect, it } from "vitest";
 import { QueryKey } from "../src/queries.ts";
 import { failWith, fakeApi, gate, heldBy, reply, Role, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { styleOf } from "./support/style.ts";
+import { styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const saved = settingsSchema.parse(DEFAULT_SETTINGS);
 const SIX_HOURS = 6;
+const TWO = 2;
 const VAT_17_5 = 1750;
 const THRESHOLD_150_EUR = 15_000;
 
@@ -85,6 +86,13 @@ describe("Settings", () => {
       },
     };
     expect(api.sent).toContainEqual({ method: "PUT", path: apiRoutes.putSettings.url, body: expected });
+  });
+
+  it("keeps the form to half the content width", async () => {
+    const screen = await open();
+    const form = screen.getByLabelText("Ship to").element().closest("form");
+    const half = Number.parseFloat(token("--content-max")) / TWO;
+    expect(form === null ? "" : getComputedStyle(form).maxWidth).toBe(`${String(half)}px`);
   });
 
   it("says Saving… on its button while the settings are on their way", async () => {

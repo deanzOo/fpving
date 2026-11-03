@@ -77,7 +77,7 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
     <form
       ref={form}
       noValidate
-      className="mt-6 max-w-xl"
+      className="mt-6 max-w-[calc(var(--content-max)/2)]"
       onSubmit={(event) => {
         event.preventDefault();
         setChecked(true);
