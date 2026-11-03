@@ -54,7 +54,8 @@ export const Count = ({ count }: { readonly count: number }) => count === 0
   : (
       <span
         aria-hidden="true"
-        className="inline-grid h-4.5 min-w-5 place-content-center rounded-1 bg-signal px-1 text-on-signal type-label"
+        className={"inline-grid h-4.5 min-w-5 place-content-center rounded-1 bg-signal px-1.25 font-semibold "
+          + "text-on-signal type-label"}
       >
         {count}
       </span>

@@ -59,6 +59,8 @@ describe("Count", () => {
     const count = screen.getByText("3");
     await expect.element(count).toHaveAttribute("aria-hidden", "true");
     expect(styleOf(count).backgroundColor).toBe(rgb(token("--color-signal")));
+    expect(styleOf(count).fontWeight).toBe("600");
+    expect(styleOf(count).paddingLeft).toBe("5px");
   });
 
   it("hides at zero", async () => {
@@ -108,9 +110,18 @@ describe("Notice", () => {
     await expect.element(screen.getByRole("status")).toHaveTextContent("Done Now watching TBS Source One V5.");
   });
 
-  it("stays mounted and empty with nothing to say, so later text is announced", async () => {
-    const screen = await render(<Notice tone={NoticeTone.Status} tag="Done">{null}</Notice>);
-    await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
+  it.each([null, undefined, false, ""])("stays mounted and empty with %j to say, so later text is announced",
+    async (nothing) => {
+      const screen = await render(<Notice tone={NoticeTone.Status} tag="Done">{nothing}</Notice>);
+      await expect.element(screen.getByRole("status")).toBeEmptyDOMElement();
+    });
+
+  it("mounts a new live region when its tone changes, so the new role is announced", async () => {
+    const screen = await render(<Notice tone={NoticeTone.Status} tag="Saving">Saving…</Notice>);
+    const status = screen.getByRole("status").element();
+    await screen.rerender(<Notice tone={NoticeTone.Critical} tag="Failed">Not saved.</Notice>);
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("Failed Not saved.");
+    expect(status.isConnected).toBe(false);
   });
 });
 
