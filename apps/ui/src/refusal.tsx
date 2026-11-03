@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { AlreadyTrackedFailure } from "./client.ts";
 import type { ApiFailure } from "./client.ts";
+import { LINK } from "./ui/link.ts";
 
 const RESTARTING = "fpving is restarting its plugins for a settings change. Try again in a moment.";
 
@@ -18,7 +19,7 @@ export const explain = (failure: ApiFailure): ReactNode => {
     const { id, name } = failure.product;
     return (
       <>
-        Already watched as <Link to="/products/$id" params={{ id }} className="underline">{name}</Link>
+        Already watched as <Link to="/products/$id" params={{ id }} className={LINK}>{name}</Link>
       </>
     );
   }
