@@ -1,0 +1,5 @@
+.nested {
+  border-color: hsl(200 10% 50%);
+}
+
+/* tokens.css is only exempt at the root */
