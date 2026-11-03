@@ -5,7 +5,8 @@ import { toFailure, useClient } from "./client.ts";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
-import { unlessPending } from "./pending.ts";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
+import { ScanStatus } from "./ui/scan-status.tsx";
 
 const POLL_MS = 1000;
 
@@ -54,19 +55,17 @@ export const ScanNow = () => {
         + `${String(last.plugins.reduce((sum, { succeeded }) => sum + succeeded, 0))} listings fetched, `
         + `${String(last.plugins.reduce((sum, { failed }) => sum + failed, 0))} failed, ${String(last.alerts)} alerts`;
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <p role="status" className="text-sm text-ink-muted">{status === undefined ? "" : said}</p>
-      <button
-        type="button"
-        aria-disabled={started.isPending || running}
-        onClick={unlessPending(started.isPending || running, () => {
+    <div className="flex flex-col items-end gap-2">
+      <ScanStatus
+        running={running}
+        starting={started.isPending}
+        onStart={() => {
           started.mutate();
-        })}
-        className="rounded-md border border-line px-4 py-2 font-medium aria-disabled:opacity-60"
+        }}
       >
-        Scan now
-      </button>
-      {started.isError && <p role="alert" className="w-full text-critical">{explain(toFailure(started.error))}</p>}
+        {status === undefined ? "" : said}
+      </ScanStatus>
+      {started.isError && <Notice tone={NoticeTone.Critical}>{explain(toFailure(started.error))}</Notice>}
     </div>
   );
 };
