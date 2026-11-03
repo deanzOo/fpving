@@ -11,6 +11,10 @@
     outline: var(--hairline) solid var(--color-signal);
     outline-offset: var(--bracket-gap);
   }
+
+  :where(main, h1, h2)[tabindex="-1"]:focus-visible {
+    outline: none;
+  }
 }
 
 @layer components {
