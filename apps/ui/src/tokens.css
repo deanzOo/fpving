@@ -34,7 +34,6 @@
   --color-series-8: #b54a4b;
   --color-chart-grid: var(--color-line);
   --color-chart-axis: var(--color-line-strong);
-  --shadow-dialog: 0 16px 40px rgba(16, 22, 27, 0.18);
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --spacing: 4px;
@@ -45,6 +44,7 @@
 
 :root {
   color-scheme: light;
+  --shadow-dialog: 0 16px 40px rgba(16, 22, 27, 0.18);
   --hairline: 1px;
   --bracket-arm: 8px;
   --bracket-stroke: 2px;

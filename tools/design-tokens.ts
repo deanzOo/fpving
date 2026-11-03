@@ -35,16 +35,16 @@ const colorValue = (value: ColorValue, theme: ThemeId, names: ReadonlySet<string
   return value[theme];
 };
 
-const themedLines = (source: Tokens, theme: ThemeId): string[] => {
+const colorLines = (source: Tokens, theme: ThemeId): string[] => {
   const names = new Set(source.color.tokens.map(({ name }) => name));
-  return [
-    ...source.color.tokens.flatMap(({ name, value }) => {
-      const resolved = colorValue(value, theme, names);
-      return resolved === undefined ? [] : [`--color-${name}: ${resolved};`];
-    }),
-    ...source.shadow.tokens.map(({ name, value }) => `--${name}: ${value[theme]};`),
-  ];
+  return source.color.tokens.flatMap(({ name, value }) => {
+    const resolved = colorValue(value, theme, names);
+    return resolved === undefined ? [] : [`--color-${name}: ${resolved};`];
+  });
 };
+
+const shadowLines = (source: Tokens, theme: ThemeId): string[] =>
+  source.shadow.tokens.map(({ name, value }) => `--${name}: ${value[theme]};`);
 
 const spacing = (source: Tokens): string => {
   const base = source.spacing.tokens.find(({ name }) => name === BASE_SPACING);
@@ -67,28 +67,34 @@ const typeUtility = (style: TypeStyle, family: string): string => block(`@utilit
 ]);
 
 /**
- * The stylesheet for the design tokens: the light theme in Tailwind's `@theme`, the dark theme when the system
- * prefers it and no light choice is set, and again for an explicit dark choice, then the size tokens, the mono figure
- * settings and one `type-*` utility per type style, all emitted whether a source file names them or not.
+ * The stylesheet for the design tokens: the light colours in Tailwind's `@theme`; the light shadow and the size
+ * tokens on `:root`, so no utility copies the shadow's light value; the dark theme when the system prefers it and no
+ * light choice is set, and again for an explicit dark choice; then the mono figure settings and one `type-*` utility
+ * per type style, all emitted whether a source file names them or not.
  *
  * @param source - The design tokens.
  * @returns The CSS.
  */
 export const renderTokensCss = (source: Tokens): string => {
-  const dark = [`color-scheme: ${ThemeId.Dark};`, ...themedLines(source, ThemeId.Dark)];
+  const dark = [
+    `color-scheme: ${ThemeId.Dark};`,
+    ...colorLines(source, ThemeId.Dark),
+    ...shadowLines(source, ThemeId.Dark),
+  ];
   const typeNames = source.type.groups.flatMap(({ styles }) => styles.map(({ name }) => `type-${name}`));
   return [
     HEADER,
     `@source inline("${[...typeNames, MONO_FIGURES].join(" ")}");`,
     block("@theme static", [
       "--color-*: initial;",
-      ...themedLines(source, ThemeId.Light),
+      ...colorLines(source, ThemeId.Light),
       ...Object.entries(source.type.families).map(([name, stack]) => `--font-${name}: ${stack};`),
       `--spacing: ${spacing(source)};`,
       ...source.radius.tokens.map(({ name, value }) => `--${name}: ${value};`),
     ]),
     block(":root", [
       `color-scheme: ${ThemeId.Light};`,
+      ...shadowLines(source, ThemeId.Light),
       ...source.size.tokens.map(({ name, value }) => `--${name}: ${value};`),
     ]),
     block("@media (prefers-color-scheme: dark)", [block(":root:not([data-theme=\"light\"])", dark)]),

@@ -72,6 +72,11 @@ describe("Design tokens stylesheet", () => {
     expect(() => renderTokensCss({ ...designTokens, color })).toThrow("{lien} names no colour token");
   });
 
+  it("keeps the shadow out of the theme, where Tailwind would copy its light value into the utility", () => {
+    expect(section("@theme static")).not.toContain("--shadow-dialog");
+    expect(section(":root {")).toContain("--shadow-dialog: 0 16px 40px rgba(16, 22, 27, 0.18);");
+  });
+
   it("leaves Tailwind's own palette out, so only token colours exist", () => {
     expect(section("@theme static").split("\n")[1]?.trim()).toBe("--color-*: initial;");
   });
