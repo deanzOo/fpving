@@ -29,6 +29,10 @@ const RAW_TYPE_CLASS = String.raw`\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b`
 const RAW_TYPE_MESSAGE = "Design system type rule: raw text size, font weight, leading or tracking. "
   + "Use a type-* utility such as type-body, type-heading or type-readout.";
 
+const SHAPE_CLASS = String.raw`\brounded-|\bshadow-`;
+const SHAPE_MESSAGE = "Design system shape rule: radius or shadow class. No pills, and the one shadow is on Confirm. "
+  + "Use a primitive, which carries its radius, or extend one.";
+
 const INLINE_STYLE_MESSAGE = "Design system rule 1 (only tokens): inline style outside apps/ui/src/ui. "
   + "Use a token or type-* utility, or extend a primitive.";
 
@@ -57,6 +61,7 @@ export const uiScreenGuards = [
   ...stringGuard(ARBITRARY_PROPERTY_CLASS, ARBITRARY_PROPERTY_MESSAGE),
   ...stringGuard(OPACITY_CLASS, OPACITY_MESSAGE),
   ...stringGuard(RAW_TYPE_CLASS, RAW_TYPE_MESSAGE),
+  ...stringGuard(SHAPE_CLASS, SHAPE_MESSAGE),
   { selector: "JSXAttribute[name.name=\"style\"]", message: INLINE_STYLE_MESSAGE },
   ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({
     selector: `JSXOpeningElement[name.name="${element}"]`,

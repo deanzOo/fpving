@@ -212,6 +212,22 @@ describe("Design system guards", () => {
     });
   });
 
+  describe("Radii and shadows", () => {
+    it.each(["rounded-full", "rounded-md", "rounded-[7px]", "rounded-t-lg", "hover:rounded-1", "shadow-md",
+      "shadow-(--shadow-dialog)", "hover:shadow-lg", "drop-shadow-md"])(
+      "rejects %s in a screen and names the rule and what to use",
+      async (classes) => {
+        const message = (await guardMessages(classOn(classes), SCREEN_TSX)).join();
+        expect(message).toContain("Design system shape rule");
+        expect(message).toContain("primitive");
+      },
+    );
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages(classOn("rounded-2 shadow-(--shadow-dialog)"), PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
   describe("Inline styles", () => {
     it.each([
       ["a colour", "{ color: \"red\" }"],
