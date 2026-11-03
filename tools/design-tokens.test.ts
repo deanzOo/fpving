@@ -9,6 +9,7 @@ const css = renderTokensCss(designTokens);
 
 const section = (opening: string): string => {
   const start = css.indexOf(opening);
+  expect(start, `the stylesheet has no ${opening}`).toBeGreaterThanOrEqual(0);
   return css.slice(start, css.indexOf("\n}", start));
 };
 
@@ -63,6 +64,28 @@ describe("Design tokens stylesheet", () => {
     const [first] = designTokens.color.tokens;
     const color = { ...designTokens.color, tokens: [{ name: "page", value: "#ffffff", usage: first?.usage ?? "" }] };
     expect(() => renderTokensCss({ ...designTokens, color })).toThrow("neither themed nor an alias");
+  });
+
+  it("fails on an alias to a colour token that does not exist", () => {
+    const [first] = designTokens.color.tokens;
+    const color = { ...designTokens.color, tokens: [{ name: "grid", value: "{lien}", usage: first?.usage ?? "" }] };
+    expect(() => renderTokensCss({ ...designTokens, color })).toThrow("{lien} names no colour token");
+  });
+
+  it("leaves Tailwind's own palette out, so only token colours exist", () => {
+    expect(section("@theme static").split("\n")[1]?.trim()).toBe("--color-*: initial;");
+  });
+
+  it("always emits every type utility, even one no source file names yet", () => {
+    expect(css).toContain("@source inline(\"type-title type-heading type-body type-control type-small type-readout-lg "
+      + "type-readout type-label type-code mono-figures\");");
+  });
+
+  it("writes the mono figure settings once, as a utility of their own", () => {
+    const figures = section("@utility mono-figures");
+    expect(figures).toContain("font-family: var(--font-mono);");
+    expect(figures).toContain("font-stretch: 87.5%;");
+    expect(figures).toContain("font-variant-numeric: tabular-nums slashed-zero;");
   });
 
   it("fails without a base spacing step", () => {

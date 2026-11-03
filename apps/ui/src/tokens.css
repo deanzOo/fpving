@@ -1,6 +1,9 @@
 /* Generated from apps/ui/design/tokens.json by `pnpm tokens`. Do not edit. */
 
+@source inline("type-title type-heading type-body type-control type-small type-readout-lg type-readout type-label type-code mono-figures");
+
 @theme static {
+  --color-*: initial;
   --color-page: #e9edf0;
   --color-surface: #f6f8f9;
   --color-surface-raised: #ffffff;
@@ -117,6 +120,12 @@
   --color-series-7: #4a79c6;
   --color-series-8: #bb5757;
   --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+@utility mono-figures {
+  font-family: var(--font-mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums slashed-zero;
 }
 
 @utility type-title {
