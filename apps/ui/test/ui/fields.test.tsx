@@ -49,6 +49,8 @@ describe("Text field", () => {
     await userEvent.tab();
     const frame = screen.getByRole("textbox").element().parentElement;
     expect(frame === null ? "none" : getComputedStyle(frame, "::after").content).not.toBe("none");
+    expect(frame === null ? "" : getComputedStyle(frame).outlineStyle).toBe("none");
+    expect(styleOf(screen.getByRole("textbox")).outlineStyle).toBe("none");
   });
 });
 

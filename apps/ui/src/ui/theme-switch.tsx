@@ -27,7 +27,7 @@ export const ThemeSwitch = () => {
       {CHOICES.map(({ theme, label }) => (
         <label
           key={theme}
-          className={"focus-frame relative flex h-7 cursor-pointer items-center px-2 type-control text-ink-muted "
+          className={"keyboard-frame relative flex h-7 cursor-pointer items-center px-2 type-control text-ink-muted "
             + "hover:text-ink has-checked:bg-surface-raised has-checked:text-ink"}
         >
           <input

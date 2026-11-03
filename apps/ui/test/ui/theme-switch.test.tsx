@@ -4,6 +4,7 @@ import { render } from "vitest-browser-react";
 import { ThemeSwitch } from "../../src/ui/theme-switch.tsx";
 import { applyTheme, readTheme, saveTheme, Theme } from "../../src/ui/theme.ts";
 import { prefersColorScheme } from "../support/media.ts";
+import { hasBrackets } from "../support/style.ts";
 import "../../src/styles.css";
 
 const KEY = "fpving.theme";
@@ -63,6 +64,15 @@ describe("Theme switch", () => {
     await screen.getByRole("radio", { name: "Dark" }).click();
     expect(document.documentElement).toHaveAttribute("data-theme", Theme.Dark);
     expect(page()).toBe(DARK_PAGE);
+  });
+
+  it("frames a choice in brackets for keyboard focus only, not after a click", async () => {
+    const screen = await render(<ThemeSwitch />);
+    const dark = screen.getByText("Dark", { exact: true });
+    await screen.getByRole("radio", { name: "Dark" }).click();
+    expect(hasBrackets(dark)).toBe(false);
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(hasBrackets(screen.getByText("Light", { exact: true }))).toBe(true);
   });
 
   it("moves between the choices with the arrow keys", async () => {

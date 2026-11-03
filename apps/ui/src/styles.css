@@ -16,12 +16,14 @@
 @layer components {
   :where(a, button, summary):focus-visible,
   .focus-frame:focus-within,
+  .keyboard-frame:has(:focus-visible),
   .reticle {
     position: relative;
   }
 
   :where(a, button, summary):focus-visible::after,
   .focus-frame:focus-within::after,
+  .keyboard-frame:has(:focus-visible)::after,
   .reticle::after {
     --arm: var(--bracket-arm);
     --stroke: var(--bracket-stroke);
@@ -49,12 +51,8 @@
     --reticle-color: var(--color-signal);
   }
 
-  .focus-frame:focus-within {
-    outline: var(--hairline) solid var(--color-signal);
-    outline-offset: var(--bracket-gap);
-  }
-
-  .focus-frame :focus-visible {
+  .focus-frame :focus-visible,
+  .keyboard-frame :focus-visible {
     outline: none;
   }
 
