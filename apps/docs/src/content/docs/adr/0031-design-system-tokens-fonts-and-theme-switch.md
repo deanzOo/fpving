@@ -30,6 +30,8 @@ The UI had a hand-written Tailwind `@theme` with a handful of colours, system fo
 
 `styles.css` imports `tokens.css` and keeps only base and component-layer rules: the focus reticle, the motion marks and the pseudo-element pieces of the primitives. A tooling test fails when the committed `tokens.css` differs from what the generator writes now. The old `action`, `on-action` and `focus` colours are gone; `signal` and `on-signal` replace them. Tailwind copies a `--shadow-*` theme value into its `shadow-*` utility at build time, so a dark redefinition would never reach a `shadow-dialog` utility. The shadow therefore stays out of `@theme`, and the dialog uses `shadow-(--shadow-dialog)`, which reads the variable at run time. Colours, radii, fonts and spacing compile to `var(--…)` and are safe in `@theme`. The generated file is left out of the duplication check, because its two dark blocks repeat by design.
 
+The design system is enforced, not only documented. `tools/ui-guards.ts` holds `no-restricted-syntax` guards that fail lint on raw colours anywhere in `apps/ui/src`, and outside `apps/ui/src/ui/` on palette classes, arbitrary colours and properties, native controls, opacity, raw type, radii, shadows and inline styles; `ui/` is exempt from all but raw colours, because a primitive is where those belong. A tooling test does the same for stylesheets, which lint cannot read.
+
 The faces are `@fontsource/ibm-plex-sans` 5.3.0 (weights 400, 500 and 600) and `@fontsource-variable/martian-mono` 5.3.0 (the width and weight axes), both OFL-1.1, which is compatible with AGPL-3.0 for bundled fonts. The variable package names its family "Martian Mono Variable" while the tokens name "Martian Mono", so `fonts.css` declares the latin and latin-ext faces itself under the tokens' name, pointing at the package's files; knip cannot see a dependency used only from a CSS `url()`, so `knip.json` names it. The built CSS refers only to font files under `/assets/`.
 
 The theme switch is a radio group in the nav bar. Light and Dark set `data-theme` on `<html>` and are stored in `localStorage`; System removes both and leaves the choice to the operating system. A browser that blocks storage gets System on load and a choice that lasts for the page.
@@ -41,5 +43,7 @@ The stored choice is applied by `apps/ui/public/theme-boot.js`, a classic script
 - Good: a design system change is a new `tokens.json` and `pnpm tokens`; a stale stylesheet fails the tests.
 - Good: the faces load from the app's origin and the CSP stays `default-src 'self'`; the fallback stacks keep the layout if they fail.
 - Good: a chosen theme is in place at the first frame, under the unchanged CSP.
+- Good: a screen that drifts from the design system fails `pnpm verify`, and the message says what to use instead.
+- Bad: the guards match strings, so a sentence that looks like a class or a colour is flagged and has to be reworded.
 - Bad: the boot script duplicates the key and the theme names, held in step by a test rather than by an import.
 - Bad: two font packages to keep current, and a hand-kept pair of `@font-face` rules for the mono face's family name.
