@@ -12,6 +12,23 @@ const emulateMedia: BrowserCommand<Parameters<Page["emulateMedia"]>> = async ({ 
   await page.emulateMedia(options);
 };
 
+const FIRST_FRAME = "fpvingFirstFrame";
+
+const themeAtFirstFrame: BrowserCommand<[key: string, stored: string]> = async ({ page }, key, stored) => {
+  const fresh = await page.context().newPage();
+  try {
+    await fresh.addInitScript({
+      content: `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(stored)});
+requestAnimationFrame(() => { window.${FIRST_FRAME} = document.documentElement.dataset.theme ?? "none"; });`,
+    });
+    await fresh.goto(new URL("/index.html", page.url()).href);
+    await fresh.waitForFunction(`"${FIRST_FRAME}" in window`);
+    return await fresh.evaluate(`window.${FIRST_FRAME}`);
+  } finally {
+    await fresh.close();
+  }
+};
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { conditions: ["@fpving/source", ...defaultClientConditions], dedupe: ["react", "react-dom"] },
@@ -30,7 +47,7 @@ export default defineConfig({
         contextOptions: { locale: "en-US", timezoneId: "Asia/Jerusalem" },
       }),
       instances: [{ browser: "chromium" }],
-      commands: { emulateMedia },
+      commands: { emulateMedia, themeAtFirstFrame },
     },
   },
 });

@@ -2,12 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { ThemeSwitch } from "../../src/ui/theme-switch.tsx";
-import { applyTheme, readTheme, saveTheme, Theme } from "../../src/ui/theme.ts";
+import { readTheme, saveTheme, Theme, THEME_KEY } from "../../src/ui/theme.ts";
 import { prefersColorScheme } from "../support/media.ts";
 import { hasBrackets } from "../support/style.ts";
 import "../../src/styles.css";
 
-const KEY = "fpving.theme";
 const LIGHT_PAGE = "#e9edf0";
 const DARK_PAGE = "#0e1216";
 
@@ -87,12 +86,12 @@ describe("Theme switch", () => {
   it("remembers the choice for the next visit, and forgets it when System is chosen again", async () => {
     const screen = await render(<ThemeSwitch />);
     await screen.getByRole("radio", { name: "Dark" }).click();
-    expect(localStorage.getItem(KEY)).toBe(Theme.Dark);
+    expect(localStorage.getItem(THEME_KEY)).toBe(Theme.Dark);
     await screen.unmount();
     const again = await render(<ThemeSwitch />);
     await expect.element(again.getByRole("radio", { name: "Dark" })).toBeChecked();
     await again.getByRole("radio", { name: "System" }).click();
-    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(localStorage.getItem(THEME_KEY)).toBeNull();
     expect(document.documentElement).not.toHaveAttribute("data-theme");
   });
 
@@ -108,7 +107,7 @@ describe("Theme switch", () => {
 describe("Stored theme", () => {
   it("reads as System when nothing, or something unknown, is stored", () => {
     expect(readTheme()).toBe(Theme.System);
-    localStorage.setItem(KEY, "sepia");
+    localStorage.setItem(THEME_KEY, "sepia");
     expect(readTheme()).toBe(Theme.System);
   });
 
@@ -124,13 +123,5 @@ describe("Stored theme", () => {
     expect(() => {
       saveTheme(Theme.Dark);
     }).toThrow("broken");
-  });
-
-  it("is applied to the document before anything renders", () => {
-    localStorage.setItem(KEY, Theme.Dark);
-    applyTheme(readTheme());
-    expect(document.documentElement).toHaveAttribute("data-theme", Theme.Dark);
-    applyTheme(Theme.System);
-    expect(document.documentElement).not.toHaveAttribute("data-theme");
   });
 });

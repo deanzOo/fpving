@@ -3,7 +3,8 @@ export const Theme = { System: "system", Light: "light", Dark: "dark" } as const
 /** One of the {@link Theme} choices. */
 export type Theme = (typeof Theme)[keyof typeof Theme];
 
-const KEY = "fpving.theme";
+/** Where the chosen theme is stored; `public/theme-boot.js` reads the same key. */
+export const THEME_KEY = "fpving.theme";
 const THEMES: readonly string[] = Object.values(Theme);
 const isTheme = (value: string | null): value is Theme => value !== null && THEMES.includes(value);
 
@@ -22,7 +23,7 @@ const refused = (error: unknown): null => {
 export const readTheme = (): Theme => {
   let stored: string | null;
   try {
-    stored = localStorage.getItem(KEY);
+    stored = localStorage.getItem(THEME_KEY);
   } catch (error) {
     stored = refused(error);
   }
@@ -38,9 +39,9 @@ export const readTheme = (): Theme => {
 export const saveTheme = (theme: Theme): void => {
   try {
     if (theme === Theme.System) {
-      localStorage.removeItem(KEY);
+      localStorage.removeItem(THEME_KEY);
     } else {
-      localStorage.setItem(KEY, theme);
+      localStorage.setItem(THEME_KEY, theme);
     }
   } catch (error) {
     refused(error);
