@@ -16,7 +16,7 @@ import { Notice, NoticeTone } from "./ui/notice.tsx";
 
 const KIND = {
   [AlertKind.PriceDrop]: { label: "Price drop", tone: BadgeTone.Good, glyph: "▼" },
-  [AlertKind.BackInStock]: { label: "Back in stock", tone: BadgeTone.Info, glyph: "✓" },
+  [AlertKind.BackInStock]: { label: "Back in stock", tone: BadgeTone.Info },
   [AlertKind.NewCheapest]: { label: "New cheapest listing", tone: BadgeTone.Good, glyph: "★" },
 } as const;
 
@@ -103,14 +103,14 @@ export const Alerts = () => {
           {alerts?.map((alert, index) => {
             const name = names.get(alert.productId);
             const when = fromNow(alert.createdAt);
-            const { label, tone, glyph } = KIND[alert.kind];
+            const { label, ...look } = KIND[alert.kind];
             return (
               <li
                 key={alert.id}
                 tabIndex={-1}
                 className="flex min-h-(--row-height) flex-wrap items-center gap-3 border-b border-line py-2"
               >
-                <Badge tone={tone} glyph={glyph}>{label}</Badge>
+                <Badge {...look}>{label}</Badge>
                 {name === undefined
                   ? <span className="text-ink-muted type-body">{GONE}</span>
                   : (

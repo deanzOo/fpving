@@ -42,9 +42,9 @@ describe("Alerts", () => {
 
   it.each([
     [AlertKind.PriceDrop, "Price drop", "▼", "--color-good"],
-    [AlertKind.BackInStock, "Back in stock", "✓", "--color-info"],
+    [AlertKind.BackInStock, "Back in stock", undefined, "--color-info"],
     [AlertKind.NewCheapest, "New cheapest listing", "★", "--color-good"],
-  ])("shows a %s alert's kind as a badge: its words, its glyph and its colour", async (kind, words, glyph, ink) => {
+  ])("shows a %s alert's kind as a badge: its words, any glyph and its colour", async (kind, words, glyph, ink) => {
     const screen = await renderApp(scripted([{ ...drop, kind }]).client, "/alerts");
     const badge = screen.getByRole("listitem").getByText(words, { exact: true });
     await expect.element(badge).toBeVisible();

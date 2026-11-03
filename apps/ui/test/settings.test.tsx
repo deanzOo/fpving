@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, settingsSchema, ThresholdBasis } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { describe, expect, it } from "vitest";
 import { QueryKey } from "../src/queries.ts";
-import { failWith, fakeApi, reply, wire, Role } from "./support/fake-api.ts";
+import { failWith, fakeApi, gate, heldBy, reply, Role, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 import { styleOf } from "./support/style.ts";
 import "../src/styles.css";
@@ -85,6 +85,16 @@ describe("Settings", () => {
       },
     };
     expect(api.sent).toContainEqual({ method: "PUT", path: apiRoutes.putSettings.url, body: expected });
+  });
+
+  it("says Saving… on its button while the settings are on their way", async () => {
+    const api = scripted();
+    const saving = gate();
+    api.on(apiRoutes.putSettings, heldBy(saving, reply(wire.settings, saved)));
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Save settings" }).click();
+    await expect.element(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute("aria-disabled", "true");
+    saving.release();
   });
 
   it("marks every cached read that depends on the settings stale once saved, so landed costs refresh", async () => {

@@ -102,6 +102,20 @@ describe("Match review", () => {
     expect(styleOf(verdict).color).toBe(rgb(token(ink)));
   });
 
+  it("dashes the not judged badge, and only that one", async () => {
+    const screen = await renderApp(scripted([
+      candidate("c1", FRAME),
+      candidate("c2", FRAME, { llmVerdict: LlmVerdict.Unjudged, llmReason: null }),
+    ]).client, "/matches");
+    const border = (words: string) => {
+      const badge = group(screen, "Acme X5 frame").getByText(words, { exact: true }).element().parentElement;
+      return badge === null ? "" : getComputedStyle(badge).borderTopStyle;
+    };
+    await expect.element(group(screen, "Acme X5 frame").getByText("Not judged yet", { exact: true })).toBeVisible();
+    expect(border("Not judged yet")).toBe("dashed");
+    expect(border("Same product")).toBe("solid");
+  });
+
   it("frames the first candidate waiting for review, and only that one", async () => {
     const screen = await renderApp(
       scripted([candidate("c1", FRAME), candidate("c2", FRAME)], [candidate("c3", KIT)]).client, "/matches",

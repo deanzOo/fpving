@@ -291,6 +291,18 @@ describe("Product detail", () => {
     expect(stale.element().previousElementSibling?.textContent).toBe("▲");
   });
 
+  it.each([ListingStatus.Gone, ListingStatus.Removed])(
+    "shows a %s listing as a neutral badge, a word in muted ink with no glyph", async (status) => {
+      const shown = detail();
+      const gone = { ...shown, listings: [{ listing: listing("l1", { status }), history: [snapshot("l1", 0)] }] };
+      const screen = await open(scripted(gone));
+      const word = screen.getByRole("row", { name: /^shop/u }).getByText(status, { exact: true });
+      await expect.element(word).toBeVisible();
+      expect(styleOf(word).color).toBe(rgb(token("--color-ink-muted")));
+      expect(word.element().previousElementSibling).toBeNull();
+    },
+  );
+
   it("sets each price in the readout face", async () => {
     const screen = await open();
     const price = screen.getByRole("row", { name: /^shop/u }).getByText("$123.45");

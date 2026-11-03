@@ -24,12 +24,11 @@ import { UrlForm } from "./url-form.tsx";
 type Detail = Awaited<ReturnType<Client["getProduct"]>>;
 type ListingRow = Detail["listings"][number];
 
-const GONE = { tone: BadgeTone.Neutral, glyph: "✕" } as const;
 const STATUS_BADGE = {
   [ListingStatus.Active]: { tone: BadgeTone.Live },
   [ListingStatus.Stale]: { tone: BadgeTone.Warning, glyph: "▲" },
-  [ListingStatus.Gone]: GONE,
-  [ListingStatus.Removed]: GONE,
+  [ListingStatus.Gone]: { tone: BadgeTone.Neutral },
+  [ListingStatus.Removed]: { tone: BadgeTone.Neutral },
 } as const;
 
 const latestOf = ({ history }: ListingRow) => history.reduce((_older, snapshot) => snapshot);
