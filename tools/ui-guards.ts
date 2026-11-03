@@ -17,6 +17,15 @@ const ARBITRARY_COLOUR_CLASS = String.raw`\b${COLOUR_UTILITY}-\[`;
 const ARBITRARY_MESSAGE = "Design system rule 1 (only tokens): arbitrary value on a colour utility. "
   + "Use a token utility such as text-ink or bg-surface.";
 
+const PRIMITIVE_FOR_NATIVE = {
+  button: "Button",
+  input: "TextField or Checkbox",
+  select: "Select",
+  textarea: "TextField, extended for several lines",
+  table: "DataTable",
+  dialog: "Confirm",
+} as const;
+
 const stringGuard = (pattern: string, message: string) => [
   { selector: `Literal[value=/${pattern}/i]`, message },
   { selector: `TemplateElement[value.raw=/${pattern}/i]`, message },
@@ -30,6 +39,10 @@ export const uiScreenGuards = [
   ...uiSourceGuards,
   ...stringGuard(PALETTE_CLASS, PALETTE_MESSAGE),
   ...stringGuard(ARBITRARY_COLOUR_CLASS, ARBITRARY_MESSAGE),
+  ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({
+    selector: `JSXOpeningElement[name.name="${element}"]`,
+    message: `Design system rule 2 (shared primitives): native <${element}> outside apps/ui/src/ui. Use ${primitive}.`,
+  })),
 ];
 
 /**

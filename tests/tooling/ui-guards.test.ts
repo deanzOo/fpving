@@ -91,6 +91,31 @@ describe("Design system guards", () => {
     });
   });
 
+  describe("Native controls", () => {
+    it.each([
+      ["button", "Button"],
+      ["input", "TextField or Checkbox"],
+      ["select", "Select"],
+      ["textarea", "TextField"],
+      ["table", "DataTable"],
+      ["dialog", "Confirm"],
+    ])("rejects a native %s in a screen and names %s", async (element, primitive) => {
+      const [message] = await guardMessages(`export const view = <${element} />;\n`, SCREEN_TSX);
+      expect(message).toContain("Design system rule 2");
+      expect(message).toContain(`<${element}>`);
+      expect(message).toContain(primitive);
+    });
+
+    it("accepts a native control in a primitive", async () => {
+      expect(await guardMessages("export const view = <button />;\n", PRIMITIVE_TSX)).toEqual([]);
+    });
+
+    it("accepts a primitive and other native elements in a screen", async () => {
+      const code = "declare const Button: () => null;\nexport const view = <div><Button /></div>;\n";
+      expect(await guardMessages(code, SCREEN_TSX)).toEqual([]);
+    });
+  });
+
   describe("Raw colours in stylesheets", () => {
     it("reports every raw colour with its file, the rule and the token to use", async () => {
       const findings = await rawColourFindings(STYLESHEET_FIXTURES);
