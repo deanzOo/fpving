@@ -81,8 +81,7 @@ describe("Match review", () => {
     const frame = group(screen, "Acme X5 frame");
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" }))
       .toHaveAttribute("href", "https://mall.example/c1");
-    await expect.element(frame.getByText("Same product", { exact: true })).toBeVisible();
-    await expect.element(frame.getByText("same model and size", { exact: true })).toBeVisible();
+    await expect.element(frame.getByText(/Same product: same model and size/u)).toBeVisible();
     await expect.element(frame.getByText("87% similar, on mall")).toBeVisible();
     await expect.element(group(screen, "Acme X5 kit").getByText("Not judged yet")).toBeVisible();
   });
@@ -169,8 +168,7 @@ describe("Match review", () => {
     const toggle = screen.getByRole("checkbox", { name: "Show candidates judged different" });
     await expect.element(toggle).not.toBeChecked();
     await toggle.click();
-    await expect.element(frame.getByText("Different product", { exact: true })).toBeVisible();
-    await expect.element(frame.getByText("another frame size", { exact: true })).toBeVisible();
+    await expect.element(frame.getByText(/Different product: another frame size/u)).toBeVisible();
     await toggle.click();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c2" })).not.toBeInTheDocument();
   });

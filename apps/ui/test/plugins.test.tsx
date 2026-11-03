@@ -62,8 +62,8 @@ describe("Plugins", () => {
 
   it("shows a plugin backing off and when it retries", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
-    await expect.element(screen.getByRole("row", { name: /^Mall mall/u }).getByText("Backing off, retrying in 2 hours"))
-      .toBeVisible();
+    const mall = screen.getByRole("row", { name: /^Mall mall/u });
+    await expect.element(mall.getByText(/Backing off, retrying in 2 hours/u)).toBeVisible();
   });
 
   it("shows a loaded plugin's warnings", async () => {
@@ -71,20 +71,20 @@ describe("Plugins", () => {
     const screen = await renderApp(scripted([warned]).client, "/plugins");
     const row = screen.getByRole("row", { name: /^Shop shop/u });
     await expect.element(row.getByText("Loaded", { exact: true })).toBeVisible();
-    await expect.element(row.getByText("Warning (domain_conflict): shop.example is also declared by mall"))
+    await expect.element(row.getByText(/Warning: domain_conflict: shop\.example is also declared by mall/u))
       .toBeVisible();
   });
 
   it("shows a disabled plugin with the reason", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     await expect.element(screen.getByRole("row", { name: /^Old old/u })
-      .getByText("Disabled (sdk_incompatible): needs sdk >=2.0.0")).toBeVisible();
+      .getByText(/Disabled: sdk_incompatible: needs sdk >=2\.0\.0/u)).toBeVisible();
   });
 
   it("shows a rejected plugins.json entry as its own row", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     await expect.element(screen.getByRole("row", { name: /^plugins\.json\[2\]/u })
-      .getByText("Disabled (entry_invalid): path must be a string")).toBeVisible();
+      .getByText(/Disabled: entry_invalid: path must be a string/u)).toBeVisible();
   });
 
   it("shows an unusable plugins.json as a row of its own", async () => {
@@ -101,24 +101,25 @@ describe("Plugins", () => {
   });
 
   it.each([
-    [/^Old old/u, "Disabled (sdk_incompatible): needs sdk >=2.0.0", "✕", "--color-critical"],
-    [/^plugins\.json\b(?!\[)/u, "plugins.json is unusable: not JSON", "✕", "--color-critical"],
-    [/^Mall mall/u, "Backing off, retrying in 2 hours", "↻", "--color-warning"],
-  ])("marks a troubled plugin's line with a glyph and its colour: %s", async (name, line, glyph, ink) => {
+    [/^Old old/u, "Disabled", "✕", "--color-on-critical"],
+    [/^plugins\.json\b(?!\[)/u, "Config invalid", "✕", "--color-on-critical"],
+    [/^Mall mall/u, "Backing off", "↻", "--color-warning"],
+  ])("shows a troubled plugin's state as a badge: %s", async (name, word, glyph, ink) => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
-    const text = screen.getByRole("row", { name }).getByText(line, { exact: true });
-    await expect.element(text).toBeVisible();
-    expect(text.element().previousElementSibling?.textContent).toBe(glyph);
-    expect(styleOf(text).color).toBe(rgb(token(ink)));
+    const badge = screen.getByRole("row", { name }).getByText(word, { exact: true });
+    await expect.element(badge).toBeVisible();
+    expect(badge.element().previousElementSibling?.textContent).toBe(glyph);
+    expect(styleOf(badge).color).toBe(rgb(token(ink)));
   });
 
-  it("marks a loaded plugin's warning with a glyph in the warning colour", async () => {
+  it("shows a loaded plugin's warning as a warning badge with the detail beside it", async () => {
     const warned = plugin({ issues: [{ kind: DomainConflict, detail: "shop.example is also declared by mall" }] });
     const screen = await renderApp(scripted([warned]).client, "/plugins");
-    const text = screen.getByText("Warning (domain_conflict): shop.example is also declared by mall", { exact: true });
-    await expect.element(text).toBeVisible();
-    expect(text.element().previousElementSibling?.textContent).toBe("▲");
-    expect(styleOf(text).color).toBe(rgb(token("--color-warning")));
+    const badge = screen.getByText("Warning", { exact: true });
+    await expect.element(badge).toBeVisible();
+    expect(badge.element().previousElementSibling?.textContent).toBe("▲");
+    expect(styleOf(badge).color).toBe(rgb(token("--color-warning")));
+    expect(styleOf(screen.getByText("domain_conflict", { exact: true })).fontFamily).toContain("Martian Mono");
   });
 
   it("marks stale listings in the warning colour, and none in plain ink", async () => {

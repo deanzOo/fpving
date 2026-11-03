@@ -16,33 +16,43 @@ const { Loaded } = rowSchema.status.enum;
 const { ConfigInvalid } = rowSchema.issues.element.shape.kind.enum;
 
 const Trouble = {
-  Failed: { ink: "text-critical", glyph: "✕" },
-  Warning: { ink: "text-warning", glyph: "▲" },
-  BackingOff: { ink: "text-warning", glyph: "↻" },
+  Failed: { tone: BadgeTone.Critical, glyph: "✕" },
+  Warned: { tone: BadgeTone.Warning, glyph: "▲" },
+  BackingOff: { tone: BadgeTone.Warning, glyph: "↻" },
 } as const;
-type Trouble = (typeof Trouble)[keyof typeof Trouble];
 
-const troubles = ({ status, issues, backoffUntil }: Row): { readonly text: string; readonly look: Trouble }[] => [
+const Kinded = ({ kind, detail }: { readonly kind: string; readonly detail: string }) => (
+  <>
+    <code className="type-code">{kind}</code>
+    {`: ${detail}`}
+  </>
+);
+
+const troubles = ({ status, issues, backoffUntil }: Row) => [
   ...issues.map(({ kind, detail }) => {
     if (kind === ConfigInvalid) {
-      return { text: `plugins.json is unusable: ${detail}`, look: Trouble.Failed };
+      return { word: "Config invalid", look: Trouble.Failed, joint: ": ", said: `plugins.json is unusable: ${detail}` };
     }
-    return status === Loaded
-      ? { text: `Warning (${kind}): ${detail}`, look: Trouble.Warning }
-      : { text: `Disabled (${kind}): ${detail}`, look: Trouble.Failed };
+    return {
+      word: status === Loaded ? "Warning" : "Disabled",
+      look: status === Loaded ? Trouble.Warned : Trouble.Failed,
+      joint: ": ",
+      said: <Kinded kind={kind} detail={detail} />,
+    };
   }),
   ...(backoffUntil === null
     ? []
-    : [{ text: `Backing off, retrying ${fromNow(backoffUntil)}`, look: Trouble.BackingOff }]),
+    : [{ word: "Backing off", look: Trouble.BackingOff, joint: ", ", said: `retrying ${fromNow(backoffUntil)}` }]),
 ];
 
 const State = ({ row }: { readonly row: Row }) => (
   <div className="flex flex-col items-start gap-1">
     {row.status === Loaded ? <Badge tone={BadgeTone.Live}>Loaded</Badge> : null}
-    {troubles(row).map(({ text, look }) => (
-      <p key={text} className={`flex gap-2 type-small ${look.ink}`}>
-        <span aria-hidden="true" className="type-code">{look.glyph}</span>
-        <span>{text}</span>
+    {troubles(row).map(({ word, look, joint, said }, index) => (
+      <p key={index} className="flex flex-wrap items-center gap-2 type-small">
+        <Badge {...look}>{word}</Badge>
+        <span className="sr-only">{joint}</span>
+        <span>{said}</span>
       </p>
     ))}
   </div>
