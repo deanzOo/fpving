@@ -81,6 +81,13 @@ describe("Design tokens stylesheet", () => {
     expect(section("@theme static").split("\n")[1]?.trim()).toBe("--color-*: initial;");
   });
 
+  it("leaves Tailwind's own radii out, so only the token radii exist", () => {
+    const theme = section("@theme static");
+    const reset = theme.indexOf("--radius-*: initial;");
+    expect(reset).toBeGreaterThan(-1);
+    expect(reset).toBeLessThan(theme.indexOf("--radius-0:"));
+  });
+
   it("always emits every type utility, even one no source file names yet", () => {
     expect(css).toContain("@source inline(\"type-title type-heading type-body type-control type-small type-readout-lg "
       + "type-readout type-label type-code chart-tick\");");

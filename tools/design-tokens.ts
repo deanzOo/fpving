@@ -99,6 +99,7 @@ export const renderTokensCss = (source: Tokens): string => {
       ...colorLines(source, ThemeId.Light),
       ...Object.entries(source.type.families).map(([name, stack]) => `--font-${name}: ${stack};`),
       `--spacing: ${spacing(source)};`,
+      "--radius-*: initial;",
       ...source.radius.tokens.map(({ name, value }) => `--${name}: ${value};`),
     ]),
     block(":root", [

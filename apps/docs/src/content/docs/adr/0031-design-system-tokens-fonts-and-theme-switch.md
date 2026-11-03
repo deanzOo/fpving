@@ -21,7 +21,7 @@ The UI had a hand-written Tailwind `@theme` with a handful of colours, system fo
 
 `apps/ui/design/tokens.json` is the design system's file, committed verbatim. `pnpm tokens` runs `tools/design-tokens.ts`, which writes `apps/ui/src/tokens.css`:
 
-- `--color-*: initial`, so Tailwind's stock palette does not exist and only token colours can be used;
+- `--color-*: initial` and `--radius-*: initial`, so Tailwind's stock palette and radii do not exist and only token colours and radii can be used;
 - the light colours, the font stacks, `--spacing: 4px` (the `space-1` step) and the radii in Tailwind's `@theme static`, so every token is a CSS variable whether a utility uses it or not, even though `tokens.json` lists dark first;
 - the light shadow and the size tokens (`hairline`, the reticle bracket measures, `control-height`, `row-height`, `content-max`) as plain variables on `:root`;
 - the dark colours and shadow under `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` and again under `:root[data-theme="dark"]`, each with the matching `color-scheme`;

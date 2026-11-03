@@ -37,6 +37,7 @@
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --spacing: 4px;
+  --radius-*: initial;
   --radius-0: 0;
   --radius-1: 2px;
   --radius-2: 4px;
