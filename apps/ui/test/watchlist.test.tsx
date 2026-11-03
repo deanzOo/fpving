@@ -10,6 +10,8 @@ import type { z } from "zod";
 import { alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, product, reply, wire } from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { rgb, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 type Row = z.output<typeof wire.watchlist>[number];
 
@@ -64,6 +66,21 @@ describe("Watchlist", () => {
     await expect.element(line.getByText("3 unread")).toBeVisible();
     await line.getByRole("link", { name: "Acme X5 frame" }).click();
     await expect.element(screen.getByRole("heading", { level: 1, name: "Acme X5 frame" })).toBeVisible();
+  });
+
+  it("marks a row's unread alerts as a live status in the signal colour", async () => {
+    const screen = await renderApp(scripted([row({ unreadAlerts: 3 })]).client);
+    const unread = screen.getByRole("row", { name: /Acme X5 frame/u }).getByText("3 unread");
+    await expect.element(unread).toBeVisible();
+    const badge = unread.element().parentElement;
+    expect(badge === null ? "" : getComputedStyle(badge).color).toBe(rgb(token("--color-signal")));
+  });
+
+  it("sets the cheapest landed cost in the readout face", async () => {
+    const screen = await renderApp(scripted([row()]).client);
+    const price = screen.getByRole("row", { name: /Acme X5 frame/u }).getByText("$123.45");
+    await expect.element(price).toBeVisible();
+    expect(styleOf(price).fontFamily).toContain("Martian Mono");
   });
 
   it("says when a product has no price yet and shows no unread count when none is unread", async () => {
