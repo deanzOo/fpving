@@ -98,4 +98,11 @@ describe("Chart theme", () => {
     expect(style?.backgroundColor).toBe(rgb(token("--color-surface-raised")));
     expect(style?.fontSize).toBe("12px");
   });
+
+  it("sets a tooltip's title above its lines, in the medium weight", async () => {
+    const screen = await render(<ChartTooltip title="Nov 4"><p>€41.54</p></ChartTooltip>);
+    const title = screen.getByText("Nov 4").element();
+    expect(getComputedStyle(title).fontWeight).toBe("500");
+    expect(title.nextElementSibling?.textContent).toBe("€41.54");
+  });
 });

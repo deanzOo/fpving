@@ -98,8 +98,7 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     }
     const day = Number(label);
     return (
-      <ChartTooltip>
-        <p className="font-medium">{dateOf(day)}</p>
+      <ChartTooltip title={dateOf(day)}>
         {series.map(({ key, name: listingName, color, values }) => {
           const value = values[day] ?? null;
           return (

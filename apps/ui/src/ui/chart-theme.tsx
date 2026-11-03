@@ -87,15 +87,17 @@ export const Legend = ({ series, single = false }: {
     );
 
 /**
- * The frame of a chart tooltip: the raised surface on a strong hairline, in the small type.
+ * The frame of a chart tooltip: the raised surface on a strong hairline, in the small type, with an optional title
+ * such as the date above the lines.
  *
- * @param props - The tooltip lines.
+ * @param props - The title and the tooltip lines.
  * @returns The frame.
  */
-export const ChartTooltip = ({ children }: { readonly children: ReactNode }) => (
+export const ChartTooltip = ({ title, children }: { readonly title?: string; readonly children: ReactNode }) => (
   <div
     className="whitespace-nowrap rounded-2 border border-line-strong bg-surface-raised px-2 py-1 text-ink type-small"
   >
+    {title === undefined ? null : <p className="font-medium">{title}</p>}
     {children}
   </div>
 );
