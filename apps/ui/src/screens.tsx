@@ -5,7 +5,7 @@
  */
 export const NotFound = () => (
   <section>
-    <h1 className="text-2xl font-semibold">Page not found</h1>
-    <p className="mt-2 text-ink-muted">No screen lives at this address.</p>
+    <h1 className="type-title">Page not found</h1>
+    <p className="mt-2 text-ink-muted type-body">No screen lives at this address.</p>
   </section>
 );
