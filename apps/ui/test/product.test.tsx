@@ -339,7 +339,7 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
-    const target = screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" });
+    const target = screen.getByRole("button", { name: "Removing mall: Acme X5 frame at l2" });
     await expect.element(target).toHaveTextContent("Removing…");
     const other = screen.getByRole("button", { name: "Remove shop: Acme X5 frame at l1" });
     await expect.element(other).toHaveTextContent("Remove");

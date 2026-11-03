@@ -193,7 +193,8 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
           actions={({ listing }) => (
             <Confirm
               action="Remove"
-              actionLabel={`Remove ${listingName(listing)}`}
+              actionLabel={`${remove.isPending && remove.variables === listing.id ? "Removing" : "Remove"} ${
+                listingName(listing)}`}
               question={`Remove ${listingName(listing)}? It is never scanned again; its history is kept.`}
               confirm="Remove"
               size={ButtonSize.Small}

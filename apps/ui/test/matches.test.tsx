@@ -135,7 +135,7 @@ describe("Match review", () => {
     api.on(at(apiRoutes.acceptCandidate, { candidateId: "c1" }), heldBy(accepting, added));
     const screen = await renderApp(api.client, "/matches");
     await screen.getByRole("button", { name: "Accept Acme X5 c1" }).click();
-    await expect.element(screen.getByRole("button", { name: "Accept Acme X5 c1" })).toHaveTextContent("Accepting…");
+    await expect.element(screen.getByRole("button", { name: "Accepting Acme X5 c1" })).toHaveTextContent("Accepting…");
     const reject = screen.getByRole("button", { name: "Reject Acme X5 c1" });
     await expect.element(reject).toHaveTextContent("Reject");
     await expect.element(reject).toHaveAttribute("aria-disabled", "true");
@@ -148,7 +148,7 @@ describe("Match review", () => {
     api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), heldBy(rejecting, noContent));
     const screen = await renderApp(api.client, "/matches");
     await screen.getByRole("button", { name: "Reject Acme X5 c1" }).click();
-    await expect.element(screen.getByRole("button", { name: "Reject Acme X5 c1" })).toHaveTextContent("Rejecting…");
+    await expect.element(screen.getByRole("button", { name: "Rejecting Acme X5 c1" })).toHaveTextContent("Rejecting…");
     rejecting.release();
   });
 

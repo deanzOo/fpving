@@ -65,7 +65,8 @@ describe("Alerts", () => {
     api.on(at(apiRoutes.markAlertRead, { alertId: "a2" }), heldBy(marking, noContent));
     const screen = await renderApp(api.client, "/alerts");
     await screen.getByRole("button", { name: /^Mark read: Price drop/u }).click();
-    await expect.element(screen.getByRole("button", { name: /^Mark read: Price drop/u })).toHaveTextContent("Marking…");
+    await expect.element(screen.getByRole("button", { name: /^Marking read: Price drop/u }))
+      .toHaveTextContent("Marking…");
     const other = screen.getByRole("button", { name: /^Mark read: Back in stock/u });
     await expect.element(other).toHaveTextContent("Mark read");
     await expect.element(other).toHaveAttribute("aria-disabled", "true");

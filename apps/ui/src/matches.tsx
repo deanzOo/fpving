@@ -97,7 +97,7 @@ const Candidate = ({ candidate, product, featured, announce, reviewing }: Candid
           size={ButtonSize.Small}
           pending={busy}
           pendingLabel={accept.isPending ? "Accepting…" : undefined}
-          aria-label={`Accept ${candidate.title}`}
+          aria-label={`${accept.isPending ? "Accepting" : "Accept"} ${candidate.title}`}
           onClick={() => {
             accept.mutate(params);
           }}
@@ -108,7 +108,7 @@ const Candidate = ({ candidate, product, featured, announce, reviewing }: Candid
           size={ButtonSize.Small}
           pending={busy}
           pendingLabel={reject.isPending ? "Rejecting…" : undefined}
-          aria-label={`Reject ${candidate.title}`}
+          aria-label={`${reject.isPending ? "Rejecting" : "Reject"} ${candidate.title}`}
           onClick={() => {
             reject.mutate(params);
           }}

@@ -104,6 +104,7 @@ export const Alerts = () => {
             const name = names.get(alert.productId);
             const when = fromNow(alert.createdAt);
             const { label, ...look } = KIND[alert.kind];
+            const marking = markOne.isPending && markOne.variables.alertId === alert.id;
             return (
               <li
                 key={alert.id}
@@ -127,8 +128,8 @@ export const Alerts = () => {
                     <Button
                       size={ButtonSize.Small}
                       pending={markOne.isPending}
-                      pendingLabel={markOne.variables?.alertId === alert.id ? MARKING : undefined}
-                      aria-label={`Mark read: ${label} on ${name ?? GONE}, ${when}`}
+                      pendingLabel={marking ? MARKING : undefined}
+                      aria-label={`${marking ? "Marking read" : "Mark read"}: ${label} on ${name ?? GONE}, ${when}`}
                       onClick={() => {
                         markOne.mutate({ alertId: alert.id, index });
                       }}
