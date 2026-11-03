@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { ESLint } from "eslint";
 import { beforeAll, describe, expect, it } from "vitest";
-import { rawColourFindings } from "../../tools/ui-guards.ts";
+import { rawColourFindings } from "../../tools/ui-stylesheet-guard.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const SCREEN_TSX = `${root}apps/ui/src/settings.tsx`;

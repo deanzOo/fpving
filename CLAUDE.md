@@ -27,7 +27,7 @@ Write the missing failing test, scan the codebase for the same bug class, fix ev
 ## UI
 - Tokens: `apps/ui/design/tokens.json` is the source. `pnpm tokens` writes `apps/ui/src/tokens.css`; never edit that file. A test fails when it is stale.
 - Primitives live in `apps/ui/src/ui/`. Extend a primitive instead of styling around it. Screens use `type-*` utilities for type.
-- Guards in `tools/ui-guards.ts` fail `pnpm verify` on a break of rules 1, 2 and 7 and on raw type sizes.
+- Guards in `tools/ui-guards.ts` and `tools/ui-stylesheet-guard.ts` fail `pnpm verify` on a break of rules 1, 2 and 7 and on raw type sizes.
 - Rules:
   1. Only tokens. No hex, rgb or Tailwind palette colours; a missing role gets a token first.
   2. Shared primitives, not restyled native elements.
