@@ -6,7 +6,7 @@ import type { Client } from "./client.ts";
 import { listingName } from "./listing-name.ts";
 import { formatMoney } from "./money.ts";
 import {
-  axisProps, ChartTooltip, cursorProps, gridProps, Legend, lineProps, SERIES, Swatch,
+  axisProps, ChartTooltip, cursorProps, gridProps, Legend, lineProps, moneyAxisProps, SERIES, Swatch,
 } from "./ui/chart-theme.tsx";
 import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
 import { Panel } from "./ui/panel.tsx";
@@ -15,11 +15,12 @@ type Listings = Awaited<ReturnType<Client["getProduct"]>>["listings"];
 
 const HEIGHT = 280;
 const AXIS_WIDTH = 88;
-const MARGIN = { top: 8, right: 16, bottom: 8, left: 8 } as const;
+const MARGIN = { top: 8, right: 24, bottom: 8, left: 8 } as const;
 const DAY = "day";
 const TITLE = "Price history";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const tickFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 const midnight = (at: Date, offset = 0): Date => new Date(at.getFullYear(), at.getMonth(), at.getDate() + offset);
 
 /**
@@ -132,9 +133,9 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
                 dataKey={DAY}
                 type="number"
                 domain={["dataMin", "dataMax"]}
-                tickFormatter={dateOf}
+                tickFormatter={(index: number) => tickFormat.format(days[index])}
               />
-              <YAxis {...axisProps} domain={["auto", "auto"]} tickFormatter={money} width={AXIS_WIDTH} />
+              <YAxis {...moneyAxisProps} domain={["auto", "auto"]} tickFormatter={money} width={AXIS_WIDTH} />
               <Tooltip content={TooltipBody} cursor={cursorProps} filterNull={false} isAnimationActive={false} />
               {series.map(({ key, color, values }) => (
                 <Line key={key} dataKey={key} {...lineProps(values, color, "history-dot")} />

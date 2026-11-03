@@ -499,7 +499,7 @@ describe("Price history chart", () => {
     await userEvent.hover(chartOf(screen));
     await expect.poll(() => chartOf(screen).element().querySelector(".recharts-tooltip-cursor")).not.toBeNull();
     const cursor = chartOf(screen).element().querySelector(".recharts-tooltip-cursor");
-    expect(cursor?.getAttribute("stroke-dasharray")).not.toBeNull();
+    expect(cursor?.getAttribute("stroke-dasharray")).toBe("2 3");
   });
 
   it("sets each listing's cost in the tooltip in the readout face", async () => {
@@ -511,6 +511,38 @@ describe("Price history chart", () => {
     const cost = line.element().lastElementChild;
     expect(cost?.textContent).toBe("$120.00");
     expect(cost === null ? "" : getComputedStyle(cost).fontFamily).toContain("Martian Mono");
+  });
+
+  it("labels the days briefly and keeps every label inside the chart", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    await expect.element(chartOf(screen)).toBeVisible();
+    const chart = chartOf(screen).element();
+    const bounds = chart.getBoundingClientRect();
+    const ticks = [...chart.querySelectorAll(".recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value")];
+    expect(ticks.length).toBeGreaterThan(1);
+    for (const tick of ticks) {
+      const box = tick.getBoundingClientRect();
+      expect(tick.textContent).toMatch(/^\D+ \d{1,2}$/u);
+      expect(box.left).toBeGreaterThanOrEqual(bounds.left);
+      expect(box.right).toBeLessThanOrEqual(bounds.right);
+    }
+  });
+
+  it("names the whole date in the tooltip", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    chartOf(screen).element().focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(screen.getByText(/^\D+ \d{1,2}, \d{4}$/u)).toBeVisible();
+  });
+
+  it("draws the money axis as labels only, without a line or tick marks", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    await expect.element(chartOf(screen)).toBeVisible();
+    const chart = chartOf(screen).element();
+    expect(chart.querySelector(".recharts-yAxis .recharts-cartesian-axis-line")).toBeNull();
+    expect(chart.querySelector(".recharts-yAxis-tick-lines .recharts-cartesian-axis-tick-line")).toBeNull();
+    expect(chart.querySelector(".recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value")).not.toBeNull();
+    expect(chart.querySelector(".recharts-xAxis .recharts-cartesian-axis-line")).not.toBeNull();
   });
 
   it("says when no listing has a landed cost to chart", async () => {

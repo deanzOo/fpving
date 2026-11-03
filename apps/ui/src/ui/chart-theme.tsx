@@ -29,8 +29,11 @@ export const axisProps = {
   },
 } as const;
 
+/** Recharts money axis props: the same tick labels, with no axis line or tick marks. */
+export const moneyAxisProps = { ...axisProps, axisLine: false, tickLine: false } as const;
+
 /** Recharts tooltip cursor: a dashed crosshair at the hovered day, in the strong line colour. */
-export const cursorProps = { stroke: "var(--color-line-strong)", strokeDasharray: "4 4" } as const;
+export const cursorProps = { stroke: "var(--color-line-strong)", strokeDasharray: "2 3" } as const;
 
 /**
  * Recharts line props for one series: a 2px line in its colour that leaves gaps, and a 4px dot ringed in the surface

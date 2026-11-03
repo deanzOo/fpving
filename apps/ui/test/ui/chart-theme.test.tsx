@@ -88,7 +88,7 @@ describe("Chart theme", () => {
     await expect.poll(() => screen.container.querySelector(".recharts-tooltip-cursor")).not.toBeNull();
     const cursor = screen.container.querySelector(".recharts-tooltip-cursor");
     expect(cursor?.getAttribute("stroke")).toBe("var(--color-line-strong)");
-    expect(cursor?.getAttribute("stroke-dasharray")).not.toBeNull();
+    expect(cursor?.getAttribute("stroke-dasharray")).toBe("2 3");
   });
 
   it("frames a tooltip on the raised surface, in the small type", async () => {
