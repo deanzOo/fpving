@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { QueryKey } from "../src/queries.ts";
 import { failWith, fakeApi, gate, heldBy, reply, Role, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { styleOf, token } from "./support/style.ts";
+import { rgb, styleOf, token } from "./support/style.ts";
 import "../src/styles.css";
 
 const saved = settingsSchema.parse(DEFAULT_SETTINGS);
@@ -78,6 +78,7 @@ describe("Settings", () => {
     await screen.getByLabelText("Threshold applies to").selectOptions(ThresholdBasis.ItemAndShipping);
     await screen.getByRole("button", { name: "Save settings" }).click();
     await expect.element(screen.getByRole("status")).toHaveTextContent("Done Settings saved.");
+    expect(styleOf(screen.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
     const expected: Settings = {
       ...saved, displayCurrency: "USD", shipToCountry: "DE", scanIntervalHours: SIX_HOURS,
       importTax: {

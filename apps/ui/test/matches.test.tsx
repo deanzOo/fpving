@@ -206,6 +206,7 @@ describe("Match review", () => {
     await frame.getByRole("button", { name: "Reject Acme X5 c2" }).click();
     await expect.element(frame.getByRole("heading", { level: 2, name: "Acme X5 frame" })).toHaveFocus();
     await expect.element(frame.getByRole("status")).toHaveTextContent("Done Rejected Acme X5 c2.");
+    expect(styleOf(frame.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
   });
 
   it("rejects a candidate and drops it from the queue", async () => {
