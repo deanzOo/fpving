@@ -1,21 +1,23 @@
 import { ListingStatus } from "@fpving/core";
 import type { Money } from "@fpving/plugin-sdk";
-import { useId } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import type { Client } from "./client.ts";
 import { listingName } from "./listing-name.ts";
-import { SERIES } from "./ui/chart-theme.tsx";
-import { loneDot } from "./ui/lone-dot.tsx";
 import { formatMoney } from "./money.ts";
+import {
+  axisProps, ChartTooltip, cursorProps, gridProps, Legend, lineProps, SERIES, Swatch,
+} from "./ui/chart-theme.tsx";
+import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
+import { Panel } from "./ui/panel.tsx";
 
 type Listings = Awaited<ReturnType<Client["getProduct"]>>["listings"];
 
 const HEIGHT = 280;
-const STROKE = 2;
 const AXIS_WIDTH = 88;
 const MARGIN = { top: 8, right: 16, bottom: 8, left: 8 } as const;
 const DAY = "day";
+const TITLE = "Price history";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const midnight = (at: Date, offset = 0): Date => new Date(at.getFullYear(), at.getMonth(), at.getDate() + offset);
@@ -34,7 +36,6 @@ const midnight = (at: Date, offset = 0): Date => new Date(at.getFullYear(), at.g
  * @returns The chart, or a note when nothing has a landed cost.
  */
 export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
-  const headingId = useId();
   const firstSeen = Math.min(
     ...listings.flatMap(({ history }) => history.map(({ observedAt }) => observedAt.getTime())),
   );
@@ -60,14 +61,14 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     return entry === undefined ? [] : [{ ...entry, color }];
   });
   const notCharted = listings.length - charted.length;
-  const heading = <h2 id={headingId} className="text-xl font-semibold">Price history</h2>;
   const [first] = charted;
   if (first === undefined) {
     return (
-      <section className="mt-8">
-        {heading}
-        <p className="mt-2 text-ink-muted">No landed cost to chart yet.</p>
-      </section>
+      <div className="mt-8">
+        <Panel title={TITLE}>
+          <EmptyState tag={EmptyTag.NoData}>No landed cost to chart yet.</EmptyState>
+        </Panel>
+      </div>
     );
   }
   const money = (amountMinor: number): string => formatMoney({ amountMinor, currency: first.last.cost.currency });
@@ -96,78 +97,52 @@ export const PriceHistory = ({ listings }: { readonly listings: Listings }) => {
     }
     const day = Number(label);
     return (
-      <div className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink">
+      <ChartTooltip>
         <p className="font-medium">{dateOf(day)}</p>
         {series.map(({ key, name: listingName, color, values }) => {
           const value = values[day] ?? null;
           return (
-            <p key={key} className="flex items-center gap-2 whitespace-nowrap">
-              <span aria-hidden="true" className="inline-block h-0.5 w-3" style={{ backgroundColor: color }} />
-              {`${listingName} ${value === null ? "No price" : formatMoney(value)}`}
+            <p key={key} className="flex items-center gap-2">
+              <Swatch color={color} />
+              {`${listingName} `}
+              {value === null ? "No price" : <span className="type-readout">{formatMoney(value)}</span>}
             </p>
           );
         })}
-      </div>
+      </ChartTooltip>
     );
   };
   return (
-    <section className="mt-8">
-      {heading}
-      <figure aria-labelledby={headingId} className="mt-4">
-        {notCharted > 0 && (
-          <p className="mb-2 text-sm text-ink-muted">
-            {`Not charted: ${String(notCharted)} ${notCharted === 1 ? "listing" : "listings"}. The chart shows up to `
-              + `${String(SERIES.length)} listings with a landed cost, the most recently priced first; the `
-              + "table lists them all."}
-          </p>
-        )}
-        <ul aria-label="Legend" className="mb-2 flex flex-wrap gap-4 text-sm text-ink-muted">
-          {series.map(({ key, name: listingName, color }) => (
-            <li key={key} className="flex items-center gap-2">
-              <span aria-hidden="true" className="inline-block h-0.5 w-4" style={{ backgroundColor: color }} />
-              {listingName}
-            </li>
-          ))}
-        </ul>
-        <ResponsiveContainer width="100%" height={HEIGHT}>
-          <LineChart data={rows} title={name} margin={MARGIN}>
-            <CartesianGrid vertical={false} stroke="var(--color-line)" />
-            <XAxis
-              dataKey={DAY}
-              type="number"
-              domain={["dataMin", "dataMax"]}
-              tickFormatter={dateOf}
-              stroke="var(--color-line)"
-              tick={{ fill: "var(--color-ink-muted)" }}
-            />
-            <YAxis
-              domain={["auto", "auto"]}
-              tickFormatter={money}
-              width={AXIS_WIDTH}
-              stroke="var(--color-line)"
-              tick={{ fill: "var(--color-ink-muted)" }}
-            />
-            <Tooltip content={TooltipBody} filterNull={false} isAnimationActive={false} />
-            {series.map(({ key, color, values }) => {
-              return (
-                <Line
-                  key={key}
-                  dataKey={key}
-                  stroke={color}
-                  strokeWidth={STROKE}
-                  dot={loneDot(values, {
-                    className: "history-dot",
-                    fill: color,
-                    ring: { stroke: "var(--color-surface)", width: STROKE },
-                  })}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-              );
-            })}
-          </LineChart>
-        </ResponsiveContainer>
-      </figure>
-    </section>
+    <div className="mt-8">
+      <Panel title={TITLE}>
+        <figure aria-label={TITLE} className="m-0">
+          {notCharted > 0 && (
+            <p className="mb-2 text-ink-muted type-small">
+              {`Not charted: ${String(notCharted)} ${notCharted === 1 ? "listing" : "listings"}. The chart shows up to `
+                + `${String(SERIES.length)} listings with a landed cost, the most recently priced first; the `
+                + "table lists them all."}
+            </p>
+          )}
+          <Legend series={series} single />
+          <ResponsiveContainer width="100%" height={HEIGHT}>
+            <LineChart data={rows} title={name} margin={MARGIN}>
+              <CartesianGrid {...gridProps} />
+              <XAxis
+                {...axisProps}
+                dataKey={DAY}
+                type="number"
+                domain={["dataMin", "dataMax"]}
+                tickFormatter={dateOf}
+              />
+              <YAxis {...axisProps} domain={["auto", "auto"]} tickFormatter={money} width={AXIS_WIDTH} />
+              <Tooltip content={TooltipBody} cursor={cursorProps} filterNull={false} isAnimationActive={false} />
+              {series.map(({ key, color, values }) => (
+                <Line key={key} dataKey={key} {...lineProps(values, color, "history-dot")} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </figure>
+      </Panel>
+    </div>
   );
 };

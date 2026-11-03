@@ -1,4 +1,5 @@
 import { ApiErrorKind } from "@fpving/app/errors";
+import { ListingStatus } from "@fpving/core";
 import type { Product } from "@fpving/core";
 import { ShippingKind } from "@fpving/plugin-sdk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,20 +7,33 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toFailure, useClient } from "./client.ts";
 import type { Client } from "./client.ts";
-import { Confirm } from "./ui/confirm.tsx";
 import { listingName } from "./listing-name.ts";
-import { formatMoney } from "./money.ts";
 import { PriceHistory } from "./price-history.tsx";
 import { QueryKey } from "./queries.ts";
 import { explain } from "./refusal.tsx";
+import { Badge, BadgeTone } from "./ui/badge.tsx";
+import { Button, ButtonSize, ButtonVariant } from "./ui/button.tsx";
+import { Confirm } from "./ui/confirm.tsx";
+import { DataTable } from "./ui/data-table.tsx";
+import { LINK } from "./ui/link.ts";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
+import { Panel } from "./ui/panel.tsx";
+import { Price } from "./ui/price.tsx";
+import { TextField } from "./ui/text-field.tsx";
 import { UrlForm } from "./url-form.tsx";
-import { unlessPending } from "./pending.ts";
 
 type Detail = Awaited<ReturnType<Client["getProduct"]>>;
 type ListingRow = Detail["listings"][number];
 
-const cell = "border-b border-line px-3 py-2";
-const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
+const GONE = { tone: BadgeTone.Neutral, glyph: "✕" } as const;
+const STATUS_BADGE = {
+  [ListingStatus.Active]: { tone: BadgeTone.Live },
+  [ListingStatus.Stale]: { tone: BadgeTone.Warning, glyph: "▲" },
+  [ListingStatus.Gone]: GONE,
+  [ListingStatus.Removed]: GONE,
+} as const;
+
+const latestOf = ({ history }: ListingRow) => history.reduce((_older, snapshot) => snapshot);
 
 const isNotFound = (error: unknown): boolean => toFailure(error).kind === ApiErrorKind.ProductNotFound;
 
@@ -72,34 +86,30 @@ const Header = ({ product }: { readonly product: Product }) => {
         ? (
             <form
               className="flex flex-wrap items-end gap-3"
-              onSubmit={unlessPending(rename.isPending, () => {
+              onSubmit={(event) => {
+                event.preventDefault();
                 rename.mutate(name);
-              })}
+              }}
             >
-              <label className="flex min-w-72 flex-1 flex-col gap-1">
-                <span className="font-medium">Product name</span>
-                <input
+              <div className="min-w-72 flex-1">
+                <TextField
+                  label="Product name"
                   autoFocus
                   value={name}
                   onChange={(event) => {
                     setName(event.target.value);
                   }}
-                  className="rounded-md border border-line bg-surface px-3 py-2"
                 />
-              </label>
-              <button type="submit" className={button} aria-disabled={rename.isPending}>
-                Save name
-              </button>
-              <button type="button" className={button} onClick={stopEditing}>Cancel</button>
+              </div>
+              <Button type="submit" pending={rename.isPending} pendingLabel="Saving…">Save name</Button>
+              <Button variant={ButtonVariant.Ghost} onClick={stopEditing}>Cancel</Button>
             </form>
           )
         : (
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold">{product.name}</h1>
-              <button
+              <h1 className="type-title">{product.name}</h1>
+              <Button
                 ref={renameButton}
-                type="button"
-                className={button}
                 onClick={() => {
                   setName(product.name);
                   rename.reset();
@@ -107,19 +117,24 @@ const Header = ({ product }: { readonly product: Product }) => {
                 }}
               >
                 Rename
-              </button>
+              </Button>
               <Confirm
                 action="Stop watching"
                 question={`Stop watching ${product.name}? Its price history is kept.`}
                 confirm="Stop watching"
                 pending={archive.isPending}
+                pendingLabel="Stopping…"
                 onConfirm={() => {
                   archive.mutate();
                 }}
               />
             </div>
           )}
-      {failed !== null && <p role="alert" className="mt-2 text-critical">{explain(toFailure(failed))}</p>}
+      {failed !== null && (
+        <div className="mt-2">
+          <Notice tone={NoticeTone.Critical}>{explain(toFailure(failed))}</Notice>
+        </div>
+      )}
     </header>
   );
 };
@@ -137,67 +152,88 @@ const Listings = ({ productId, rows }: { readonly productId: string; readonly ro
   });
   return (
     <section className="mt-8">
-      <h2 ref={heading} tabIndex={-1} className="text-xl font-semibold">Listings</h2>
-      {remove.isError && <p role="alert" className="mt-2 text-critical">{explain(toFailure(remove.error))}</p>}
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full border-collapse text-left">
-          <caption className="sr-only">Listings, with each one's latest price and landed cost</caption>
-          <thead>
-            <tr className="text-sm text-ink-muted">
-              <th scope="col" className={cell}>Listing</th>
-              <th scope="col" className={cell}>Price</th>
-              <th scope="col" className={cell}>Shipping</th>
-              <th scope="col" className={cell}>Landed cost</th>
-              <th scope="col" className={cell}>Stock</th>
-              <th scope="col" className={cell}>Status</th>
-              <th scope="col" className={cell}><span className="sr-only">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ listing, history }) => {
-              const latest = history.reduce((_older, snapshot) => snapshot);
-              return (
-                <tr key={listing.id}>
-                  <th scope="row" className={`${cell} font-medium`}>
-                    {listing.pluginId}:{" "}
-                    <a href={listing.url} target="_blank" rel="noreferrer" className="underline">{listing.title}</a>
-                  </th>
-                  <td className={`${cell} tabular-nums`}>{formatMoney(latest.itemPrice)}</td>
-                  <td className={`${cell} tabular-nums`}>
-                    {latest.shipping.kind === ShippingKind.Known ? formatMoney(latest.shipping) : "Unknown"}
-                  </td>
-                  <td className={`${cell} tabular-nums`}>
-                    {latest.landedCost === null ? "Not priced" : formatMoney(latest.landedCost)}
-                  </td>
-                  <td className={cell}>{latest.inStock ? "In stock" : "Out of stock"}</td>
-                  <td className={cell}>{listing.status}</td>
-                  <td className={cell}>
-                    <Confirm
-                      action="Remove"
-                      actionLabel={`Remove ${listingName(listing)}`}
-                      question={`Remove ${listingName(listing)}? It is never scanned again; its history is kept.`}
-                      confirm="Remove"
-                      pending={remove.isPending}
-                      onConfirm={() => {
-                        remove.mutate(listing.id);
-                      }}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <h2 ref={heading} tabIndex={-1} className="type-heading">Listings</h2>
+      {remove.isError && (
+        <div className="mt-2">
+          <Notice tone={NoticeTone.Critical}>{explain(toFailure(remove.error))}</Notice>
+        </div>
+      )}
+      <div className="mt-4">
+        <DataTable
+          caption="Listings, with each one's latest price and landed cost"
+          rows={rows.map((row) => ({ ...row, latest: latestOf(row) }))}
+          rowKey={({ listing }) => listing.id}
+          rowHeader={{
+            header: "Listing",
+            cell: ({ listing }) => (
+              <>
+                {listing.pluginId}:{" "}
+                <a href={listing.url} target="_blank" rel="noreferrer" className={LINK}>{listing.title}</a>
+              </>
+            ),
+          }}
+          columns={[
+            { header: "Price", numeric: true, cell: ({ latest }) => <Price money={latest.itemPrice} /> },
+            {
+              header: "Shipping",
+              numeric: true,
+              cell: ({ latest: { shipping } }) => (
+                <Price money={shipping.kind === ShippingKind.Known ? shipping : null} missing="Unknown" />
+              ),
+            },
+            {
+              header: "Landed cost",
+              numeric: true,
+              cell: ({ latest }) => <Price money={latest.landedCost} missing="Not priced" />,
+            },
+            { header: "Stock", cell: ({ latest }) => (latest.inStock ? "In stock" : "Out of stock") },
+            {
+              header: "Status",
+              cell: ({ listing }) => <Badge {...STATUS_BADGE[listing.status]}>{listing.status}</Badge>,
+            },
+          ]}
+          actions={({ listing }) => (
+            <Confirm
+              action="Remove"
+              actionLabel={`Remove ${listingName(listing)}`}
+              question={`Remove ${listingName(listing)}? It is never scanned again; its history is kept.`}
+              confirm="Remove"
+              size={ButtonSize.Small}
+              pending={remove.isPending}
+              pendingLabel={remove.variables === listing.id ? "Removing…" : undefined}
+              onConfirm={() => {
+                remove.mutate(listing.id);
+              }}
+            />
+          )}
+        />
       </div>
     </section>
   );
 };
 
+const Cheapest = ({ product, rows }: { readonly product: Product; readonly rows: readonly ListingRow[] }) => {
+  const row = rows.find(({ listing }) => listing.id === product.cheapestListingId);
+  const landed = row === undefined ? null : latestOf(row).landedCost;
+  return row === undefined || landed === null
+    ? null
+    : (
+        <div className="mt-6">
+          <Panel title="Cheapest landed" featured>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <Price money={landed} large />
+              <span className="text-ink-muted type-body">{listingName(row.listing)}</span>
+            </div>
+          </Panel>
+        </div>
+      );
+};
+
 const NotWatched = () => (
   <section>
-    <h1 className="text-2xl font-semibold">Product not found</h1>
-    <p className="mt-2 text-ink-muted">No watched product has this address; it may have been stopped.</p>
-    <Link to="/" className="mt-4 inline-block underline">Back to the watchlist</Link>
+    <h1 className="type-title">Product not found</h1>
+    <p className="mt-2 text-ink-muted type-body">No watched product has this address; it may have been stopped.</p>
+    <p className="mt-4 type-body"><Link to="/" className={LINK}>Back to the watchlist</Link></p>
   </section>
 );
 
@@ -221,16 +257,17 @@ export const ProductDetail = ({ id }: { readonly id: string }) => {
     return <NotWatched />;
   }
   if (detail.data === undefined) {
-    return <p className="text-ink-muted">Loading…</p>;
+    return <p className="text-ink-muted type-body">Loading…</p>;
   }
   const { product, listings } = detail.data;
   return (
     <section>
       <Header product={product} />
+      <Cheapest product={product} rows={listings} />
       <Listings productId={product.id} rows={listings} />
       <PriceHistory listings={listings} />
       <section className="mt-8">
-        <h2 className="text-xl font-semibold">Add a listing</h2>
+        <h2 className="type-heading">Add a listing</h2>
         <UrlForm
           submitLabel="Add listing"
           pendingLabel="Adding…"

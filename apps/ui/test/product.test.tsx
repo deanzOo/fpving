@@ -9,10 +9,12 @@ import { userEvent } from "vitest/browser";
 import type { z } from "zod";
 import { takeLogged } from "./support/console-guard.ts";
 import {
-  alreadyTracked, at, failWith, fakeApi, noContent, product, reply, wire,
+  alreadyTracked, at, failWith, fakeApi, gate, noContent, product, reply, wire,
 } from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { hasBrackets, rgb, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 type Detail = z.output<typeof wire.detail>;
 type Priced = Detail["listings"][number]["history"][number];
@@ -89,6 +91,11 @@ const open = async (api = scripted()) => {
   const screen = await renderApp(api.client, `/products/${ID}`);
   await expect.element(screen.getByRole("heading", { level: 1, name: "Acme X5 frame" })).toBeVisible();
   return screen;
+};
+
+const cheapestAt = (listingId: string): Detail => {
+  const shown = detail();
+  return { ...shown, product: { ...shown.product, cheapestListingId: listingIdSchema.parse(listingId) } };
 };
 
 const renamed = (name: string): Detail => ({ ...detail(), product: { ...detail().product, name } });
@@ -259,6 +266,83 @@ describe("Product detail", () => {
     await expect.element(screen.getByRole("alert")).toHaveTextContent(said);
   });
 
+  it("features the cheapest listing's landed cost in the one framed panel", async () => {
+    const screen = await open(scripted(cheapestAt("l1")));
+    const cheapest = screen.getByRole("region", { name: "Cheapest landed" });
+    await expect.element(cheapest.getByText("$138.45")).toBeVisible();
+    await expect.element(cheapest.getByText("shop: Acme X5 frame at l1")).toBeVisible();
+    expect(hasBrackets(cheapest)).toBe(true);
+    expect(styleOf(cheapest.getByText("$138.45")).fontSize).toBe("20px");
+  });
+
+  it("features nothing while the cheapest listing has no landed cost", async () => {
+    const screen = await open(scripted(cheapestAt("l2")));
+    await expect.element(screen.getByRole("region", { name: "Cheapest landed" })).not.toBeInTheDocument();
+  });
+
+  it("shows each listing's status as a badge: active as live, stale as a warning with its glyph", async () => {
+    const screen = await open();
+    const active = screen.getByRole("row", { name: /^shop/u }).getByText("active", { exact: true });
+    await expect.element(active).toBeVisible();
+    expect(styleOf(active).color).toBe(rgb(token("--color-signal")));
+    const stale = screen.getByRole("row", { name: /^mall/u }).getByText("stale", { exact: true });
+    expect(styleOf(stale).color).toBe(rgb(token("--color-warning")));
+    expect(stale.element().previousElementSibling?.textContent).toBe("▲");
+  });
+
+  it("sets each price in the readout face", async () => {
+    const screen = await open();
+    const price = screen.getByRole("row", { name: /^shop/u }).getByText("$123.45");
+    await expect.element(price).toBeVisible();
+    expect(styleOf(price).fontFamily).toContain("Martian Mono");
+  });
+
+  it("says Saving… on the save button while a rename is on its way", async () => {
+    const api = scripted();
+    const saved = gate();
+    api.on(at(apiRoutes.renameProduct, { productId: ID }), async () => {
+      await saved.opened;
+      return noContent();
+    });
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Rename" }).click();
+    await screen.getByRole("button", { name: "Save name" }).click();
+    await expect.element(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute("aria-disabled", "true");
+    saved.release();
+  });
+
+  it("says Stopping… on its button while stop watching is on its way", async () => {
+    const api = scripted();
+    const stopped = gate();
+    api.on(at(apiRoutes.archiveProduct, { productId: ID }), async () => {
+      await stopped.opened;
+      return noContent();
+    });
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Stop watching" }).click();
+    await screen.getByRole("dialog").getByRole("button", { name: "Stop watching" }).click();
+    await expect.element(screen.getByRole("button", { name: "Stopping…" })).toHaveAttribute("aria-disabled", "true");
+    stopped.release();
+  });
+
+  it("says Removing… on the removed listing's button only, and holds the others meanwhile", async () => {
+    const api = scripted();
+    const removed = gate();
+    api.on(at(apiRoutes.removeListing, { productId: ID, listingId: "l2" }), async () => {
+      await removed.opened;
+      return noContent();
+    });
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
+    await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
+    const target = screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" });
+    await expect.element(target).toHaveTextContent("Removing…");
+    const other = screen.getByRole("button", { name: "Remove shop: Acme X5 frame at l1" });
+    await expect.element(other).toHaveTextContent("Remove");
+    await expect.element(other).toHaveAttribute("aria-disabled", "true");
+    removed.release();
+  });
+
   it("shows a not found state for a product that is not watched", async () => {
     const api = scripted();
     api.on(at(apiRoutes.getProduct, { productId: ID }),
@@ -404,6 +488,25 @@ describe("Price history chart", () => {
     await expect.element(chartOf(screen)).toHaveAccessibleName(
       "Landed cost over the last 2 days: shop: Acme X5 frame at l1 lowest $138.45, highest $150.00, latest $138.45",
     );
+  });
+
+  it("marks the hovered day with a dashed crosshair", async () => {
+    const screen = await open(scripted(charted([steady])));
+    await userEvent.hover(chartOf(screen));
+    await expect.poll(() => chartOf(screen).element().querySelector(".recharts-tooltip-cursor")).not.toBeNull();
+    const cursor = chartOf(screen).element().querySelector(".recharts-tooltip-cursor");
+    expect(cursor?.getAttribute("stroke-dasharray")).not.toBeNull();
+  });
+
+  it("sets each listing's cost in the tooltip in the readout face", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    chartOf(screen).element().focus();
+    await userEvent.keyboard("{ArrowRight}");
+    const line = screen.getByText(/^store2: Acme X5 frame at l2 \$120\.00$/u);
+    await expect.element(line).toBeVisible();
+    const cost = line.element().lastElementChild;
+    expect(cost?.textContent).toBe("$120.00");
+    expect(cost === null ? "" : getComputedStyle(cost).fontFamily).toContain("Martian Mono");
   });
 
   it("says when no listing has a landed cost to chart", async () => {
