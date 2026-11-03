@@ -15,7 +15,7 @@ import type { MatchCandidate } from "@fpving/core";
 import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import {
-  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, noContent, product, reply, wire,
+  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 import { rgb, styleOf, token } from "./support/style.ts";
@@ -118,10 +118,8 @@ describe("Match review", () => {
   it("says Accepting… on the accepted candidate while it is on its way, holding its reject button", async () => {
     const api = scripted([candidate("c1", FRAME)]);
     const accepting = gate();
-    api.on(at(apiRoutes.acceptCandidate, { candidateId: "c1" }), async () => {
-      await accepting.opened;
-      return reply(wire.addedListing, accepted, HttpStatus.Created)();
-    });
+    const added = reply(wire.addedListing, accepted, HttpStatus.Created);
+    api.on(at(apiRoutes.acceptCandidate, { candidateId: "c1" }), heldBy(accepting, added));
     const screen = await renderApp(api.client, "/matches");
     await screen.getByRole("button", { name: "Accept Acme X5 c1" }).click();
     await expect.element(screen.getByRole("button", { name: "Accept Acme X5 c1" })).toHaveTextContent("Accepting…");
@@ -134,10 +132,7 @@ describe("Match review", () => {
   it("says Rejecting… on the rejected candidate while it is on its way", async () => {
     const api = scripted([candidate("c1", FRAME)]);
     const rejecting = gate();
-    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), async () => {
-      await rejecting.opened;
-      return noContent();
-    });
+    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), heldBy(rejecting, noContent));
     const screen = await renderApp(api.client, "/matches");
     await screen.getByRole("button", { name: "Reject Acme X5 c1" }).click();
     await expect.element(screen.getByRole("button", { name: "Reject Acme X5 c1" })).toHaveTextContent("Rejecting…");

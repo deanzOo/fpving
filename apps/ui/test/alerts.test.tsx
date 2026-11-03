@@ -5,7 +5,7 @@ import { AlertKind } from "@fpving/core";
 import type { Alert } from "@fpving/core";
 import { describe, expect, it } from "vitest";
 import {
-  at, emptyTrend, failWith, fakeApi, gate, noContent, product, reply, unreadAlert, wire,
+  at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, unreadAlert, wire,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
 import { rgb, styleOf, token } from "./support/style.ts";
@@ -62,10 +62,7 @@ describe("Alerts", () => {
   it("says Marking… on the alert being marked read, holding the others meanwhile", async () => {
     const api = scripted([drop, { ...unreadAlert("a4", "p1"), kind: AlertKind.BackInStock }]);
     const marking = gate();
-    api.on(at(apiRoutes.markAlertRead, { alertId: "a2" }), async () => {
-      await marking.opened;
-      return noContent();
-    });
+    api.on(at(apiRoutes.markAlertRead, { alertId: "a2" }), heldBy(marking, noContent));
     const screen = await renderApp(api.client, "/alerts");
     await screen.getByRole("button", { name: /^Mark read: Price drop/u }).click();
     await expect.element(screen.getByRole("button", { name: /^Mark read: Price drop/u })).toHaveTextContent("Marking…");
@@ -78,10 +75,7 @@ describe("Alerts", () => {
   it("says Marking… on mark all read while it is on its way", async () => {
     const api = scripted([drop]);
     const marking = gate();
-    api.on(apiRoutes.markAllAlertsRead, async () => {
-      await marking.opened;
-      return reply(wire.marked, { marked: 1 })();
-    });
+    api.on(apiRoutes.markAllAlertsRead, heldBy(marking, reply(wire.marked, { marked: 1 })));
     const screen = await renderApp(api.client, "/alerts");
     await screen.getByRole("button", { name: "Mark all read" }).click();
     await expect.element(screen.getByRole("button", { name: "Marking…" })).toHaveAttribute("aria-disabled", "true");

@@ -105,5 +105,11 @@ export const gate = () => {
   } };
 };
 
+/** `answer`, given only once `held` opens, so a test sees the pending state first. */
+export const heldBy = (held: { readonly opened: Promise<void> }, answer: Answer): Answer => async () => {
+  await held.opened;
+  return answer();
+};
+
 /** A 204 answer. */
 export const noContent: Answer = () => new Response(null, { status: HttpStatus.NoContent });

@@ -9,7 +9,7 @@ import { userEvent } from "vitest/browser";
 import type { z } from "zod";
 import { takeLogged } from "./support/console-guard.ts";
 import {
-  alreadyTracked, at, failWith, fakeApi, gate, noContent, product, reply, wire,
+  alreadyTracked, at, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire,
 } from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
@@ -300,10 +300,7 @@ describe("Product detail", () => {
   it("says Saving… on the save button while a rename is on its way", async () => {
     const api = scripted();
     const saved = gate();
-    api.on(at(apiRoutes.renameProduct, { productId: ID }), async () => {
-      await saved.opened;
-      return noContent();
-    });
+    api.on(at(apiRoutes.renameProduct, { productId: ID }), heldBy(saved, noContent));
     const screen = await open(api);
     await screen.getByRole("button", { name: "Rename" }).click();
     await screen.getByRole("button", { name: "Save name" }).click();
@@ -314,10 +311,7 @@ describe("Product detail", () => {
   it("says Stopping… on its button while stop watching is on its way", async () => {
     const api = scripted();
     const stopped = gate();
-    api.on(at(apiRoutes.archiveProduct, { productId: ID }), async () => {
-      await stopped.opened;
-      return noContent();
-    });
+    api.on(at(apiRoutes.archiveProduct, { productId: ID }), heldBy(stopped, noContent));
     const screen = await open(api);
     await screen.getByRole("button", { name: "Stop watching" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Stop watching" }).click();
@@ -328,10 +322,7 @@ describe("Product detail", () => {
   it("says Removing… on the removed listing's button only, and holds the others meanwhile", async () => {
     const api = scripted();
     const removed = gate();
-    api.on(at(apiRoutes.removeListing, { productId: ID, listingId: "l2" }), async () => {
-      await removed.opened;
-      return noContent();
-    });
+    api.on(at(apiRoutes.removeListing, { productId: ID, listingId: "l2" }), heldBy(removed, noContent));
     const screen = await open(api);
     await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
