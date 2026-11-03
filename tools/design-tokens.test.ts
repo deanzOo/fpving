@@ -83,14 +83,24 @@ describe("Design tokens stylesheet", () => {
 
   it("always emits every type utility, even one no source file names yet", () => {
     expect(css).toContain("@source inline(\"type-title type-heading type-body type-control type-small type-readout-lg "
-      + "type-readout type-label type-code mono-figures\");");
+      + "type-readout type-label type-code chart-tick\");");
   });
 
-  it("writes the mono figure settings once, as a utility of their own", () => {
-    const figures = section("@utility mono-figures");
+  it("writes the chart tick style: the mono figures at the label size", () => {
+    const figures = section("@utility chart-tick");
     expect(figures).toContain("font-family: var(--font-mono);");
+    expect(figures).toContain("font-size: 11px;");
     expect(figures).toContain("font-stretch: 87.5%;");
     expect(figures).toContain("font-variant-numeric: tabular-nums slashed-zero;");
+  });
+
+  it("fails without the label style the chart ticks take their size from", () => {
+    const groups = designTokens.type.groups.map((group) => ({
+      ...group,
+      styles: group.styles.filter(({ name }) => name !== "label"),
+    }));
+    expect(() => renderTokensCss({ ...designTokens, type: { ...designTokens.type, groups } }))
+      .toThrow("type has no label style");
   });
 
   it("fails without a base spacing step", () => {

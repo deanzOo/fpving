@@ -14,7 +14,8 @@ const UPPERCASE: ReadonlySet<string> = new Set(["label"]);
 const MONO_STRETCH = "87.5%";
 const MONO_NUMERIC = "tabular-nums slashed-zero";
 const BASE_SPACING = "space-1";
-const MONO_FIGURES = "mono-figures";
+const CHART_TICK = "chart-tick";
+const TICK_STYLE = "label";
 
 const HEADER = "/* Generated from apps/ui/design/tokens.json by `pnpm tokens`. Do not edit. */";
 
@@ -46,6 +47,14 @@ const colorLines = (source: Tokens, theme: ThemeId): string[] => {
 const shadowLines = (source: Tokens, theme: ThemeId): string[] =>
   source.shadow.tokens.map(({ name, value }) => `--${name}: ${value[theme]};`);
 
+const tickSize = (source: Tokens): string => {
+  const label = source.type.groups.flatMap(({ styles }) => styles).find(({ name }) => name === TICK_STYLE);
+  if (label === undefined) {
+    throw new Error(`type has no ${TICK_STYLE} style`);
+  }
+  return label.fontSize;
+};
+
 const spacing = (source: Tokens): string => {
   const base = source.spacing.tokens.find(({ name }) => name === BASE_SPACING);
   if (base === undefined) {
@@ -69,7 +78,7 @@ const typeUtility = (style: TypeStyle, family: string): string => block(`@utilit
 /**
  * The stylesheet for the design tokens: the light colours in Tailwind's `@theme`; the light shadow and the size
  * tokens on `:root`, so no utility copies the shadow's light value; the dark theme when the system prefers it and no
- * light choice is set, and again for an explicit dark choice; then the mono figure settings and one `type-*` utility
+ * light choice is set, and again for an explicit dark choice; then the chart tick style and one `type-*` utility
  * per type style, all emitted whether a source file names them or not.
  *
  * @param source - The design tokens.
@@ -84,7 +93,7 @@ export const renderTokensCss = (source: Tokens): string => {
   const typeNames = source.type.groups.flatMap(({ styles }) => styles.map(({ name }) => `type-${name}`));
   return [
     HEADER,
-    `@source inline("${[...typeNames, MONO_FIGURES].join(" ")}");`,
+    `@source inline("${[...typeNames, CHART_TICK].join(" ")}");`,
     block("@theme static", [
       "--color-*: initial;",
       ...colorLines(source, ThemeId.Light),
@@ -99,7 +108,11 @@ export const renderTokensCss = (source: Tokens): string => {
     ]),
     block("@media (prefers-color-scheme: dark)", [block(":root:not([data-theme=\"light\"])", dark)]),
     block(":root[data-theme=\"dark\"]", dark),
-    block(`@utility ${MONO_FIGURES}`, [`font-family: var(--font-${MONO});`, ...MONO_SETTINGS]),
+    block(`@utility ${CHART_TICK}`, [
+      `font-family: var(--font-${MONO});`,
+      `font-size: ${tickSize(source)};`,
+      ...MONO_SETTINGS,
+    ]),
     ...source.type.groups.flatMap(({ family, styles }) => styles.map((style) => typeUtility(style, family))),
   ].join("\n\n").concat("\n");
 };

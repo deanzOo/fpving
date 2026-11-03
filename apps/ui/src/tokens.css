@@ -1,6 +1,6 @@
 /* Generated from apps/ui/design/tokens.json by `pnpm tokens`. Do not edit. */
 
-@source inline("type-title type-heading type-body type-control type-small type-readout-lg type-readout type-label type-code mono-figures");
+@source inline("type-title type-heading type-body type-control type-small type-readout-lg type-readout type-label type-code chart-tick");
 
 @theme static {
   --color-*: initial;
@@ -122,8 +122,9 @@
   --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
-@utility mono-figures {
+@utility chart-tick {
   font-family: var(--font-mono);
+  font-size: 11px;
   font-stretch: 87.5%;
   font-variant-numeric: tabular-nums slashed-zero;
 }
