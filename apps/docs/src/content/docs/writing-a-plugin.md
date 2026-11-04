@@ -13,7 +13,7 @@ Plugins are for personal use. Respect each site's terms of service. Each plugin 
 
 This takes a plugin from an empty folder to the **Plugins** screen. The SDK is not on npm, so you need a built clone of fpving: follow [Install](../getting-started/#install) and run `pnpm build`, which writes the SDK's `dist`. See [ADR 0032](../adr/0032-unpublished-packages-and-file-dependency-for-plugins/).
 
-1. Create a folder outside the clone, with this `package.json`. Set the `file:` path to your clone. `main` is the built ESM entry the host loads.
+1. Create a folder outside the clone, with this `package.json`. Replace the `file:` path with the absolute path of your clone. `main` is the built ESM entry the host loads.
 
    ```json
    {
@@ -27,7 +27,7 @@ This takes a plugin from an empty folder to the **Plugins** screen. The SDK is n
        "test": "vitest run"
      },
      "dependencies": {
-       "@fpving/plugin-sdk": "file:/home/pilot/fpving/packages/plugin-sdk"
+       "@fpving/plugin-sdk": "file:/absolute/path/to/fpving/packages/plugin-sdk"
      },
      "devDependencies": {
        "typescript": "6.0.3",
@@ -55,10 +55,10 @@ This takes a plugin from an empty folder to the **Plugins** screen. The SDK is n
 4. Write the store in `src/index.ts`. Start from the [example](#host-provided-context) below and declare your own store's domain.
 5. Save pages from the store and put them in `test/contract.test.ts`, starting from the [contract test kit](#contract-test-kit) below. Run `npm test`; every check should pass.
 6. Run `npm run build`, which writes `dist/index.js`.
-7. The app creates `DATA_DIR`, the one in the clone's `.env`, when it starts, so start it once if you have not and stop it. Then add the folder's absolute path to `plugins.json` in `DATA_DIR`:
+7. The app creates `DATA_DIR`, the one in the clone's `.env`, when it starts, so start it once if you have not and stop it. Then add the plugin folder's absolute path to `plugins.json` in `DATA_DIR`, replacing the placeholder:
 
    ```json
-   [{ "path": "/home/pilot/fpving-plugins/example-shop" }]
+   [{ "path": "/absolute/path/to/your-plugin-folder" }]
    ```
 
 8. Start the app again with `pnpm --filter @fpving/app start` in the clone and open **Plugins**. Your plugin shows as loaded with its domains. If it is disabled, the same line gives the reason; see [Loading](#loading).
