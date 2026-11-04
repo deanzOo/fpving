@@ -85,6 +85,10 @@ describe("Plugin manifest", () => {
     expect(rejects({ capabilities: ["teleport"] })).toBe(true);
   });
 
+  it("rejects capabilities without fetchListing, which every store plugin must answer", () => {
+    expect(rejects({ capabilities: [PluginCapability.Search] })).toBe(true);
+  });
+
   it("rejects empty capabilities", () => {
     expect(rejects({ capabilities: [] })).toBe(true);
   });
