@@ -12,6 +12,7 @@ import type { ClosableBrowserDriver } from "../../../src/adapters/transport/play
 import { NOT_FOUND, startLocalServer } from "../../support/local-server.ts";
 import type { LocalServer } from "../../support/local-server.ts";
 
+const RM_RETRIES = 10;
 const BROWSER_TIMEOUT_MS = 60_000;
 const SETTLE_TIMEOUT_MS = 10_000;
 const OK = 200;
@@ -58,7 +59,7 @@ describe.skipIf(!chromiumInstalled)(
     afterAll(async () => {
       await driver.close();
       await server.close();
-      await rm(profileDir, { recursive: true, force: true });
+      await rm(profileDir, { recursive: true, force: true, maxRetries: RM_RETRIES });
     }, BROWSER_TIMEOUT_MS);
 
     it(
@@ -117,7 +118,7 @@ describe.skipIf(!chromiumInstalled)(
 
       afterAll(async () => {
         await popupDriver.close();
-        await rm(popupProfile, { recursive: true, force: true });
+        await rm(popupProfile, { recursive: true, force: true, maxRetries: RM_RETRIES });
       }, BROWSER_TIMEOUT_MS);
 
       it(
@@ -173,7 +174,7 @@ describe.skipIf(!chromiumInstalled)(
 
       afterAll(async () => {
         await strict.close();
-        await rm(strictProfile, { recursive: true, force: true });
+        await rm(strictProfile, { recursive: true, force: true, maxRetries: RM_RETRIES });
       }, BROWSER_TIMEOUT_MS);
 
       it(
