@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { ReactNode } from "react";
+import type { AriaAttributes, ReactNode } from "react";
 
 /** What a form control can say under itself: a hint, or an error that replaces it. */
 export interface Described {
@@ -13,11 +13,18 @@ export const CONTROL = "h-(--control-height) w-full rounded-1 border border-line
 
 /**
  * Ties a control to its hint or error: the attributes the control takes and the line to show under it.
+ * Without a hint or an error, an `aria-describedby` and `aria-invalid` given here stand, for a message shown
+ * elsewhere such as a refusal notice.
  *
- * @param described - The hint and the error.
+ * @param described - The hint, the error and any `aria-describedby` and `aria-invalid` from the caller.
  * @returns The control's `aria-describedby` and `aria-invalid`, and the description line.
  */
-export const useDescription = ({ hint, error }: Described) => {
+export const useDescription = ({
+  hint,
+  error,
+  "aria-describedby": describedBy,
+  "aria-invalid": invalid,
+}: Described & Pick<AriaAttributes, "aria-describedby" | "aria-invalid">) => {
   const id = useId();
   const shown = error ?? hint;
   const description = error === undefined
@@ -30,8 +37,8 @@ export const useDescription = ({ hint, error }: Described) => {
       );
   return {
     control: {
-      "aria-describedby": shown === undefined ? undefined : id,
-      "aria-invalid": error === undefined ? undefined : true,
+      "aria-describedby": shown === undefined ? describedBy : id,
+      "aria-invalid": error === undefined ? invalid : true,
     },
     description: shown === undefined ? null : description,
   };

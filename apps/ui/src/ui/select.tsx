@@ -15,7 +15,7 @@ interface SelectProps extends Described, Omit<ComponentProps<"select">, "id"> {
  */
 export const Select = ({ label, hint, error, className = "", ...rest }: SelectProps) => {
   const id = useId();
-  const { control, description } = useDescription({ hint, error });
+  const { control, description } = useDescription({ hint, error, ...rest });
   return (
     <Field label={label} id={id} frame="select-chevron" description={description}>
       <select

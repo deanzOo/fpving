@@ -13,7 +13,7 @@ interface CheckboxProps extends Described, Omit<ComponentProps<"input">, "type" 
  * @returns The checkbox.
  */
 export const Checkbox = ({ label, hint, error, ...rest }: CheckboxProps) => {
-  const { control, description } = useDescription({ hint, error });
+  const { control, description } = useDescription({ hint, error, ...rest });
   return (
     <div className="flex flex-col gap-1">
       <label className="focus-frame inline-flex cursor-pointer items-center gap-2 self-start type-body">

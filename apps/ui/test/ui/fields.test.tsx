@@ -67,6 +67,17 @@ describe("Text field", () => {
 });
 
 describe("Select", () => {
+  it("keeps a description and invalid state given from outside when it has no hint or error", async () => {
+    const screen = await render(
+      <Select label="Currency" aria-describedby="refusal" aria-invalid>
+        <option>ILS</option>
+      </Select>,
+    );
+    const select = screen.getByRole("combobox");
+    await expect.element(select).toHaveAttribute("aria-describedby", "refusal");
+    await expect.element(select).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("names the select by its label, describes it and lists its options", async () => {
     const screen = await render(
       <Select label="Display currency" hint="Prices show in this currency." defaultValue="USD">
@@ -100,6 +111,13 @@ describe("Select", () => {
 });
 
 describe("Checkbox", () => {
+  it("keeps a description and invalid state given from outside when it has no hint or error", async () => {
+    const screen = await render(<Checkbox label="Only unread" aria-describedby="refusal" aria-invalid />);
+    const box = screen.getByRole("checkbox");
+    await expect.element(box).toHaveAttribute("aria-describedby", "refusal");
+    await expect.element(box).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("is named by its label, which is the whole hit target", async () => {
     const change = vi.fn();
     const screen = await render(<Checkbox label="Unread only" checked={false} onChange={change} />);
