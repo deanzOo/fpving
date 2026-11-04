@@ -1,21 +1,35 @@
 ---
 title: Getting started
-description: The planned first-run flow, how to run the server today, and what exists.
+description: How to install and run fpving, the first-run flow, and what exists.
 ---
 
-:::caution[Not built yet]
-The app is not released. Everything below under "Planned flow" describes the intended experience. Today the server starts, answers a JSON API (see the [HTTP API reference](../reference/http-api/)) and serves the UI with all of its screens.
+:::caution[Early]
+fpving is pre-1.0 and interfaces can change between releases. You run it from a clone of the repository.
 :::
 
-## Planned flow
+## Install
 
-1. Install Node 24 and fetch fpving.
-2. Start the local server. Open the UI at `localhost` in your browser.
-3. Open **Settings** and choose a display currency and ship-to country.
-4. List the store plugins you installed in `plugins.json` in the data directory and check them under **Plugins**. fpving ships none.
-5. Add a product by pasting a store URL. The plugin that handles that domain fetches the listing.
-6. Review match suggestions for other stores and accept or reject each one.
-7. Leave the app running. It scans on an interval, catches up on boot, and raises alerts.
+You need Node 24 (`nvm install` reads `.nvmrc`), which includes corepack.
+
+```sh
+git clone https://github.com/deanzOo/fpving.git
+cd fpving
+corepack enable
+pnpm install
+pnpm --filter @fpving/app exec playwright install chromium
+pnpm worktree:init
+```
+
+Chromium is the browser that plugins fetch pages through. The app starts without it, a plugin that only uses HTTP never needs it, and for any other plugin a missing browser shows up as a `network` error on the first page. `pnpm worktree:init` writes a `.env` with this checkout's own port and data directory. See [Contributing](../contributing/).
+
+## First run
+
+1. Start the local server (see [Running the server](#running-the-server)) and open the address it prints.
+2. Open **Settings** and choose a display currency and ship-to country.
+3. List the store plugins you installed in `plugins.json` in the data directory, restart the app and check them under **Plugins**. fpving ships none; to write one, see [Writing a plugin](../writing-a-plugin/).
+4. Add a product by pasting a store URL. The plugin that handles that domain fetches the listing.
+5. Review match suggestions for other stores and accept or reject each one.
+6. Leave the app running. It scans on an interval, catches up on boot, and raises alerts.
 
 If no plugin handles a URL's domain, adding a product fails with a clear message naming the domain.
 
@@ -47,7 +61,7 @@ To work on it, follow the setup in [Contributing](../contributing/).
 
 ## Running the server
 
-After the contributor setup and `pnpm worktree:init`:
+After the install above:
 
 ```sh
 pnpm build
