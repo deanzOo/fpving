@@ -1,5 +1,6 @@
 {
   "apps/fpving": "0.0.0",
+  "apps/ui": "0.0.0",
   "packages/core": "0.0.0",
   "packages/plugin-sdk": "0.0.0"
 }

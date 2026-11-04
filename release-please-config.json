@@ -6,6 +6,7 @@
   "include-component-in-tag": true,
   "packages": {
     "apps/fpving": {},
+    "apps/ui": {},
     "packages/core": {},
     "packages/plugin-sdk": {}
   },
