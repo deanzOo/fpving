@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
+import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Button, ButtonSize } from "../../src/ui/button.tsx";
 import { DataTable } from "../../src/ui/data-table.tsx";
@@ -7,6 +8,8 @@ import "../../src/styles.css";
 
 const ROW_HEIGHT = 36;
 const TWIN_COLUMNS = 2;
+const PHONE = { width: 375, height: 812 } as const;
+const WIDE_CELL = "UnbreakableListingNameWiderThanAPhoneScreenOnItsOwnAndThenSomeMore";
 const ROWS = [
   { id: "l1", name: "fpv-shop: Source One V5", landed: "€44.40", stock: "In stock" },
   { id: "l2", name: "quadparts: TBS Source One V5", landed: "€45.90", stock: "Out of stock" },
@@ -29,6 +32,23 @@ const table = async (actions = true) => render(
 );
 
 describe("Data table", () => {
+  it("scrolls inside its wrapper on a phone, so the page itself never scrolls sideways", async () => {
+    const { width, height } = { width: innerWidth, height: innerHeight };
+    onTestFinished(async () => page.viewport(width, height));
+    await page.viewport(PHONE.width, PHONE.height);
+    await render(
+      <DataTable
+        caption="Listings"
+        rows={ROWS}
+        rowKey={({ id }) => id}
+        rowHeader={{ header: "Listing", cell: () => WIDE_CELL }}
+        columns={[{ header: "Stock", cell: ({ stock }) => stock }]}
+        actions={({ name }) => <Button aria-label={`Remove ${name}`}>Remove</Button>}
+      />,
+    );
+    expect(document.documentElement.scrollWidth).toBe(PHONE.width);
+  });
+
   it("is a captioned table whose rows are named by their first cell", async () => {
     const screen = await table();
     const grid = screen.getByRole("table", { name: "Listings" });

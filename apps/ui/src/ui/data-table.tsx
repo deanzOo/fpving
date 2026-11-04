@@ -26,7 +26,7 @@ export const DataTable = <Row extends object>({ caption, rows, rowKey, rowHeader
   readonly columns: readonly Column<Row>[];
   readonly actions?: ((row: Row) => ReactNode) | undefined;
 }) => (
-  <div className="overflow-x-auto">
+  <div className="relative overflow-x-auto">
     <table className="w-full border-collapse">
       <caption className="sr-only">{caption}</caption>
       <thead>
