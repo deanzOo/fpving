@@ -24,7 +24,10 @@ const classOn = (classes: string): string => `export const view = <div className
 
 describe("Design system guards", () => {
   beforeAll(async () => {
-    eslint = new ESLint({ cwd: root });
+    eslint = new ESLint({
+      cwd: root,
+      overrideConfig: { languageOptions: { parserOptions: { disallowAutomaticSingleRunInference: true } } },
+    });
     await guardMessages(classOn("type-body"), SCREEN_TSX);
   }, COLD_PROGRAM_TIMEOUT_MS);
 
