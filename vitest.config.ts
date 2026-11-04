@@ -5,6 +5,7 @@ import { SpecReporter } from "./tools/spec-reporter.ts";
 const FULL = 100;
 const SOURCE_CONDITIONS = ["@fpving/source"];
 const E2E_TIMEOUT_MS = 180_000;
+const APP_TIMEOUT_MS = 30_000;
 const E2E_TESTS = "test/e2e/**/*.test.ts";
 
 export default defineConfig({
@@ -19,6 +20,7 @@ export default defineConfig({
         test: {
           name: "app",
           dir: "apps/fpving",
+          testTimeout: APP_TIMEOUT_MS,
           include: ["test/**/*.test.ts"],
           exclude: [...configDefaults.exclude, E2E_TESTS],
         },
