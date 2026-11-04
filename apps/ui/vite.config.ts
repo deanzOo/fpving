@@ -7,6 +7,7 @@ import { defineConfig } from "vitest/config";
 import type { BrowserCommand } from "vitest/node";
 
 const ACTION_TIMEOUT_MS = 2000;
+const PAGE_LOAD_TIMEOUT_MS = 10_000;
 
 const emulateMedia: BrowserCommand<Parameters<Page["emulateMedia"]>> = async ({ page }, options) => {
   await page.emulateMedia(options);
@@ -21,8 +22,8 @@ const themeAtFirstFrame: BrowserCommand<[key: string, stored: string]> = async (
       content: `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(stored)});
 requestAnimationFrame(() => { window.${FIRST_FRAME} = document.documentElement.dataset.theme ?? "none"; });`,
     });
-    await fresh.goto(new URL("/index.html", page.url()).href);
-    await fresh.waitForFunction(`"${FIRST_FRAME}" in window`);
+    await fresh.goto(new URL("/index.html", page.url()).href, { timeout: PAGE_LOAD_TIMEOUT_MS });
+    await fresh.waitForFunction(`"${FIRST_FRAME}" in window`, undefined, { timeout: PAGE_LOAD_TIMEOUT_MS });
     return await fresh.evaluate(`window.${FIRST_FRAME}`);
   } finally {
     await fresh.close();
