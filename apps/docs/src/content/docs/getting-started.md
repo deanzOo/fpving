@@ -54,7 +54,7 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
   - Matches: the pending match candidates of every product, with the judge's verdict and reason and the similarity, to accept or reject, and a search for more per product. Candidates judged different are hidden until you ask to see them.
   - Alerts: every alert newest first or only the unread ones, marking one or all of them read.
   - Settings: every setting in one form.
-  - Plugins: each `plugins.json` entry with its state (loaded, disabled with the reason, or backing off and when it retries), its domains and its stale listing count, plus rejected entries and an unusable `plugins.json`.
+  - Plugins: each `plugins.json` entry with its state (loaded, disabled with the reason, or backing off and when it retries), its domains and its stale and not scanned listing counts, plus rows for the listings of a plugin no longer in `plugins.json`, plus rejected entries and an unusable `plugins.json`.
 - The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health` and the domain routes (the watchlist, products, listings, match candidates, alerts, settings, plugins, scan now), refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
 
 To work on it, follow the setup in [Contributing](../contributing/).

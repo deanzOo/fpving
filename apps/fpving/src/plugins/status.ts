@@ -9,6 +9,7 @@ export const PluginIssueKind = {
   DuplicateId: "duplicate_id",
   DomainConflict: "domain_conflict",
   Crashed: "crashed",
+  NotListed: "not_listed",
 } as const;
 
 export type PluginIssueKind = (typeof PluginIssueKind)[keyof typeof PluginIssueKind];

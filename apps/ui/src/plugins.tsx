@@ -58,7 +58,7 @@ const State = ({ row }: { readonly row: Row }) => (
   </div>
 );
 
-const Stale = ({ count }: { readonly count: number }) => count === 0
+const WarnedCount = ({ count }: { readonly count: number }) => count === 0
   ? count
   : (
       <span className="text-warning">
@@ -69,7 +69,7 @@ const Stale = ({ count }: { readonly count: number }) => count === 0
 
 /**
  * The plugins screen: one row per `plugins.json` entry, rejected entry or unusable file, with the plugin's name and
- * id, its state, the domains it declares and how many of its listings are stale.
+ * id, its state, the domains it declares and how many of its listings are stale or not being scanned.
  *
  * @returns The screen.
  */
@@ -111,7 +111,16 @@ export const Plugins = () => {
                 header: "Domains",
                 cell: ({ manifest }) => <span className="type-code">{manifest?.domains.join(", ") ?? ""}</span>,
               },
-              { header: "Stale listings", numeric: true, cell: ({ staleListings }) => <Stale count={staleListings} /> },
+              {
+                header: "Stale listings",
+                numeric: true,
+                cell: ({ staleListings }) => <WarnedCount count={staleListings} />,
+              },
+              {
+                header: "Not scanned",
+                numeric: true,
+                cell: ({ unscannedListings }) => <WarnedCount count={unscannedListings} />,
+              },
             ]}
           />
         )}

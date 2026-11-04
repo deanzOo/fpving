@@ -49,9 +49,13 @@ const pluginRowSchema = z.object({
   issues: z.array(z.object({ kind: z.enum(PluginIssueKind), detail: z.string() })),
   backoffUntil: z.date().nullable(),
   staleListings: countSchema,
+  unscannedListings: countSchema,
 });
 
-/** One row of the plugins screen: a `plugins.json` entry, a rejected entry or the unusable file itself. */
+/**
+ * One row of the plugins screen: a `plugins.json` entry, a rejected entry, the unusable file itself, or the listings
+ * of a plugin id nothing in `plugins.json` provides.
+ */
 export type PluginRow = z.infer<typeof pluginRowSchema>;
 
 const scanStatusSchema = z.object({
@@ -214,8 +218,8 @@ export const apiRoutes = {
   listPlugins: {
     method: "GET",
     url: "/api/plugins",
-    summary: "Every plugin with its status, backoff and stale listing count, rejected `plugins.json` entries and an "
-      + "unusable `plugins.json`.",
+    summary: "Every plugin with its status, backoff, stale and not scanned listing counts, "
+      + "rejected `plugins.json` entries, an unusable `plugins.json` and listings of plugin ids it does not provide.",
     schema: { response: { [Ok]: z.array(pluginRowSchema) } },
   },
   startScan: {

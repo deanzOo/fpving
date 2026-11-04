@@ -14,7 +14,7 @@ const TWO = 2;
 const STALE = 3;
 const { Disabled, Loaded } = wire.plugins.element.shape.status.enum;
 const issueKind = wire.plugins.element.shape.issues.element.shape.kind.enum;
-const { ConfigInvalid, DomainConflict, EntryInvalid, SdkIncompatible } = issueKind;
+const { ConfigInvalid, DomainConflict, EntryInvalid, NotListed, SdkIncompatible } = issueKind;
 
 const manifest = (id: string, displayName: string) => ({
   id, displayName, version: "1.0.0", sdkVersion: ">=0.0.0 <1.0.0", domains: [`${id}.example`, `www.${id}.example`],
@@ -23,7 +23,7 @@ const manifest = (id: string, displayName: string) => ({
 
 const plugin = (overrides: Partial<Row>): Row => ({
   source: "./plugins/shop", manifest: manifest("shop", "Shop"), status: Loaded, issues: [], backoffUntil: null,
-  staleListings: 0, ...overrides,
+  staleListings: 0, unscannedListings: 0, ...overrides,
 });
 
 const rows = (): Row[] => [
@@ -116,12 +116,24 @@ describe("Plugins", () => {
     expect(styleOf(screen.getByText("domain_conflict", { exact: true })).fontFamily).toContain("Martian Mono");
   });
 
+  it("shows how many of a plugin's listings are not being scanned, in the warning colour", async () => {
+    const unlisted = plugin({
+      source: "listings of gone-shop", manifest: null, status: Disabled, unscannedListings: STALE,
+      issues: [{ kind: NotListed, detail: "no plugin in plugins.json provides this id" }],
+    });
+    const screen = await renderApp(scripted([unlisted]).client, "/plugins");
+    await expect.element(screen.getByRole("rowheader", { name: "listings of gone-shop" })).toBeVisible();
+    await expect.element(screen.getByRole("columnheader", { name: "Not scanned" })).toBeVisible();
+    await expect.element(screen.getByText("provides this id", { exact: false })).toBeVisible();
+    expect(styleOf(screen.getByText(String(STALE))).color).toBe(rgb(token("--color-warning")));
+  });
+
   it("marks stale listings in the warning colour, and none in plain ink", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     const stale = screen.getByRole("row", { name: /^Shop shop/u }).getByText("3", { exact: true });
     await expect.element(stale).toBeVisible();
     expect(styleOf(stale).color).toBe(rgb(token("--color-warning")));
-    const none = screen.getByRole("row", { name: /^Mall mall/u }).getByRole("cell", { name: "0", exact: true });
+    const none = screen.getByRole("row", { name: /^Mall mall/u }).getByRole("cell", { name: "0", exact: true }).first();
     expect(styleOf(none).color).toBe(rgb(token("--color-ink")));
   });
 

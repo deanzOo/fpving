@@ -590,7 +590,15 @@ describe("Settings API", () => {
 describe("Plugins API", () => {
   it("answers the runtime's plugin rows", async () => {
     api.rows.current = [
-      { source: "plugins.json", manifest: null, status: "disabled", issues: [], backoffUntil: null, staleListings: 0 },
+      {
+        source: "plugins.json",
+        manifest: null,
+        status: "disabled",
+        issues: [],
+        backoffUntil: null,
+        staleListings: 0,
+        unscannedListings: 0,
+      },
     ];
     const response = await api.request("GET", apiRoutes.listPlugins.url);
     expect(response.json()).toEqual(api.rows.current);
