@@ -34,6 +34,46 @@ describe("Title similarity", () => {
     expect(similarity("R-Line 6S", "R Line 6S")).toBeLessThan(1);
   });
 
+  it.each([" ", "\t", ",", ";", ":", "(", ")", "[", "]", "{", "}", "+", "&", "|", "\"", "'"])(
+    "splits words on the separator %j",
+    (separator) => {
+      expect(similarity("Foxeer Lollipop", `Foxeer${separator}Lollipop`)).toBe(1);
+    },
+  );
+
+  it("treats a run of separators as a single break", () => {
+    expect(similarity("Foxeer Lollipop", "Foxeer ,; Lollipop")).toBe(1);
+  });
+
+  it.each(["R-Line", "R_Line", "R-_Line"])(
+    "joins the word %j into one word without its hyphens and underscores",
+    (title) => {
+      expect(similarity("RLine", title)).toBe(1);
+    },
+  );
+
+  it.each(["Foxeer.", "Foxeer...", ".Foxeer", "...Foxeer", "#Foxeer!"])(
+    "trims the punctuation around the word %j",
+    (title) => {
+      expect(similarity("Foxeer", title)).toBe(1);
+    },
+  );
+
+  it("drops a chunk of nothing but punctuation instead of counting it as a word", () => {
+    expect(similarity("Foxeer !!! ...", "Foxeer")).toBe(1);
+  });
+
+  it.each([["5.8G", "58G"], ["1/1.8", "11.8"]])(
+    "keeps the dots and slashes inside %j, so it differs from %j",
+    (reference, title) => {
+      expect(similarity(reference, title)).toBe(0);
+    },
+  );
+
+  it("folds case by lowercasing, so ß and SS stay different words", () => {
+    expect(similarity("STRASSE", "straße")).toBe(0);
+  });
+
   it("ranks a title with the reference's model numbers above one sharing more words but other numbers", () => {
     const reference = "Tattu R-Line 1300mAh 6S";
     expect(similarity(reference, "1300mAh 6S Lipo")).toBeGreaterThan(similarity(reference, "Tattu R-Line 1550mAh 4S"));

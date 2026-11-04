@@ -13,6 +13,9 @@ const valid = {
 const rejects = (override: Record<string, unknown>): boolean =>
   !manifestSchema.safeParse({ ...valid, ...override }).success;
 
+const messages = (override: Record<string, unknown>): string[] | undefined =>
+  manifestSchema.safeParse({ ...valid, ...override }).error?.issues.map((issue) => issue.message);
+
 describe("Plugin manifest", () => {
   it("accepts a valid manifest", () => {
     expect(manifestSchema.parse(valid)).toEqual(valid);
@@ -91,5 +94,14 @@ describe("Plugin manifest", () => {
 
   it("rejects empty capabilities", () => {
     expect(rejects({ capabilities: [] })).toBe(true);
+  });
+
+  it.each([
+    ["version", { version: "latest" }, "must be a canonical semver version such as 1.2.3"],
+    ["sdk version", { sdkVersion: "*" }, "must be a semver range with an upper bound such as >=0.0.0 <1.0.0"],
+    ["domain", { domains: ["example"] }, "must be a lowercase hostname without scheme, port or path"],
+    ["capability list", { capabilities: [PluginCapability.Search] }, "must include fetchListing"],
+  ])("tells the plugin author what a bad %s must be", (_field, override, message) => {
+    expect(messages(override)).toEqual([message]);
   });
 });
