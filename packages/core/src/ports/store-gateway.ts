@@ -9,6 +9,8 @@ import type { PluginId } from "../ids.js";
 export interface StoreGateway {
   /** Every hostname a loaded plugin declares in its manifest, so URLs can be normalized onto them. */
   declaredDomains(): readonly string[];
+  /** Whether the plugin `pluginId` can answer calls now, as opposed to disabled, crashed or not listed. */
+  isLoaded(pluginId: PluginId): boolean;
   /** The plugin whose manifest declares the URL's hostname exactly, or null. Pass a normalized URL. */
   pluginFor(url: string): PluginId | null;
   /**

@@ -22,6 +22,7 @@ import type {
   Listing,
   Notifier,
   PluginHealth,
+  PluginId,
   PriceSnapshot,
   Product,
   Repository,
@@ -110,6 +111,7 @@ interface Options {
   readonly notifier?: Notifier;
   readonly rates?: boolean;
   readonly onFetch?: (url: string) => Promise<void>;
+  readonly loaded?: (id: PluginId) => boolean;
   readonly wrap?: (repository: Repository) => Repository;
 }
 
@@ -149,7 +151,7 @@ const setup = async (options: Options = {}) => {
   const logger = fakeLogger();
   const deps: ScanDeps = {
     repository,
-    stores,
+    stores: options.loaded === undefined ? stores : { ...stores, isLoaded: options.loaded },
     ids: fakeIdGenerator(),
     clock,
     notifier: options.notifier ?? notifier,
@@ -271,6 +273,30 @@ describe("Scanning listings", () => {
       await scanListings(deps);
       expect(await statusOf(repository, l1)).toEqual(state(ListingStatus.Active, 1, 0));
       expect(await repository.snapshots.listSince(l1.id, NOW)).toEqual([]);
+    });
+
+    it("leaves listings as they are and fetches nothing when their plugin is not loaded", async () => {
+      const worn = { ...l1, failureStreak: STREAK.two };
+      const { deps, repository, stores } = await setup({ listings: [worn], loaded: () => false });
+      const report = await scanListings(deps);
+      expect(stores.fetched).toEqual([]);
+      expect(await statusOf(repository, worn)).toEqual(state(ListingStatus.Active, STREAK.two, 0));
+      expect(report.plugins.map(({ run, succeeded, failed }) => [run.outcome, run.errorKind, succeeded, failed]))
+        .toEqual([[ScanOutcome.Failed, StoreErrorKind.Network, 0, 0]]);
+    });
+
+    it("stops a plugin's scan when it goes down between fetches, sparing the listings not reached", async () => {
+      let checks = 0;
+      const { deps, repository, stores } = await setup({
+        listings: [l1, l2],
+        loaded: () => {
+          checks += 1;
+          return checks === 1;
+        },
+      });
+      await scanListings(deps);
+      expect(stores.fetched).toEqual([l1.url]);
+      expect(await statusOf(repository, l2)).toEqual(state(ListingStatus.Active, 0, 0));
     });
 
     it("keeps a listing active after two consecutive failures and marks it stale on the third", async () => {

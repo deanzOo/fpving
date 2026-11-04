@@ -31,6 +31,7 @@ export const fakeStoreGateway = (
     fetched,
     searched,
     declaredDomains: () => plugins.flatMap((row) => row.domains),
+    isLoaded: (id) => plugin(id) !== undefined,
     pluginFor: (url) => plugins.find((row) => row.domains.includes(new URL(url).hostname))?.id ?? null,
     fetchListing: async (id, url) => {
       fetched.push(url);
