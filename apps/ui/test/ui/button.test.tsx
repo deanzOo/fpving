@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -75,6 +76,30 @@ describe("Button", () => {
     );
     await screen.getByRole("button").click({ force: true });
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("does not submit its form again when Enter is pressed in a field while pending", async () => {
+    const submit = vi.fn();
+    const Form = () => {
+      const [pending, setPending] = useState(false);
+      return (
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+          setPending(true);
+        }}
+        >
+          <input aria-label="Name" />
+          <Button type="submit" pending={pending} pendingLabel="Saving…">Save</Button>
+        </form>
+      );
+    };
+    const screen = await render(<Form />);
+    await screen.getByRole("textbox").click();
+    await userEvent.keyboard("{Enter}");
+    await expect.element(screen.getByRole("button", { name: "Saving…" })).toBeVisible();
+    await userEvent.keyboard("{Enter}");
+    expect(submit).toHaveBeenCalledTimes(1);
   });
 
   it("frames keyboard focus in reticle brackets and a signal outline", async () => {
