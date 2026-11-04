@@ -4,10 +4,66 @@ description: The plugin contract, the context the host provides, and the contrac
 ---
 
 :::caution[Pre-release]
-The SDK contract below exists in `@fpving/plugin-sdk` and is covered by tests, but nothing is released yet and it may still change. The host loads plugins and isolates them in worker threads; wiring them into scans and the app is planned, not built.
+The SDK contract below is covered by tests and the app uses plugins for adding products, matching and scans, each in its own worker thread. The SDK is pre-1.0 and not published to npm, and the contract may still change.
 :::
 
 Plugins are for personal use. Respect each site's terms of service. Each plugin runs in its own worker thread for crash containment, not as a security sandbox: install only plugins you trust.
+
+## Walkthrough
+
+This takes a plugin from an empty folder to the **Plugins** screen. The SDK is not on npm, so you need a built clone of fpving: follow [Install](../getting-started/#install) and run `pnpm build`, which writes the SDK's `dist`. See [ADR 0032](../adr/0032-unpublished-packages-and-file-dependency-for-plugins/).
+
+1. Create a folder outside the clone, with this `package.json`. Replace the `file:` path with the absolute path of your clone. `main` is the built ESM entry the host loads.
+
+   ```json
+   {
+     "name": "fpving-plugin-example-shop",
+     "version": "1.0.0",
+     "private": true,
+     "type": "module",
+     "main": "./dist/index.js",
+     "scripts": {
+       "build": "tsc",
+       "test": "vitest run"
+     },
+     "dependencies": {
+       "@fpving/plugin-sdk": "file:/absolute/path/to/fpving/packages/plugin-sdk"
+     },
+     "devDependencies": {
+       "typescript": "6.0.3",
+       "vitest": "5.0.5"
+     }
+   }
+   ```
+
+2. Add a `tsconfig.json`:
+
+   ```json
+   {
+     "compilerOptions": {
+       "target": "ES2024",
+       "module": "nodenext",
+       "strict": true,
+       "rootDir": "src",
+       "outDir": "dist"
+     },
+     "include": ["src"]
+   }
+   ```
+
+3. Run `npm install` or `pnpm install`. Both work and the plugin loads either way, but they differ after the clone changes. npm links to the clone, so a rebuilt SDK applies at once. pnpm keeps its own copy, which a plain install may not refresh, so run `pnpm install --force` after rebuilding.
+4. Write the store in `src/index.ts`. Start from the [example](#host-provided-context) below and declare your own store's domain.
+5. Save pages from the store and put them in `test/contract.test.ts`, starting from the [contract test kit](#contract-test-kit) below. Run `npm test`; every check should pass.
+6. Run `npm run build`, which writes `dist/index.js`.
+7. The app creates `DATA_DIR`, the one in the clone's `.env`, when it starts, so start it once if you have not and stop it. Then add the plugin folder's absolute path to `plugins.json` in `DATA_DIR`, replacing the placeholder:
+
+   ```json
+   [{ "path": "/absolute/path/to/your-plugin-folder" }]
+   ```
+
+8. Start the app again with `pnpm --filter @fpving/app start` in the clone and open **Plugins**. Your plugin shows as loaded with its domains. If it is disabled, the same line gives the reason; see [Loading](#loading).
+
+After you change the plugin, build it and restart the app.
 
 ## Contract
 
@@ -24,7 +80,7 @@ A plugin is an npm package or local folder that exports a `StorePlugin`:
   - `fetchListing(url)` takes the product URL as an absolute http(s) string and resolves to a `StoreResult<FetchedListing>`.
   - `search(query)` resolves to a `StoreResult<SearchCandidate[]>`. Implement it exactly when the manifest declares `search`.
 
-The SDK is pre-1.0: any `0.x` minor release may break the contract. Declare the range you test against, for example `>=0.0.0 <1.0.0` today, and narrow it once the SDK publishes releases.
+The SDK is pre-1.0: any `0.x` minor release may break the contract. Declare the range you test against, for example `>=0.0.0 <1.0.0` today, and narrow it once you test against a tagged release.
 
 A `FetchedListing` is `{ title, itemPrice, shipping, inStock, images }`:
 
@@ -90,6 +146,7 @@ const plugin: StorePlugin = {
       if (!page.ok) return err(page.error);
       const { status, html } = page.value;
       if (status === 404) return err({ kind: StoreErrorKind.NotFound, detail: url });
+      if (html.includes("data-captcha")) return err({ kind: StoreErrorKind.Blocked, detail: url });
       const price = /data-price="(\d+)"/.exec(html)?.[1];
       if (price === undefined) {
         return err({ kind: StoreErrorKind.ParseFailed, detail: "no price", rawPage: html });
@@ -98,7 +155,7 @@ const plugin: StorePlugin = {
         title: "Example frame",
         itemPrice: { amountMinor: Number(price), currency: "USD" },
         shipping: ShippingUnknown,
-        inStock: true,
+        inStock: !html.includes("data-sold-out"),
         images: [],
       });
     },
@@ -145,16 +202,16 @@ const fixtures: ContractFixtures = {
   pages: {
     "https://shop.example.com/p/1": {
       status: 200,
-      body: "<html>…saved in-stock page…</html>",
+      body: '<html><div data-price="1999"></div></html>',
     },
     "https://shop.example.com/p/2": {
       status: 200,
-      body: "<html>…saved out-of-stock page…</html>",
+      body: '<html><div data-price="1999" data-sold-out></div></html>',
     },
     "https://shop.example.com/p/gone": { status: 404, body: "Not found" },
     "https://shop.example.com/p/captcha": {
       status: 200,
-      body: "<html>…saved captcha page…</html>",
+      body: "<html><div data-captcha></div></html>",
     },
     "https://shop.example.com/p/garbage": {
       status: 200,

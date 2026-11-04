@@ -97,4 +97,6 @@ Do not commit process notes or design drafts. Product docs and ADRs are public.
 
 Release PRs opened by release-please with the default `GITHUB_TOKEN` do not trigger CI. Add a `RELEASE_PLEASE_TOKEN` repository secret (a fine-grained PAT with contents and pull requests write) so release PRs run checks. Without it, release PRs need an owner bypass to merge.
 
+Each push to `main` updates one open Release PR, which sets the next versions of `@fpving/app`, `@fpving/core` and `@fpving/plugin-sdk` and their changelogs; the first release is 0.1.0. Merging it commits those versions and creates a Git tag and a GitHub Release per package, such as `plugin-sdk-v0.1.0`. Nothing is published to npm: every package stays private. See [ADR 0032](apps/docs/src/content/docs/adr/0032-unpublished-packages-and-file-dependency-for-plugins.md).
+
 Dependabot PRs skip the commit message check because its bodies exceed the line limit; the PR title check still gates the squash commit.
