@@ -27,6 +27,9 @@ const launchResolvingPublicName = async (userDataDir: string) =>
     args: [`--host-resolver-rules=MAP ${PUBLIC_NAME} 127.0.0.1`],
   });
 
+const answered = (result: Awaited<ReturnType<ClosableBrowserDriver["fetchPage"]>>) =>
+  result.ok ? result.value.status : result.error;
+
 const instantLimiter = createDomainLimiter({ now: () => Date.now(), sleep: () => Promise.resolve(), random: () => 0 });
 
 const chromiumInstalled = existsSync(chromium.executablePath());
@@ -88,7 +91,7 @@ describe.skipIf(!chromiumInstalled)(
       "returns a 404 page as a page",
       async () => {
         const result = await driver.fetchPage(`${server.origin}/missing`);
-        expect(result).toMatchObject({ ok: true, value: { status: NOT_FOUND } });
+        expect(answered(result)).toBe(NOT_FOUND);
       },
       BROWSER_TIMEOUT_MS,
     );
@@ -125,7 +128,7 @@ describe.skipIf(!chromiumInstalled)(
         "leaves only the pages the context started with once the popup the page opened is reported",
         async () => {
           const result = await popupDriver.fetchPage(`${server.origin}/popup-opener`);
-          expect(result).toMatchObject({ ok: true, value: { status: OK } });
+          expect(answered(result)).toBe(OK);
           await expect.poll(() => pagesSeen, { timeout: SETTLE_TIMEOUT_MS }).toHaveLength(OPENER_AND_POPUP);
           await expect.poll(() => opened?.pages(), { timeout: SETTLE_TIMEOUT_MS }).toEqual(startingPages);
         },
@@ -136,7 +139,7 @@ describe.skipIf(!chromiumInstalled)(
         "closes a popup that the browser reports only after the fetch has closed its opener",
         async () => {
           const result = await popupDriver.fetchPage(`${server.origin}/late-popup-opener`);
-          expect(result).toMatchObject({ ok: true, value: { status: OK } });
+          expect(answered(result)).toBe(OK);
           server.releaseLatePopup();
           const reported = () => pagesSeen.map((page) => new URL(page.url()).pathname);
           await expect.poll(reported, { timeout: SETTLE_TIMEOUT_MS }).toContain("/late-popup");
@@ -181,7 +184,7 @@ describe.skipIf(!chromiumInstalled)(
         "loads the page but blocks its image, script and fetch requests to the private host",
         async () => {
           const result = await strict.fetchPage(publicUrl("/leaky"));
-          expect(result).toMatchObject({ ok: true, value: { status: OK } });
+          expect(answered(result)).toBe(OK);
           expect(privateServer.requests).toEqual([]);
         },
         BROWSER_TIMEOUT_MS,
@@ -191,7 +194,7 @@ describe.skipIf(!chromiumInstalled)(
         "lets the same requests through when private hosts are allowed, so the block above is real",
         async () => {
           const result = await driver.fetchPage(`${pageServer.origin}/leaky`);
-          expect(result).toMatchObject({ ok: true });
+          expect(answered(result)).toBe(OK);
           expect(privateServer.requests).toEqual(expect.arrayContaining(["/pixel", "/script.js"]));
         },
         BROWSER_TIMEOUT_MS,
@@ -201,7 +204,7 @@ describe.skipIf(!chromiumInstalled)(
         "closes a WebSocket the page opens to the private host before it connects",
         async () => {
           const result = await strict.fetchPage(publicUrl("/socket-page"));
-          expect(result).toMatchObject({ ok: true });
+          expect(answered(result)).toBe(OK);
           const served = () => pageServer.requests;
           await expect.poll(served, { timeout: BROWSER_TIMEOUT_MS }).toContain("/socket-done");
           expect(privateServer.requests).not.toContain("upgrade /socket");
