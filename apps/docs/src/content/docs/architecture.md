@@ -3,13 +3,9 @@ title: Architecture
 description: Components, ports and adapters, the plugin system and the data flow.
 ---
 
-:::note
-This is the target design. The workspace, the public plugin SDK contract (types, schemas, error taxonomy and contract test kit), core pricing, the core entities and ports, the alert evaluator, the add-product and add-listing use cases, assisted matching, the scan use case and the scan schedule policy exist; the SQLite, Anthropic, exchange rates, notifier, logger, HTTP client and browser adapters, the matcher eval runner, and the plugin list, compatibility check, domain registry, the worker-thread plugin runtime, the `StoreGateway` implementation and the file debug sink exist; the host app, the timer adapter, the other adapters and the rest of the domain logic are still being built.
-:::
-
 ## Shape
 
-fpving is designed as a local web app: a Node server with SQLite on the user's machine and a React UI in the browser. It is meant to run the same on macOS, Windows and Linux. See [ADR 0002](../adr/0002-local-web-app-over-desktop-shell/).
+fpving is a local web app: a Node server with SQLite on the user's machine and a React UI in the browser. It is meant to run the same on macOS, Windows and Linux. See [ADR 0002](../adr/0002-local-web-app-over-desktop-shell/).
 
 ```text
 browser UI (localhost)

@@ -8,8 +8,8 @@ Include what you found, the affected version or commit, and steps to reproduce. 
 
 ## Scope
 
-fpving is designed to run locally on your machine and ships no store plugins. Plugins are designed to run in worker threads for crash containment, not as a security sandbox (not built yet), so install only plugins you trust. Reports about a third-party plugin belong with that plugin's author.
+fpving runs locally on your machine and ships no store plugins. Plugins run in worker threads for crash containment, not as a security sandbox, so install only plugins you trust. Reports about a third-party plugin belong with that plugin's author.
 
 ## Supported versions
 
-The project is pre-alpha. Only the latest commit on `main` is supported.
+The project is early and pre-1.0. Only the latest commit on `main` is supported.
