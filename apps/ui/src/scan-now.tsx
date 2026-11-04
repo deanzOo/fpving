@@ -3,11 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { toFailure, useClient } from "./client.ts";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
-import { unlessPending } from "./pending.ts";
+import { ScanStatus } from "./ui/scan-status.tsx";
 
 const POLL_MS = 1000;
+
+const Figure = ({ children }: { readonly children: number }) => <span className="type-readout">{children}</span>;
 
 /**
  * The scan now control and the scan status: running, or when the last scan finished with how many listings it
@@ -50,23 +52,31 @@ export const ScanNow = () => {
     ? "Scanning every listing…"
     : last === null || last === undefined
       ? "No scan has finished since fpving started."
-      : `Last scan finished ${fromNow(last.finishedAt)}: `
-        + `${String(last.plugins.reduce((sum, { succeeded }) => sum + succeeded, 0))} listings fetched, `
-        + `${String(last.plugins.reduce((sum, { failed }) => sum + failed, 0))} failed, ${String(last.alerts)} alerts`;
+      : (
+          <>
+            {`Last scan finished ${fromNow(last.finishedAt)}: `}
+            <Figure>{last.plugins.reduce((sum, { succeeded }) => sum + succeeded, 0)}</Figure>
+            {" listings fetched, "}
+            <Figure>{last.plugins.reduce((sum, { failed }) => sum + failed, 0)}</Figure>
+            {" failed, "}
+            <Figure>{last.alerts}</Figure>
+            {" alerts"}
+          </>
+        );
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <p role="status" className="text-sm text-ink-muted">{status === undefined ? "" : said}</p>
-      <button
-        type="button"
-        aria-disabled={started.isPending || running}
-        onClick={unlessPending(started.isPending || running, () => {
+    <div className="flex flex-col items-end">
+      <ScanStatus
+        running={running}
+        starting={started.isPending}
+        onStart={() => {
           started.mutate();
-        })}
-        className="rounded-md border border-line px-4 py-2 font-medium aria-disabled:opacity-60"
+        }}
       >
-        Scan now
-      </button>
-      {started.isError && <p role="alert" className="w-full text-critical">{explain(toFailure(started.error))}</p>}
+        {status === undefined ? "" : said}
+      </ScanStatus>
+      <div className="has-[p]:mt-2">
+        <Refused error={started.error} />
+      </div>
     </div>
   );
 };

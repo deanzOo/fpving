@@ -9,8 +9,10 @@
     "rootDir": ".",
     "outDir": "dist/types",
     "emitDeclarationOnly": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": true
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "design/tokens.json", "public/theme-boot.js"],
   "references": [{ "path": "../fpving" }, { "path": "../../packages/plugin-sdk" }, { "path": "../../packages/core" }]
 }

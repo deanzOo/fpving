@@ -1,0 +1,8 @@
+.clean {
+  @apply bg-page type-body font-sans;
+  color: var(--color-ink);
+}
+
+#root {
+  margin: 0;
+}

@@ -2,14 +2,17 @@ import { settingsSchema, ThresholdBasis } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { CURRENCY_MINOR_UNITS } from "@fpving/plugin-sdk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { useRef, useState } from "react";
 import type { z } from "zod";
-import { toFailure, useClient } from "./client.ts";
+import { useClient } from "./client.ts";
 import { fromDecimal, toDecimal } from "./money.ts";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
-import { unlessPending } from "./pending.ts";
+import { Refused } from "./refusal.tsx";
+import { Button, ButtonVariant } from "./ui/button.tsx";
+import { Done } from "./ui/notice.tsx";
+import { Panel } from "./ui/panel.tsx";
+import { Select } from "./ui/select.tsx";
+import { TextField } from "./ui/text-field.tsx";
 
 const PERCENT_DECIMALS = 2;
 const { shape } = settingsSchema;
@@ -20,32 +23,6 @@ const BASIS_LABEL = {
   [ThresholdBasis.Item]: "The item price",
   [ThresholdBasis.ItemAndShipping]: "The item price and shipping",
 } as const;
-
-const input = "rounded-md border border-line bg-surface px-3 py-2";
-
-interface ControlProps {
-  readonly "id": string;
-  readonly "aria-invalid": boolean;
-  readonly "aria-describedby": string | undefined;
-}
-
-interface FieldProps {
-  readonly label: string;
-  readonly error: string | null;
-  readonly children: (props: ControlProps) => ReactNode;
-}
-
-const Field = ({ label, error, children }: FieldProps) => {
-  const id = useId();
-  const errorId = `${id}-error`;
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="font-medium">{label}</label>
-      {children({ id, "aria-invalid": error !== null, "aria-describedby": error === null ? undefined : errorId })}
-      {error !== null && <span id={errorId} className="text-sm text-critical">{error}</span>}
-    </div>
-  );
-};
 
 const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
   const client = useClient();
@@ -75,8 +52,8 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
     scanIntervalHours: fromDecimal(hours, 0),
     priceDropMinBasisPoints: fromDecimal(drop, PERCENT_DECIMALS),
   } satisfies z.input<typeof settingsSchema>;
-  const invalid = (schema: z.ZodType, value: number, message: string): string | null =>
-    checked && !schema.safeParse(value).success ? message : null;
+  const invalid = (schema: z.ZodType, value: number, message: string): string | undefined =>
+    checked && !schema.safeParse(value).success ? message : undefined;
   const errors = {
     threshold: invalid(
       taxShape.dutyFreeThreshold.shape.amountMinor,
@@ -100,64 +77,51 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
     <form
       ref={form}
       noValidate
-      className="mt-6 grid max-w-xl gap-4"
-      onSubmit={unlessPending(saving.isPending, () => {
+      className="mt-6 max-w-[calc(var(--content-max)/2)]"
+      onSubmit={(event) => {
+        event.preventDefault();
         setChecked(true);
         if (settingsSchema.safeParse(body).success) {
           saving.mutate(body);
           return;
         }
         form.current?.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
-      })}
+      }}
     >
-      <Field label="Display currency" error={null}>
-        {(aria) => (
-          <select
-            {...aria}
-            className={input}
+      <Panel>
+        <div className="grid gap-4">
+          <Select
+            label="Display currency"
             value={displayCurrency}
             onChange={(event) => {
               setDisplayCurrency(shape.displayCurrency.parse(event.target.value));
             }}
           >
             {shape.displayCurrency.options.map((code) => <option key={code} value={code}>{code}</option>)}
-          </select>
-        )}
-      </Field>
-      <Field label="Ship to" error={null}>
-        {(aria) => (
-          <select
-            {...aria}
-            className={input}
+          </Select>
+          <Select
+            label="Ship to"
             value={shipToCountry}
             onChange={(event) => {
               setShipToCountry(shape.shipToCountry.parse(event.target.value));
             }}
           >
             {shape.shipToCountry.options.map((code) => <option key={code} value={code}>{code}</option>)}
-          </select>
-        )}
-      </Field>
-      <fieldset className="grid gap-4 rounded-md border border-line p-4">
-        <legend className="px-1 font-semibold">Import tax</legend>
-        <Field label="Duty-free threshold" error={errors.threshold}>
-          {(aria) => (
-            <input
-              {...aria}
-              className={input}
+          </Select>
+          <fieldset className="m-0 grid gap-4 border-0 border-t border-line p-0 pt-4">
+            <legend className="pr-2 text-ink-muted type-label">Import tax</legend>
+            <TextField
+              label="Duty-free threshold"
+              numeric
               inputMode="decimal"
+              error={errors.threshold}
               value={threshold}
               onChange={(event) => {
                 setThreshold(event.target.value);
               }}
             />
-          )}
-        </Field>
-        <Field label="Threshold currency" error={null}>
-          {(aria) => (
-            <select
-              {...aria}
-              className={input}
+            <Select
+              label="Threshold currency"
               value={thresholdCurrency}
               onChange={(event) => {
                 setThresholdCurrency(taxShape.dutyFreeThreshold.shape.currency.parse(event.target.value));
@@ -166,14 +130,9 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
               {taxShape.dutyFreeThreshold.shape.currency.options.map((code) => (
                 <option key={code} value={code}>{code}</option>
               ))}
-            </select>
-          )}
-        </Field>
-        <Field label="Threshold applies to" error={null}>
-          {(aria) => (
-            <select
-              {...aria}
-              className={input}
+            </Select>
+            <Select
+              label="Threshold applies to"
               value={thresholdBasis}
               onChange={(event) => {
                 setThresholdBasis(taxShape.thresholdBasis.parse(event.target.value));
@@ -182,60 +141,53 @@ const SettingsForm = ({ saved }: { readonly saved: Settings }) => {
               {taxShape.thresholdBasis.options.map((basis) => (
                 <option key={basis} value={basis}>{BASIS_LABEL[basis]}</option>
               ))}
-            </select>
-          )}
-        </Field>
-        <Field label="VAT (%)" error={errors.vat}>
-          {(aria) => (
-            <input
-              {...aria}
-              className={input}
+            </Select>
+            <TextField
+              label="VAT (%)"
+              numeric
               inputMode="decimal"
+              error={errors.vat}
               value={vat}
               onChange={(event) => {
                 setVat(event.target.value);
               }}
             />
-          )}
-        </Field>
-      </fieldset>
-      <Field label="Scan every (hours)" error={errors.hours}>
-        {(aria) => (
-          <input
-            {...aria}
-            className={input}
-            inputMode="numeric"
-            value={hours}
-            onChange={(event) => {
-              setHours(event.target.value);
-            }}
-          />
-        )}
-      </Field>
-      <Field label="Price drop alert from (%)" error={errors.drop}>
-        {(aria) => (
-          <input
-            {...aria}
-            className={input}
-            inputMode="decimal"
-            value={drop}
-            onChange={(event) => {
-              setDrop(event.target.value);
-            }}
-          />
-        )}
-      </Field>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          aria-disabled={saving.isPending}
-          className="rounded-md bg-action px-4 py-2 font-medium text-on-action aria-disabled:opacity-60"
-        >
-          {saving.isPending ? "Saving…" : "Save settings"}
-        </button>
-        <p role="status" className="text-ink-muted">{saving.isSuccess ? "Settings saved." : ""}</p>
+          </fieldset>
+          <div className="grid gap-4 border-t border-line pt-4">
+            <TextField
+              label="Scan every (hours)"
+              numeric
+              inputMode="numeric"
+              error={errors.hours}
+              value={hours}
+              onChange={(event) => {
+                setHours(event.target.value);
+              }}
+            />
+            <TextField
+              label="Price drop alert from (%)"
+              numeric
+              inputMode="decimal"
+              error={errors.drop}
+              value={drop}
+              onChange={(event) => {
+                setDrop(event.target.value);
+              }}
+            />
+          </div>
+        </div>
+      </Panel>
+      <div className="mt-4">
+        <Button type="submit" variant={ButtonVariant.Primary} pending={saving.isPending} pendingLabel="Saving…">
+          Save settings
+        </Button>
       </div>
-      {saving.isError && <p role="alert" className="text-critical">{explain(toFailure(saving.error))}</p>}
+      <div className="has-[p]:mt-4">
+        <Done>{saving.isSuccess ? "Settings saved." : ""}</Done>
+      </div>
+      <div className="has-[p]:mt-4">
+        <Refused error={saving.error} />
+      </div>
     </form>
   );
 };
@@ -255,8 +207,8 @@ export const SettingsScreen = () => {
   }).data;
   return (
     <section>
-      <h1 className="text-2xl font-semibold">Settings</h1>
-      {saved === undefined ? <p className="mt-6 text-ink-muted">Loading…</p> : <SettingsForm saved={saved} />}
+      <h1 className="type-title">Settings</h1>
+      {saved === undefined ? <p className="mt-6 text-ink-muted type-body">Loading…</p> : <SettingsForm saved={saved} />}
     </section>
   );
 };

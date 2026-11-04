@@ -24,6 +24,31 @@ Local-first, AGPL-3.0 pnpm monorepo that watches FPV gear prices. Human guide: C
 ## Bug protocol
 Write the missing failing test, scan the codebase for the same bug class, fix every instance with tests.
 
+## UI
+- Tokens: `apps/ui/design/tokens.json` is the source. `pnpm tokens` writes `apps/ui/src/tokens.css`; never edit that file. A test fails when it is stale.
+- Primitives live in `apps/ui/src/ui/`. Extend a primitive instead of styling around it. Screens use `type-*` utilities for type.
+- Guards in `tools/ui-guards.ts` and `tools/ui-stylesheet-guard.ts` fail `pnpm verify` on a break of rules 1, 2 and 7, on raw type, radii and shadows, and on `style` props. A string flagged by mistake gets reworded, never suppressed.
+- Rules:
+  1. Only tokens. No hex, rgb or Tailwind palette colours; a missing role gets a token first.
+  2. Shared primitives, not restyled native elements.
+  3. Money and compared numbers are mono with tabular figures; words are sans.
+  4. Reticle brackets mark focus, the current nav item or a screen's one featured element, nothing else.
+  5. A form or header has one primary button; only Confirm has a danger fill.
+  6. Status carries a word, a glyph and a colour, and its colours are not used for chart series.
+  7. Show pending with `aria-disabled` and a changed label, not `opacity`.
+  8. Contrast in both themes: 4.5:1 for text, 3:1 for borders, focus and marks. Check new pairs before shipping.
+- Agreed exceptions:
+  - Back in stock, gone and removed badges have no glyph: word and colour only, so each glyph keeps one meaning.
+  - Refusal notices are tagged REFUSED or FAILED. A restart is a warning tagged RESTARTING, the startup 503 a warning tagged STARTING, a partial Find matches result a warning tagged PARTIAL.
+  - The watchlist's unread count is a Badge, not Count.
+  - Scan now keeps its label while running; its status line changes instead.
+  - The settings form is half of `--content-max` wide (512px), which is not a design token.
+  - ▲ also marks a plugin warning, not only a rise or a stale listing.
+  - `Legend single` gives a one-series chart a legend, which the design starts at two series.
+  - FAILED also tags a Find matches search that saved nothing, which is not a refusal.
+  - No focus outline on `main`, `h1` or `h2` when script moves focus there (`tabindex="-1"`).
+- Guide: `apps/docs/src/content/docs/design-system.md`.
+
 ## Worktree and env isolation
 - One worktree per branch. Run `pnpm worktree:init` once per worktree: it writes `.env` from `.env.example` with `PORT=4000 + fnv1a(absolute worktree path) % 1000` and `DATA_DIR=<absolute worktree path>/.data/<worktree dir name>` (absolute so it never depends on the CWD; `parseEnv` rejects a relative one), and never overwrites an existing `.env`. A hash collision between two worktrees means editing `PORT` in `.env`. Config is parsed by `apps/fpving/src/config/env.ts` (`PORT`, `DATA_DIR`, optional `ANTHROPIC_API_KEY`, `LOG_LEVEL`); error text never contains the key. Logs and the browser profile live in `DATA_DIR`; the E2E suite uses a temp Chromium profile, data dir and port per test, never these.
 - Never share a DB or port across worktrees. Never commit `.env` or `.data`.

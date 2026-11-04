@@ -1,8 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { toFailure } from "./client.ts";
-import { explain } from "./refusal.tsx";
-import { unlessPending } from "./pending.ts";
+import { noticeLook, Refused } from "./refusal.tsx";
+import { Button, ButtonVariant } from "./ui/button.tsx";
+import { Done, NoticeTone } from "./ui/notice.tsx";
+import { TextField } from "./ui/text-field.tsx";
 
 interface UrlFormProps<T> {
   readonly submitLabel: string;
@@ -13,8 +15,8 @@ interface UrlFormProps<T> {
 }
 
 /**
- * A labelled store URL field with its submit button. A refusal is explained next to the field, linking to the
- * product that already watches the page when that is the reason.
+ * A labelled store URL field with its submit button. A refusal is explained in a notice under the field, which it
+ * describes, linking to the product that already watches the page when that is the reason.
  *
  * @param props - What the button says, what a submit sends, what to do once it was added and what to say then.
  * @returns The form.
@@ -29,38 +31,39 @@ export const UrlForm = <T extends object>({ submitLabel, pendingLabel, send, don
       await done(result);
     },
   });
-  const error = added.isError ? explain(toFailure(added.error)) : null;
   return (
     <form
-      className="mt-4 flex flex-wrap items-end gap-3"
-      onSubmit={unlessPending(added.isPending, () => {
+      className="mt-4"
+      onSubmit={(event) => {
+        event.preventDefault();
         added.mutate(url);
-      })}
+      }}
     >
-      <label className="flex min-w-72 flex-1 flex-col gap-1">
-        <span className="font-medium">Store URL</span>
-        <input
-          type="url"
-          required
-          value={url}
-          onChange={(event) => {
-            setUrl(event.target.value);
-          }}
-          placeholder="https://"
-          aria-invalid={error !== null}
-          aria-describedby={error === null ? undefined : errorId}
-          className="rounded-md border border-line bg-surface px-3 py-2"
-        />
-      </label>
-      <button
-        type="submit"
-        aria-disabled={added.isPending}
-        className="rounded-md bg-action px-4 py-2 font-medium text-on-action aria-disabled:opacity-60"
-      >
-        {added.isPending ? pendingLabel : submitLabel}
-      </button>
-      {error !== null && <p id={errorId} role="alert" className="w-full text-critical">{error}</p>}
-      <p role="status" className="w-full text-ink-muted">{added.isSuccess ? said(added.data) : ""}</p>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-72 flex-1">
+          <TextField
+            label="Store URL"
+            type="url"
+            required
+            value={url}
+            onChange={(event) => {
+              setUrl(event.target.value);
+            }}
+            placeholder="https://"
+            aria-invalid={added.isError && noticeLook(toFailure(added.error)).tone !== NoticeTone.Warning}
+            aria-describedby={added.isError ? errorId : undefined}
+          />
+        </div>
+        <Button type="submit" variant={ButtonVariant.Primary} pending={added.isPending} pendingLabel={pendingLabel}>
+          {submitLabel}
+        </Button>
+      </div>
+      <div className="has-[p]:mt-3">
+        <Done>{added.isSuccess ? said(added.data) : ""}</Done>
+      </div>
+      <div className="has-[p]:mt-3">
+        <Refused error={added.error} id={errorId} />
+      </div>
     </form>
   );
 };

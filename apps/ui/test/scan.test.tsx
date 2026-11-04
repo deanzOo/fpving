@@ -5,8 +5,10 @@ import { HttpStatus } from "@fpving/app/http-status";
 import { pluginIdSchema, ScanOutcome, scanRunIdSchema } from "@fpving/core";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import { emptyTrend, failWith, fakeApi, product, reply, wire } from "./support/fake-api.ts";
+import { emptyTrend, failWith, fakeApi, product, reply, wire, Role } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { expectSaidInPlace, statusRegions, styleOf } from "./support/style.ts";
+import "../src/styles.css";
 
 type Status = z.output<typeof wire.scan>;
 
@@ -48,6 +50,33 @@ describe("Scan now", () => {
     await expect.element(screen.getByRole("status").getByText(
       "Last scan finished 5 minutes ago: 3 listings fetched, 1 failed, 2 alerts",
     )).toBeVisible();
+  });
+
+  it.each(["3", "1", "2"])("sets the last scan's count %s in the readout face", async (count) => {
+    const screen = await renderApp(scripted(finished(FIVE)).client);
+    const figure = screen.getByRole("status").getByText(count, { exact: true });
+    await expect.element(figure).toBeVisible();
+    expect(styleOf(figure).fontFamily).toContain("Martian Mono");
+  });
+
+  it("says a restart in a status region that was already there, so it is announced", async () => {
+    const api = scripted(idle);
+    api.on(apiRoutes.startScan, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await renderApp(api.client);
+    const scan = screen.getByRole("button", { name: "Scan now" });
+    await expect.element(screen.getByText("No scan has finished since fpving started.")).toBeVisible();
+    const regions = statusRegions();
+    await scan.click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
+  });
+
+  it("takes no room for its empty refusal region", async () => {
+    const screen = await renderApp(scripted(idle).client);
+    const scan = screen.getByRole("button", { name: "Scan now" });
+    await expect.element(scan).toBeVisible();
+    const control = scan.element().parentElement;
+    const block = control?.parentElement;
+    expect(block?.getBoundingClientRect().height).toBe(control?.getBoundingClientRect().height);
   });
 
   it("reads the watchlist once on first load, not again for a scan that finished before", async () => {
@@ -100,17 +129,19 @@ describe("Scan now", () => {
   });
 
   it.each([
-    [HttpStatus.Conflict, ApiErrorKind.ScanRunning, "A scan is already running."],
-    [HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting,
-      "fpving is restarting its plugins for a settings change. Try again in a moment."],
-    [HttpStatus.ServiceUnavailable, ApiErrorKind.ShuttingDown, "fpving is shutting down."],
-  ] satisfies [number, PlainErrorKind, string][])("explains a %d %s refusal", async (status, kind, shown) => {
+    [HttpStatus.Conflict, ApiErrorKind.ScanRunning, Role.Alert, "Refused A scan is already running."],
+    [HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, Role.Status,
+      "Restarting fpving is restarting its plugins for a settings change. Try again in a moment."],
+    [HttpStatus.ServiceUnavailable, ApiErrorKind.ShuttingDown, Role.Alert, "Refused fpving is shutting down."],
+  ] satisfies [number, PlainErrorKind, Role, string][])("explains a %d %s refusal", async (
+    status, kind, role, shown,
+  ) => {
     const api = scripted(idle);
     api.on(apiRoutes.startScan, failWith(status, kind, "refused"));
     const screen = await renderApp(api.client);
     const button = screen.getByRole("button", { name: "Scan now" });
     await button.click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent(shown);
+    await expect.element(screen.getByRole(role).filter({ hasText: shown })).toHaveTextContent(shown);
     await expect.element(button).toHaveFocus();
   });
 });

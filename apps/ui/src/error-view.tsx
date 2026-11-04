@@ -1,10 +1,15 @@
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import type { ErrorComponentProps } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { toFailure } from "./client.ts";
-import { explain } from "./refusal.tsx";
+import { explain, noticeLook } from "./refusal.tsx";
+import { Button, ButtonVariant } from "./ui/button.tsx";
+import { Notice } from "./ui/notice.tsx";
 
 /**
- * The one error boundary's view: what failed, with the error kind, and a retry.
+ * The one error boundary's view: what failed, with the error kind, and a retry. Focus goes to its heading when it
+ * appears, so a screen reader hears the failure whatever its kind. A retry hands focus to `main`, as a navigation
+ * does; if it fails again, the view comes back and takes focus to its heading.
  *
  * @param props - The error and the boundary's reset.
  * @returns The error view.
@@ -12,23 +17,31 @@ import { explain } from "./refusal.tsx";
 export const ErrorView = ({ error, reset }: Pick<ErrorComponentProps, "error" | "reset">) => {
   const queries = useQueryErrorResetBoundary();
   const failure = toFailure(error);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
   return (
-    <section role="alert" className="mx-auto max-w-xl rounded-lg border border-line bg-surface p-6">
-      <h1 className="text-xl font-semibold">Something went wrong</h1>
-      <p className="mt-2">{explain(failure)}</p>
-      <p className="mt-2 text-sm text-ink-muted">
-        Error kind: <code>{failure.kind}</code>
-      </p>
-      <button
-        type="button"
-        className="mt-4 rounded-md bg-action px-4 py-2 font-medium text-on-action"
+    <section className="flex flex-col gap-4">
+      <h1 ref={heading} tabIndex={-1} className="type-title">Something went wrong</h1>
+      <Notice {...noticeLook(failure)}>
+        <span>{explain(failure)}</span>
+        {" "}
+        <span className="text-ink-muted">
+          Error kind: <code className="type-code">{failure.kind}</code>
+        </span>
+      </Notice>
+      <Button
+        variant={ButtonVariant.Primary}
+        className="self-start"
         onClick={() => {
           queries.reset();
           reset();
+          heading.current?.closest("main")?.focus();
         }}
       >
         Try again
-      </button>
+      </Button>
     </section>
   );
 };

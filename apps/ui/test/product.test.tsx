@@ -9,10 +9,12 @@ import { userEvent } from "vitest/browser";
 import type { z } from "zod";
 import { takeLogged } from "./support/console-guard.ts";
 import {
-  alreadyTracked, at, failWith, fakeApi, noContent, product, reply, wire,
+  alreadyTracked, at, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire,
 } from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { expectSaidInPlace, hasBrackets, rgb, statusRegions, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 type Detail = z.output<typeof wire.detail>;
 type Priced = Detail["listings"][number]["history"][number];
@@ -91,6 +93,13 @@ const open = async (api = scripted()) => {
   return screen;
 };
 
+const restarting = failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting");
+
+const cheapestAt = (listingId: string): Detail => {
+  const shown = detail();
+  return { ...shown, product: { ...shown.product, cheapestListingId: listingIdSchema.parse(listingId) } };
+};
+
 const renamed = (name: string): Detail => ({ ...detail(), product: { ...detail().product, name } });
 
 describe("Product detail", () => {
@@ -151,7 +160,7 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByRole("button", { name: "Rename" }).click();
     await screen.getByRole("button", { name: "Save name" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("body/name too long");
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("Refused body/name too long");
   });
 
   it("asks before it stops watching, and keeps watching on cancel with focus back on the action", async () => {
@@ -186,7 +195,7 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByRole("button", { name: "Stop watching" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Stop watching" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("This product is not watched any more.");
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("Refused This product is not watched any more.");
   });
 
   it("removes a listing once confirmed and moves focus to the listings heading", async () => {
@@ -223,7 +232,8 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
     await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("the product has no listing with this id");
+    await expect.element(screen.getByRole("alert"))
+      .toHaveTextContent("Refused the product has no listing with this id");
   });
 
   it("adds a listing by URL and shows it", async () => {
@@ -241,7 +251,7 @@ describe("Product detail", () => {
     await screen.getByLabelText("Store URL").fill(PAGE);
     await screen.getByRole("button", { name: "Add listing" }).click();
     await expect.element(screen.getByRole("status").filter({ hasText: "Now also" }))
-      .toHaveTextContent("Now also watching Acme X5 frame at l3");
+      .toHaveTextContent("Done Now also watching Acme X5 frame at l3");
     await expect.element(screen.getByRole("link", { name: "Acme X5 frame at l3" })).toBeVisible();
     expect(api.sent).toContainEqual({ method: "POST", path: `/api/products/${ID}/listings`, body: { url: PAGE } });
   });
@@ -256,7 +266,107 @@ describe("Product detail", () => {
     const screen = await open(api);
     await screen.getByLabelText("Store URL").fill(PAGE);
     await userEvent.keyboard("{Enter}");
-    await expect.element(screen.getByRole("alert")).toHaveTextContent(said);
+    await expect.element(screen.getByRole("alert")).toHaveTextContent(`Refused ${said}`);
+  });
+
+  it("features the cheapest listing's landed cost in the one framed panel", async () => {
+    const screen = await open(scripted(cheapestAt("l1")));
+    const cheapest = screen.getByRole("region", { name: "Cheapest landed" });
+    await expect.element(cheapest.getByText("$138.45")).toBeVisible();
+    await expect.element(cheapest.getByText("shop: Acme X5 frame at l1")).toBeVisible();
+    expect(hasBrackets(cheapest)).toBe(true);
+    expect(styleOf(cheapest.getByText("$138.45")).fontSize).toBe("20px");
+  });
+
+  it("features nothing while the cheapest listing has no landed cost", async () => {
+    const screen = await open(scripted(cheapestAt("l2")));
+    await expect.element(screen.getByRole("region", { name: "Cheapest landed" })).not.toBeInTheDocument();
+  });
+
+  it("shows each listing's status as a badge: active as live, stale as a warning with its glyph", async () => {
+    const screen = await open();
+    const active = screen.getByRole("row", { name: /^shop/u }).getByText("active", { exact: true });
+    await expect.element(active).toBeVisible();
+    expect(styleOf(active).color).toBe(rgb(token("--color-signal")));
+    const stale = screen.getByRole("row", { name: /^mall/u }).getByText("stale", { exact: true });
+    expect(styleOf(stale).color).toBe(rgb(token("--color-warning")));
+    expect(stale.element().previousElementSibling?.textContent).toBe("▲");
+  });
+
+  it.each([ListingStatus.Gone, ListingStatus.Removed])(
+    "shows a %s listing as a neutral badge, a word in muted ink with no glyph", async (status) => {
+      const shown = detail();
+      const gone = { ...shown, listings: [{ listing: listing("l1", { status }), history: [snapshot("l1", 0)] }] };
+      const screen = await open(scripted(gone));
+      const word = screen.getByRole("row", { name: /^shop/u }).getByText(status, { exact: true });
+      await expect.element(word).toBeVisible();
+      expect(styleOf(word).color).toBe(rgb(token("--color-ink-muted")));
+      expect(word.element().previousElementSibling).toBeNull();
+    },
+  );
+
+  it("sets each price in the readout face", async () => {
+    const screen = await open();
+    const price = screen.getByRole("row", { name: /^shop/u }).getByText("$123.45");
+    await expect.element(price).toBeVisible();
+    expect(styleOf(price).fontFamily).toContain("Martian Mono");
+  });
+
+  it("says Saving… on the save button while a rename is on its way", async () => {
+    const api = scripted();
+    const saved = gate();
+    api.on(at(apiRoutes.renameProduct, { productId: ID }), heldBy(saved, noContent));
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Rename" }).click();
+    await screen.getByRole("button", { name: "Save name" }).click();
+    await expect.element(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute("aria-disabled", "true");
+    saved.release();
+  });
+
+  it("says Stopping… on its button while stop watching is on its way", async () => {
+    const api = scripted();
+    const stopped = gate();
+    api.on(at(apiRoutes.archiveProduct, { productId: ID }), heldBy(stopped, noContent));
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Stop watching" }).click();
+    await screen.getByRole("dialog").getByRole("button", { name: "Stop watching" }).click();
+    await expect.element(screen.getByRole("button", { name: "Stopping…" })).toHaveAttribute("aria-disabled", "true");
+    stopped.release();
+  });
+
+  it("says Removing… on the removed listing's button only, and holds the others meanwhile", async () => {
+    const api = scripted();
+    const removed = gate();
+    api.on(at(apiRoutes.removeListing, { productId: ID, listingId: "l2" }), heldBy(removed, noContent));
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
+    await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
+    const target = screen.getByRole("button", { name: "Removing mall: Acme X5 frame at l2" });
+    await expect.element(target).toHaveTextContent("Removing…");
+    const other = screen.getByRole("button", { name: "Remove shop: Acme X5 frame at l1" });
+    await expect.element(other).toHaveTextContent("Remove");
+    await expect.element(other).toHaveAttribute("aria-disabled", "true");
+    removed.release();
+  });
+
+  it("says a restart on a rename in a status region that was already there", async () => {
+    const api = scripted();
+    api.on(at(apiRoutes.renameProduct, { productId: ID }), restarting);
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Rename" }).click();
+    const regions = statusRegions();
+    await screen.getByRole("button", { name: "Save name" }).click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
+  });
+
+  it("says a restart on a removal in a status region that was already there", async () => {
+    const api = scripted();
+    api.on(at(apiRoutes.removeListing, { productId: ID, listingId: "l2" }), restarting);
+    const screen = await open(api);
+    const regions = statusRegions();
+    await screen.getByRole("button", { name: "Remove mall: Acme X5 frame at l2" }).click();
+    await screen.getByRole("dialog").getByRole("button", { name: "Remove" }).click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
   });
 
   it("shows a not found state for a product that is not watched", async () => {
@@ -321,6 +431,8 @@ describe("Price history chart", () => {
     const screen = await open(scripted(charted([[LANDED_MINOR, null, LANDED_MINOR, null, null, null]])));
     await expect.element(chartOf(screen)).toBeVisible();
     expect(chartOf(screen).element().querySelectorAll(".history-dot")).toHaveLength(TWO_DAYS);
+    const dot = chartOf(screen).element().querySelector(".history-dot");
+    expect(dot?.getAttribute("stroke")).toBe("var(--color-surface)");
   });
 
   it("lets the keyboard reach the chart and step through the days to read every listing's cost", async () => {
@@ -402,6 +514,57 @@ describe("Price history chart", () => {
     await expect.element(chartOf(screen)).toHaveAccessibleName(
       "Landed cost over the last 2 days: shop: Acme X5 frame at l1 lowest $138.45, highest $150.00, latest $138.45",
     );
+  });
+
+  it("marks the hovered day with a dashed crosshair", async () => {
+    const screen = await open(scripted(charted([steady])));
+    await userEvent.hover(chartOf(screen));
+    await expect.poll(() => chartOf(screen).element().querySelector(".recharts-tooltip-cursor")).not.toBeNull();
+    const cursor = chartOf(screen).element().querySelector(".recharts-tooltip-cursor");
+    expect(cursor?.getAttribute("stroke-dasharray")).toBe("2 3");
+  });
+
+  it("sets each listing's cost in the tooltip in the readout face", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    chartOf(screen).element().focus();
+    await userEvent.keyboard("{ArrowRight}");
+    const line = screen.getByText(/^store2: Acme X5 frame at l2 \$120\.00$/u);
+    await expect.element(line).toBeVisible();
+    const cost = line.element().lastElementChild;
+    expect(cost?.textContent).toBe("$120.00");
+    expect(cost === null ? "" : getComputedStyle(cost).fontFamily).toContain("Martian Mono");
+  });
+
+  it("labels the days briefly and keeps every label inside the chart", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    await expect.element(chartOf(screen)).toBeVisible();
+    const chart = chartOf(screen).element();
+    const bounds = chart.getBoundingClientRect();
+    const ticks = [...chart.querySelectorAll(".recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value")];
+    expect(ticks.length).toBeGreaterThan(1);
+    for (const tick of ticks) {
+      const box = tick.getBoundingClientRect();
+      expect(tick.textContent).toMatch(/^\D+ \d{1,2}$/u);
+      expect(box.left).toBeGreaterThanOrEqual(bounds.left);
+      expect(box.right).toBeLessThanOrEqual(bounds.right);
+    }
+  });
+
+  it("names the whole date in the tooltip", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    chartOf(screen).element().focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(screen.getByText(/^\D+ \d{1,2}, \d{4}$/u)).toBeVisible();
+  });
+
+  it("draws the money axis as labels only, without a line or tick marks", async () => {
+    const screen = await open(scripted(charted([steady, other])));
+    await expect.element(chartOf(screen)).toBeVisible();
+    const chart = chartOf(screen).element();
+    expect(chart.querySelector(".recharts-yAxis .recharts-cartesian-axis-line")).toBeNull();
+    expect(chart.querySelector(".recharts-yAxis-tick-lines .recharts-cartesian-axis-tick-line")).toBeNull();
+    expect(chart.querySelector(".recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value")).not.toBeNull();
+    expect(chart.querySelector(".recharts-xAxis .recharts-cartesian-axis-line")).not.toBeNull();
   });
 
   it("says when no listing has a landed cost to chart", async () => {

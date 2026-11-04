@@ -2,22 +2,26 @@ import { AlertKind } from "@fpving/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { toFailure, useClient } from "./client.ts";
+import { useClient } from "./client.ts";
 import { useFocusAfterRemoval } from "./focus.ts";
 import { QueryKey } from "./queries.ts";
-import { explain } from "./refusal.tsx";
+import { Refused } from "./refusal.tsx";
 import { fromNow } from "./time.ts";
-import { unlessPending } from "./pending.ts";
+import { Badge, BadgeTone } from "./ui/badge.tsx";
+import { Button, ButtonSize } from "./ui/button.tsx";
+import { Checkbox } from "./ui/checkbox.tsx";
+import { EmptyState, EmptyTag } from "./ui/empty-state.tsx";
+import { LINK } from "./ui/link.ts";
+import { Done } from "./ui/notice.tsx";
 
-const KIND_LABEL = {
-  [AlertKind.PriceDrop]: "Price drop",
-  [AlertKind.BackInStock]: "Back in stock",
-  [AlertKind.NewCheapest]: "New cheapest listing",
+const KIND = {
+  [AlertKind.PriceDrop]: { label: "Price drop", tone: BadgeTone.Good, glyph: "▼" },
+  [AlertKind.BackInStock]: { label: "Back in stock", tone: BadgeTone.Info },
+  [AlertKind.NewCheapest]: { label: "New cheapest listing", tone: BadgeTone.Good, glyph: "★" },
 } as const;
 
 const GONE = "a product no longer watched";
-const item = "flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2";
-const button = "rounded-md border border-line px-3 py-1 font-medium aria-disabled:opacity-60";
+const MARKING = "Marking…";
 
 /**
  * The alerts screen: every alert newest first, or only the unread ones, each with its product, and marking one or
@@ -61,66 +65,82 @@ export const Alerts = () => {
   const failed = markOne.error ?? markAll.error;
   return (
     <section>
-      <h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold">Alerts</h1>
+      <h1 ref={heading} tabIndex={-1} className="type-title">Alerts</h1>
       <div className="mt-4 flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={unreadOnly}
-            onChange={(event) => {
-              setUnreadOnly(event.target.checked);
-            }}
-          />
-          Unread only
-        </label>
-        <button
-          type="button"
-          className={button}
-          aria-disabled={markAll.isPending}
-          onClick={unlessPending(markAll.isPending, () => {
+        <Checkbox
+          label="Unread only"
+          checked={unreadOnly}
+          onChange={(event) => {
+            setUnreadOnly(event.target.checked);
+          }}
+        />
+        <Button
+          pending={markAll.isPending}
+          pendingLabel={MARKING}
+          onClick={() => {
             markAll.mutate();
-          })}
+          }}
         >
           Mark all read
-        </button>
-        <p role="status" className="text-ink-muted">
-          {markAll.isSuccess ? `Marked ${String(markAll.data.marked)} alerts read.` : ""}
-        </p>
+        </Button>
       </div>
-      {failed !== null && <p role="alert" className="mt-4 text-critical">{explain(toFailure(failed))}</p>}
-      {alerts === undefined && <p className="mt-6 text-ink-muted">Loading…</p>}
-      {alerts?.length === 0 && (
-        <p className="mt-6 text-ink-muted">{unreadOnly ? "No unread alerts." : "No alerts yet."}</p>
-      )}
-      <ul ref={list} className="mt-6 flex flex-col gap-2">
-        {alerts?.map((alert, index) => {
-          const name = names.get(alert.productId);
-          const when = fromNow(alert.createdAt);
-          return (
-            <li key={alert.id} tabIndex={-1} className={item}>
-              <span className="font-medium">{KIND_LABEL[alert.kind]}</span>
-              {name === undefined
-                ? <span className="text-ink-muted">{GONE}</span>
-                : <Link to="/products/$id" params={{ id: alert.productId }} className="underline">{name}</Link>}
-              <span className="text-sm text-ink-muted">{when}</span>
-              <span className="text-sm">{alert.readAt === null ? "Unread" : "Read"}</span>
-              {alert.readAt === null && (
-                <button
-                  type="button"
-                  className={button}
-                  aria-disabled={markOne.isPending}
-                  aria-label={`Mark read: ${KIND_LABEL[alert.kind]} on ${name ?? GONE}, ${when}`}
-                  onClick={unlessPending(markOne.isPending, () => {
-                    markOne.mutate({ alertId: alert.id, index });
-                  })}
-                >
-                  Mark read
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <div className="has-[p]:mt-4">
+        <Done>
+          {markAll.isSuccess ? `Marked ${String(markAll.data.marked)} alerts read.` : ""}
+        </Done>
+      </div>
+      <div className="has-[p]:mt-4">
+        <Refused error={failed} />
+      </div>
+      <div className="mt-6">
+        {alerts === undefined && <p className="text-ink-muted type-body">Loading…</p>}
+        {alerts?.length === 0 && (
+          <EmptyState tag={EmptyTag.Clear}>{unreadOnly ? "No unread alerts." : "No alerts yet."}</EmptyState>
+        )}
+        <ul ref={list} className="flex flex-col">
+          {alerts?.map((alert, index) => {
+            const name = names.get(alert.productId);
+            const when = fromNow(alert.createdAt);
+            const { label, ...look } = KIND[alert.kind];
+            const marking = markOne.isPending && markOne.variables.alertId === alert.id;
+            return (
+              <li
+                key={alert.id}
+                tabIndex={-1}
+                className="flex min-h-(--row-height) flex-wrap items-center gap-3 border-b border-line py-2"
+              >
+                <Badge {...look}>{label}</Badge>
+                {name === undefined
+                  ? <span className="text-ink-muted type-body">{GONE}</span>
+                  : (
+                      <Link to="/products/$id" params={{ id: alert.productId }} className={`type-body ${LINK}`}>
+                        {name}
+                      </Link>
+                    )}
+                <span className="text-ink-muted type-small">{when}</span>
+                {alert.readAt === null
+                  ? <Badge tone={BadgeTone.Live}>Unread</Badge>
+                  : <span className="text-ink-muted type-small">Read</span>}
+                {alert.readAt === null && (
+                  <span className="ml-auto">
+                    <Button
+                      size={ButtonSize.Small}
+                      pending={markOne.isPending}
+                      pendingLabel={marking ? MARKING : undefined}
+                      aria-label={`${marking ? "Marking read" : "Mark read"}: ${label} on ${name ?? GONE}, ${when}`}
+                      onClick={() => {
+                        markOne.mutate({ alertId: alert.id, index });
+                      }}
+                    >
+                      Mark read
+                    </Button>
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </section>
   );
 };

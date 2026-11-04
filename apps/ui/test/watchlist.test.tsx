@@ -7,9 +7,13 @@ import { ShippingKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import type { z } from "zod";
-import { alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, product, reply, wire } from "./support/fake-api.ts";
+import {
+  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, product, reply, Role, wire,
+} from "./support/fake-api.ts";
 import { curveSegments } from "./support/chart.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { expectSaidInPlace, rgb, statusRegions, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 type Row = z.output<typeof wire.watchlist>[number];
 
@@ -64,6 +68,21 @@ describe("Watchlist", () => {
     await expect.element(line.getByText("3 unread")).toBeVisible();
     await line.getByRole("link", { name: "Acme X5 frame" }).click();
     await expect.element(screen.getByRole("heading", { level: 1, name: "Acme X5 frame" })).toBeVisible();
+  });
+
+  it("marks a row's unread alerts as a live status in the signal colour", async () => {
+    const screen = await renderApp(scripted([row({ unreadAlerts: 3 })]).client);
+    const unread = screen.getByRole("row", { name: /Acme X5 frame/u }).getByText("3 unread");
+    await expect.element(unread).toBeVisible();
+    const badge = unread.element().parentElement;
+    expect(badge === null ? "" : getComputedStyle(badge).color).toBe(rgb(token("--color-signal")));
+  });
+
+  it("sets the cheapest landed cost in the readout face", async () => {
+    const screen = await renderApp(scripted([row()]).client);
+    const price = screen.getByRole("row", { name: /Acme X5 frame/u }).getByText("$123.45");
+    await expect.element(price).toBeVisible();
+    expect(styleOf(price).fontFamily).toContain("Martian Mono");
   });
 
   it("says when a product has no price yet and shows no unread count when none is unread", async () => {
@@ -148,7 +167,8 @@ describe("Adding a product by URL", () => {
     await field.fill(PAGE);
     await screen.getByRole("button", { name: "Add product" }).click();
     await expect.element(screen.getByRole("status").filter({ hasText: "Now watching" }))
-      .toHaveTextContent("Now watching Acme X5 kit");
+      .toHaveTextContent("Done Now watching Acme X5 kit");
+    expect(styleOf(screen.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
     await expect.element(screen.getByRole("link", { name: "Acme X5 kit" })).toBeVisible();
     await expect.element(field).toHaveValue("");
     expect(api.sent).toContainEqual({ method: "POST", path: apiRoutes.addProduct.url, body: { url: PAGE } });
@@ -164,7 +184,7 @@ describe("Adding a product by URL", () => {
     expect(region).toBeInstanceOf(HTMLElement);
     await field.fill(PAGE);
     await userEvent.keyboard("{Enter}");
-    await expect.poll(() => region?.textContent).toBe("Now watching Acme X5 kit");
+    await expect.poll(() => region?.textContent).toBe("Done Now watching Acme X5 kit");
   });
 
   it("marks the button unavailable while fetching, keeps focus on it and ignores another press", async () => {
@@ -186,26 +206,70 @@ describe("Adding a product by URL", () => {
     expect(api.sent.filter(({ method }) => method === "POST")).toHaveLength(1);
   });
 
+  it("ignores Enter from the field while the add is on its way", async () => {
+    const api = scripted([]);
+    const fetched = gate();
+    api.on(apiRoutes.addProduct, heldBy(fetched, reply(wire.added, added("Acme X5 kit"), HttpStatus.Created)));
+    const screen = await renderApp(api.client);
+    const field = screen.getByLabelText("Store URL");
+    await field.fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expect.element(screen.getByRole("button", { name: "Adding…" })).toHaveAttribute("aria-disabled", "true");
+    await expect.element(field).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    fetched.release();
+    await expect.element(screen.getByRole("status").filter({ hasText: "Now watching" })).toBeVisible();
+    const adds = api.sent.filter(({ method, path }) => method === "POST" && path === apiRoutes.addProduct.url);
+    expect(adds).toHaveLength(1);
+  });
+
+  it("does not call the URL invalid while fpving is starting, and still describes it with the notice", async () => {
+    const api = scripted([]);
+    api.on(apiRoutes.addProduct, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Starting, "fpving is starting"));
+    const screen = await renderApp(api.client);
+    const field = screen.getByLabelText("Store URL");
+    await field.fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expect.element(screen.getByText("Starting", { exact: true })).toBeVisible();
+    await expect.element(field).toHaveAttribute("aria-invalid", "false");
+    await expect.element(field).toHaveAccessibleDescription("fpving is starting");
+    expect(styleOf(field).borderTopColor).not.toBe(rgb(token("--color-critical")));
+  });
+
   it.each([
     [ApiErrorKind.NoPluginForDomain, HttpStatus.UnprocessableContent, "no plugin handles shop-mirror.example",
+      Role.Alert, "Refused",
       "No installed plugin handles this store (no plugin handles shop-mirror.example). List one in plugins.json, "
       + "then check Plugins."],
     [ApiErrorKind.PluginUnavailable, HttpStatus.UnprocessableContent, "the plugin is not loaded",
-      "The plugin for this store is installed but not loaded. Check Plugins."],
+      Role.Alert, "Refused", "The plugin for this store is installed but not loaded. Check Plugins."],
     [ApiErrorKind.Restarting, HttpStatus.ServiceUnavailable, "restarting",
-      "fpving is restarting its plugins for a settings change. Try again in a moment."],
+      Role.Status, "Restarting", "fpving is restarting its plugins for a settings change. Try again in a moment."],
     [ApiErrorKind.FetchFailed, HttpStatus.BadGateway, "the store could not fetch the page: network",
-      "the store could not fetch the page: network"],
-  ])("explains a %s refusal next to the URL field", async (kind, status, message, shown) => {
+      Role.Alert, "Failed", "the store could not fetch the page: network"],
+  ])("explains a %s refusal next to the URL field", async (kind, status, message, role, tag, shown) => {
     const api = scripted([]);
     api.on(apiRoutes.addProduct, failWith(status, kind, message));
     const screen = await renderApp(api.client);
     const field = screen.getByLabelText("Store URL");
     await field.fill(PAGE);
     await userEvent.keyboard("{Enter}");
-    await expect.element(screen.getByRole("alert")).toHaveTextContent(shown);
-    await expect.element(field).toHaveAttribute("aria-invalid", "true");
+    const tagged = `${tag} ${shown}`;
+    await expect.element(screen.getByRole(role).filter({ hasText: tagged })).toHaveTextContent(tagged);
+    await expect.element(field).toHaveAttribute("aria-invalid", role === Role.Alert ? "true" : "false");
     await expect.element(field).toHaveAccessibleDescription(shown);
+  });
+
+  it("says a restart in a status region that was already there, so it is announced", async () => {
+    const api = scripted([]);
+    api.on(apiRoutes.addProduct, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await renderApp(api.client);
+    const field = screen.getByLabelText("Store URL");
+    await expect.element(field).toBeVisible();
+    const regions = statusRegions();
+    await field.fill(PAGE);
+    await userEvent.keyboard("{Enter}");
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
   });
 
   it("links an already_tracked refusal to the product that already watches the page", async () => {
@@ -215,7 +279,7 @@ describe("Adding a product by URL", () => {
     await screen.getByLabelText("Store URL").fill(PAGE);
     await userEvent.keyboard("{Enter}");
     const alert = screen.getByRole("alert");
-    await expect.element(alert).toHaveTextContent("Already watched as Acme X5 frame");
+    await expect.element(alert).toHaveTextContent("Refused Already watched as Acme X5 frame");
     await expect.element(alert.getByRole("link", { name: "Acme X5 frame" })).toHaveAttribute("href", "/products/p1");
   });
 });

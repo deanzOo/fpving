@@ -6,11 +6,15 @@ import { DEFAULT_SETTINGS, settingsSchema, ThresholdBasis } from "@fpving/core";
 import type { Settings } from "@fpving/core";
 import { describe, expect, it } from "vitest";
 import { QueryKey } from "../src/queries.ts";
-import { failWith, fakeApi, reply, wire } from "./support/fake-api.ts";
+import { failWith, fakeApi, gate, heldBy, reply, Role, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { expectSaidInPlace, rgb, statusRegions, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 const saved = settingsSchema.parse(DEFAULT_SETTINGS);
+const SAVED = "Settings saved.";
 const SIX_HOURS = 6;
+const TWO = 2;
 const VAT_17_5 = 1750;
 const THRESHOLD_150_EUR = 15_000;
 
@@ -46,6 +50,13 @@ describe("Settings", () => {
     await expect.element(screen.getByLabelText("Price drop alert from (%)")).toHaveValue("5.00");
   });
 
+  it.each(["Duty-free threshold", "VAT (%)", "Scan every (hours)", "Price drop alert from (%)"])(
+    "types %s in the readout face", async (label) => {
+      const screen = await open();
+      expect(styleOf(screen.getByLabelText(label, { exact: true })).fontFamily).toContain("Martian Mono");
+    },
+  );
+
   it("offers exactly the values the settings schema allows in each select", async () => {
     const screen = await open();
     const options = (label: string) =>
@@ -67,7 +78,8 @@ describe("Settings", () => {
     await screen.getByLabelText("Duty-free threshold", { exact: true }).fill("150");
     await screen.getByLabelText("Threshold applies to").selectOptions(ThresholdBasis.ItemAndShipping);
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
+    await expect.element(screen.getByRole("status").filter({ hasText: SAVED })).toHaveTextContent(`Done ${SAVED}`);
+    expect(styleOf(screen.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
     const expected: Settings = {
       ...saved, displayCurrency: "USD", shipToCountry: "DE", scanIntervalHours: SIX_HOURS,
       importTax: {
@@ -76,6 +88,32 @@ describe("Settings", () => {
       },
     };
     expect(api.sent).toContainEqual({ method: "PUT", path: apiRoutes.putSettings.url, body: expected });
+  });
+
+  it("keeps the form to half the content width", async () => {
+    const screen = await open();
+    const form = screen.getByLabelText("Ship to").element().closest("form");
+    const half = Number.parseFloat(token("--content-max")) / TWO;
+    expect(form === null ? "" : getComputedStyle(form).maxWidth).toBe(`${String(half)}px`);
+  });
+
+  it("says a restart in a status region that was already there, so it is announced", async () => {
+    const api = scripted();
+    api.on(apiRoutes.putSettings, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await open(api);
+    const regions = statusRegions();
+    await screen.getByRole("button", { name: "Save settings" }).click();
+    await expectSaidInPlace(screen.getByText("Restarting", { exact: true }), regions);
+  });
+
+  it("says Saving… on its button while the settings are on their way", async () => {
+    const api = scripted();
+    const saving = gate();
+    api.on(apiRoutes.putSettings, heldBy(saving, reply(wire.settings, saved)));
+    const screen = await open(api);
+    await screen.getByRole("button", { name: "Save settings" }).click();
+    await expect.element(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute("aria-disabled", "true");
+    saving.release();
   });
 
   it("marks every cached read that depends on the settings stale once saved, so landed costs refresh", async () => {
@@ -87,7 +125,7 @@ describe("Settings", () => {
       screen.queryClient.setQueryData(key, []);
     }
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
+    await expect.element(screen.getByRole("status").filter({ hasText: SAVED })).toHaveTextContent(`Done ${SAVED}`);
     const stale = dependent.map((key) => screen.queryClient.getQueryState(key)?.isInvalidated);
     expect(stale).toEqual([true, true, true]);
   });
@@ -110,11 +148,14 @@ describe("Settings", () => {
   });
 
   it.each([
-    [ApiErrorKind.SettingsNotApplied, "The settings were not applied and the old ones still hold. See the log, then "
-    + "try again."],
-    [ApiErrorKind.Restarting, "fpving is restarting its plugins for a settings change. Try again in a moment."],
-    [ApiErrorKind.ShuttingDown, "fpving is shutting down."],
-  ] satisfies [PlainErrorKind, string][])("explains a %s refusal and saves on retry", async (kind, said) => {
+    [ApiErrorKind.SettingsNotApplied, Role.Alert, "Failed The settings were not applied and the old ones still hold. "
+    + "See the log, then try again."],
+    [ApiErrorKind.Restarting, Role.Status,
+      "Restarting fpving is restarting its plugins for a settings change. Try again in a moment."],
+    [ApiErrorKind.ShuttingDown, Role.Alert, "Refused fpving is shutting down."],
+  ] satisfies [PlainErrorKind, Role, string][])("explains a %s refusal and saves on retry", async (
+    kind, role, said,
+  ) => {
     const api = scripted();
     api.on(apiRoutes.putSettings, () => {
       saveWith(api);
@@ -122,9 +163,9 @@ describe("Settings", () => {
     });
     const screen = await open(api);
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("alert")).toHaveTextContent(said);
+    await expect.element(screen.getByRole(role).filter({ hasText: said })).toHaveTextContent(said);
     await screen.getByRole("button", { name: "Save settings" }).click();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Settings saved.");
+    await expect.element(screen.getByRole("status").filter({ hasText: SAVED })).toHaveTextContent(`Done ${SAVED}`);
     await expect.element(screen.getByRole("alert")).not.toBeInTheDocument();
   });
 });

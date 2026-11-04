@@ -1,0 +1,205 @@
+/* Generated from apps/ui/design/tokens.json by `pnpm tokens`. Do not edit. */
+
+@source inline("type-title type-heading type-body type-control type-small type-readout-lg type-readout type-label type-code chart-tick");
+
+@theme static {
+  --color-*: initial;
+  --color-page: #e9edf0;
+  --color-surface: #f6f8f9;
+  --color-surface-raised: #ffffff;
+  --color-line: #d2d9df;
+  --color-line-strong: #7a8894;
+  --color-ink: #10161b;
+  --color-ink-muted: #4a5763;
+  --color-signal: #006b78;
+  --color-signal-soft: #d8eef0;
+  --color-on-signal: #ffffff;
+  --color-good: #1f7538;
+  --color-good-soft: #dcefe1;
+  --color-warning: #875000;
+  --color-warning-soft: #f6e8cf;
+  --color-critical: #9e2119;
+  --color-critical-soft: #f7dfdc;
+  --color-on-critical: #ffffff;
+  --color-info: #2b589b;
+  --color-info-soft: #dfe7f4;
+  --color-scrim: rgba(16, 22, 27, 0.40);
+  --color-series-1: #0088a1;
+  --color-series-2: #c7692c;
+  --color-series-3: #7652ac;
+  --color-series-4: #b38600;
+  --color-series-5: #bc598c;
+  --color-series-6: #308639;
+  --color-series-7: #2f60b2;
+  --color-series-8: #b54a4b;
+  --color-chart-grid: var(--color-line);
+  --color-chart-axis: var(--color-line-strong);
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --spacing: 4px;
+  --radius-*: initial;
+  --radius-0: 0;
+  --radius-1: 2px;
+  --radius-2: 4px;
+}
+
+:root {
+  color-scheme: light;
+  --shadow-dialog: 0 16px 40px rgba(16, 22, 27, 0.18);
+  --hairline: 1px;
+  --bracket-arm: 8px;
+  --bracket-stroke: 2px;
+  --bracket-gap: 3px;
+  --control-height: 32px;
+  --row-height: 36px;
+  --content-max: 1024px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-page: #0e1216;
+    --color-surface: #141a1f;
+    --color-surface-raised: #1b232a;
+    --color-line: #253039;
+    --color-line-strong: #64737f;
+    --color-ink: #e2e8ec;
+    --color-ink-muted: #93a1ac;
+    --color-signal: #62c3cd;
+    --color-signal-soft: #0f2c33;
+    --color-on-signal: #0e1216;
+    --color-good: #9ddca8;
+    --color-good-soft: #12281a;
+    --color-warning: #ebb552;
+    --color-warning-soft: #2c2312;
+    --color-critical: #ef6f63;
+    --color-critical-soft: #331a1a;
+    --color-on-critical: #0e1216;
+    --color-info: #94b4ea;
+    --color-info-soft: #16223a;
+    --color-scrim: rgba(5, 8, 10, 0.72);
+    --color-series-1: #00a5bc;
+    --color-series-2: #cd753f;
+    --color-series-3: #9372c8;
+    --color-series-4: #b58913;
+    --color-series-5: #c66897;
+    --color-series-6: #47944c;
+    --color-series-7: #4a79c6;
+    --color-series-8: #bb5757;
+    --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-page: #0e1216;
+  --color-surface: #141a1f;
+  --color-surface-raised: #1b232a;
+  --color-line: #253039;
+  --color-line-strong: #64737f;
+  --color-ink: #e2e8ec;
+  --color-ink-muted: #93a1ac;
+  --color-signal: #62c3cd;
+  --color-signal-soft: #0f2c33;
+  --color-on-signal: #0e1216;
+  --color-good: #9ddca8;
+  --color-good-soft: #12281a;
+  --color-warning: #ebb552;
+  --color-warning-soft: #2c2312;
+  --color-critical: #ef6f63;
+  --color-critical-soft: #331a1a;
+  --color-on-critical: #0e1216;
+  --color-info: #94b4ea;
+  --color-info-soft: #16223a;
+  --color-scrim: rgba(5, 8, 10, 0.72);
+  --color-series-1: #00a5bc;
+  --color-series-2: #cd753f;
+  --color-series-3: #9372c8;
+  --color-series-4: #b58913;
+  --color-series-5: #c66897;
+  --color-series-6: #47944c;
+  --color-series-7: #4a79c6;
+  --color-series-8: #bb5757;
+  --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+@utility chart-tick {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+@utility type-title {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility type-heading {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+@utility type-body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+@utility type-control {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+@utility type-small {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+@utility type-readout-lg {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 500;
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+@utility type-readout {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+@utility type-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums slashed-zero;
+  text-transform: uppercase;
+}
+
+@utility type-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums slashed-zero;
+}

@@ -105,5 +105,16 @@ export const gate = () => {
   } };
 };
 
+/** `answer`, given only once `held` opens, so a test sees the pending state first. */
+export const heldBy = (held: { readonly opened: Promise<void> }, answer: Answer): Answer => async () => {
+  await held.opened;
+  return answer();
+};
+
+/** The live region a notice announces through: an alert for a refusal, a status for a restart or an outcome. */
+export const Role = { Alert: "alert", Status: "status" } as const;
+/** One of the {@link Role} values. */
+export type Role = (typeof Role)[keyof typeof Role];
+
 /** A 204 answer. */
 export const noContent: Answer = () => new Response(null, { status: HttpStatus.NoContent });

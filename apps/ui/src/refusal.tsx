@@ -1,8 +1,19 @@
 import { ApiErrorKind } from "@fpving/app/errors";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { AlreadyTrackedFailure } from "./client.ts";
-import type { ApiFailure } from "./client.ts";
+import { AlreadyTrackedFailure, ClientErrorKind, toFailure } from "./client.ts";
+import type { ApiFailure, FailureKind } from "./client.ts";
+import { LINK } from "./ui/link.ts";
+import { Notice, NoticeTone } from "./ui/notice.tsx";
+
+const FAILED: ReadonlySet<FailureKind> = new Set([
+  ApiErrorKind.FetchFailed,
+  ApiErrorKind.SettingsNotApplied,
+  ApiErrorKind.Internal,
+  ...Object.values(ClientErrorKind),
+]);
+
+const QUIET = { tone: NoticeTone.Status, tag: "" } as const;
 
 const RESTARTING = "fpving is restarting its plugins for a settings change. Try again in a moment.";
 
@@ -18,7 +29,7 @@ export const explain = (failure: ApiFailure): ReactNode => {
     const { id, name } = failure.product;
     return (
       <>
-        Already watched as <Link to="/products/$id" params={{ id }} className="underline">{name}</Link>
+        Already watched as <Link to="/products/$id" params={{ id }} className={LINK}>{name}</Link>
       </>
     );
   }
@@ -49,4 +60,37 @@ export const explain = (failure: ApiFailure): ReactNode => {
     default:
       return failure.message;
   }
+};
+
+/**
+ * How a failure's notice looks: a restart or a startup clears by itself, so it is a passing warning; anything else is
+ * critical, tagged Failed when it went wrong and Refused when fpving turned the request down.
+ *
+ * @param failure - The failure.
+ * @returns The notice's tone and tag.
+ */
+export const noticeLook = ({ kind }: ApiFailure) => {
+  if (kind === ApiErrorKind.Restarting) {
+    return { tone: NoticeTone.Warning, tag: "Restarting" };
+  }
+  if (kind === ApiErrorKind.Starting) {
+    return { tone: NoticeTone.Warning, tag: "Starting" };
+  }
+  return { tone: NoticeTone.Critical, tag: FAILED.has(kind) ? "Failed" : "Refused" };
+};
+
+/**
+ * A refused or failed request, explained in a notice under the control that sent it. With no error it holds an empty
+ * status region, so a restart or a startup arriving later is announced; a failure brings its own alert.
+ *
+ * @param props - The error or null, and an id for the explanation when the control is described by it.
+ * @returns The notice.
+ */
+export const Refused = ({ error, id }: { readonly error: unknown; readonly id?: string | undefined }) => {
+  const failure = error === null ? null : toFailure(error);
+  return (
+    <Notice {...(failure === null ? QUIET : noticeLook(failure))} id={id}>
+      {failure === null ? null : explain(failure)}
+    </Notice>
+  );
 };

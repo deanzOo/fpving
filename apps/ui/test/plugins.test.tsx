@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import { fakeApi, reply, wire } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import { expectBadge, rgb, styleOf, token } from "./support/style.ts";
+import "../src/styles.css";
 
 type Row = z.output<typeof wire.plugins>[number];
 
@@ -60,8 +62,8 @@ describe("Plugins", () => {
 
   it("shows a plugin backing off and when it retries", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
-    await expect.element(screen.getByRole("row", { name: /^Mall mall/u }).getByText("Backing off, retrying in 2 hours"))
-      .toBeVisible();
+    const mall = screen.getByRole("row", { name: /^Mall mall/u });
+    await expect.element(mall.getByText(/Backing off, retrying in 2 hours/u)).toBeVisible();
   });
 
   it("shows a loaded plugin's warnings", async () => {
@@ -69,26 +71,58 @@ describe("Plugins", () => {
     const screen = await renderApp(scripted([warned]).client, "/plugins");
     const row = screen.getByRole("row", { name: /^Shop shop/u });
     await expect.element(row.getByText("Loaded", { exact: true })).toBeVisible();
-    await expect.element(row.getByText("Warning (domain_conflict): shop.example is also declared by mall"))
+    await expect.element(row.getByText(/Warning: domain_conflict: shop\.example is also declared by mall/u))
       .toBeVisible();
   });
 
   it("shows a disabled plugin with the reason", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     await expect.element(screen.getByRole("row", { name: /^Old old/u })
-      .getByText("Disabled (sdk_incompatible): needs sdk >=2.0.0")).toBeVisible();
+      .getByText(/Disabled: sdk_incompatible: needs sdk >=2\.0\.0/u)).toBeVisible();
   });
 
   it("shows a rejected plugins.json entry as its own row", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     await expect.element(screen.getByRole("row", { name: /^plugins\.json\[2\]/u })
-      .getByText("Disabled (entry_invalid): path must be a string")).toBeVisible();
+      .getByText(/Disabled: entry_invalid: path must be a string/u)).toBeVisible();
   });
 
   it("shows an unusable plugins.json as a row of its own", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     await expect.element(screen.getByRole("row", { name: /^plugins\.json\b(?!\[)/u })
       .getByText("plugins.json is unusable: not JSON")).toBeVisible();
+  });
+
+  it("shows a loaded plugin as a live status in the signal colour", async () => {
+    const screen = await renderApp(scripted(rows()).client, "/plugins");
+    const loaded = screen.getByRole("row", { name: /^Shop shop/u }).getByText("Loaded", { exact: true });
+    await expect.element(loaded).toBeVisible();
+    expect(styleOf(loaded).color).toBe(rgb(token("--color-signal")));
+  });
+
+  it.each([
+    [/^Old old/u, "Disabled", "✕", "--color-on-critical"],
+    [/^plugins\.json\b(?!\[)/u, "Config invalid", "✕", "--color-on-critical"],
+    [/^Mall mall/u, "Backing off", "↻", "--color-warning"],
+  ])("shows a troubled plugin's state as a badge: %s", async (name, word, glyph, ink) => {
+    const screen = await renderApp(scripted(rows()).client, "/plugins");
+    await expectBadge(screen.getByRole("row", { name }).getByText(word, { exact: true }), glyph, ink);
+  });
+
+  it("shows a loaded plugin's warning as a warning badge with the detail beside it", async () => {
+    const warned = plugin({ issues: [{ kind: DomainConflict, detail: "shop.example is also declared by mall" }] });
+    const screen = await renderApp(scripted([warned]).client, "/plugins");
+    await expectBadge(screen.getByText("Warning", { exact: true }), "▲", "--color-warning");
+    expect(styleOf(screen.getByText("domain_conflict", { exact: true })).fontFamily).toContain("Martian Mono");
+  });
+
+  it("marks stale listings in the warning colour, and none in plain ink", async () => {
+    const screen = await renderApp(scripted(rows()).client, "/plugins");
+    const stale = screen.getByRole("row", { name: /^Shop shop/u }).getByText("3", { exact: true });
+    await expect.element(stale).toBeVisible();
+    expect(styleOf(stale).color).toBe(rgb(token("--color-warning")));
+    const none = screen.getByRole("row", { name: /^Mall mall/u }).getByRole("cell", { name: "0", exact: true });
+    expect(styleOf(none).color).toBe(rgb(token("--color-ink")));
   });
 
   it("says when no plugin is listed", async () => {

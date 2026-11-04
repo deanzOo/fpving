@@ -1,0 +1,106 @@
+import { describe, expect, it, onTestFinished } from "vitest";
+import { page } from "vitest/browser";
+import { render } from "vitest-browser-react";
+import { Button, ButtonSize } from "../../src/ui/button.tsx";
+import { DataTable } from "../../src/ui/data-table.tsx";
+import { rgb, styleOf, token } from "../support/style.ts";
+import "../../src/styles.css";
+
+const ROW_HEIGHT = 36;
+const TWIN_COLUMNS = 2;
+const PHONE = { width: 375, height: 812 } as const;
+const WIDE_CELL = "UnbreakableListingNameWiderThanAPhoneScreenOnItsOwnAndThenSomeMore";
+const ROWS = [
+  { id: "l1", name: "fpv-shop: Source One V5", landed: "€44.40", stock: "In stock" },
+  { id: "l2", name: "quadparts: TBS Source One V5", landed: "€45.90", stock: "Out of stock" },
+] as const;
+
+const table = async (actions = true) => render(
+  <DataTable
+    caption="Listings"
+    rows={ROWS}
+    rowKey={({ id }) => id}
+    rowHeader={{ header: "Listing", cell: ({ name }) => name }}
+    columns={[
+      { header: "Landed cost", numeric: true, cell: ({ landed }) => landed },
+      { header: "Stock", cell: ({ stock }) => stock },
+    ]}
+    actions={actions
+      ? ({ name }) => <Button size={ButtonSize.Small} aria-label={`Remove ${name}`}>Remove</Button>
+      : undefined}
+  />,
+);
+
+describe("Data table", () => {
+  it("scrolls inside its wrapper on a phone, so the page itself never scrolls sideways", async () => {
+    const { width, height } = { width: innerWidth, height: innerHeight };
+    onTestFinished(async () => page.viewport(width, height));
+    await page.viewport(PHONE.width, PHONE.height);
+    await render(
+      <DataTable
+        caption="Listings"
+        rows={ROWS}
+        rowKey={({ id }) => id}
+        rowHeader={{ header: "Listing", cell: () => WIDE_CELL }}
+        columns={[{ header: "Stock", cell: ({ stock }) => stock }]}
+        actions={({ name }) => <Button aria-label={`Remove ${name}`}>Remove</Button>}
+      />,
+    );
+    expect(document.documentElement.scrollWidth).toBe(PHONE.width);
+  });
+
+  it("is a captioned table whose rows are named by their first cell", async () => {
+    const screen = await table();
+    const grid = screen.getByRole("table", { name: "Listings" });
+    await expect.element(grid.getByRole("rowheader", { name: "fpv-shop: Source One V5" })).toBeVisible();
+    await expect.element(grid.getByRole("columnheader", { name: "Landed cost" })).toBeVisible();
+    await expect.element(grid.getByRole("cell", { name: "€45.90" })).toBeVisible();
+  });
+
+  it("right-aligns numbers in the readout face and keeps words left in sans", async () => {
+    const screen = await table();
+    const money = styleOf(screen.getByRole("cell", { name: "€44.40" }));
+    expect(money.textAlign).toBe("right");
+    expect(money.fontFamily).toContain("Martian Mono");
+    const words = styleOf(screen.getByRole("cell", { name: "In stock" }));
+    expect(words.textAlign).toBe("left");
+    expect(words.fontFamily).toContain("IBM Plex Sans");
+    expect(styleOf(screen.getByRole("rowheader", { name: "fpv-shop: Source One V5" })).fontWeight).toBe("500");
+  });
+
+  it("puts uppercase label headers over a strong rule, rows at least 36px", async () => {
+    const screen = await table();
+    const header = styleOf(screen.getByRole("columnheader", { name: "Stock" }));
+    expect(header.textTransform).toBe("uppercase");
+    expect(header.borderBottomColor).toBe(rgb(token("--color-line-strong")));
+    expect(Number.parseFloat(styleOf(screen.getByRole("row").nth(1)).height)).toBeGreaterThanOrEqual(ROW_HEIGHT);
+  });
+
+  it("ends each row with its actions under a header only screen readers see", async () => {
+    const screen = await table();
+    await expect.element(screen.getByRole("columnheader", { name: "Actions" })).toBeInTheDocument();
+    await expect.element(screen.getByRole("button", { name: "Remove quadparts: TBS Source One V5" })).toBeVisible();
+  });
+
+  it("keeps two columns that share a header apart", async () => {
+    const screen = await render(
+      <DataTable
+        caption="Prices"
+        rows={ROWS}
+        rowKey={({ id }) => id}
+        rowHeader={{ header: "Listing", cell: ({ name }) => name }}
+        columns={[
+          { header: "Cost", cell: ({ landed }) => landed },
+          { header: "Cost", cell: ({ stock }) => stock },
+        ]}
+      />,
+    );
+    await expect.element(screen.getByRole("cell", { name: "Out of stock" })).toBeVisible();
+    expect(screen.getByRole("columnheader", { name: "Cost" }).all()).toHaveLength(TWIN_COLUMNS);
+  });
+
+  it("has no actions column when rows have no actions", async () => {
+    const screen = await table(false);
+    await expect.element(screen.getByRole("columnheader", { name: "Actions" })).not.toBeInTheDocument();
+  });
+});

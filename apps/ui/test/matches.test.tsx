@@ -14,14 +14,20 @@ import {
 import type { MatchCandidate } from "@fpving/core";
 import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import {
-  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, noContent, product, reply, wire,
+  alreadyTracked, at, emptyTrend, failWith, fakeApi, gate, heldBy, noContent, product, reply, wire, Role,
 } from "./support/fake-api.ts";
 import { renderApp } from "./support/render-app.tsx";
+import {
+  expectBadge, expectEmptyRegionsTakeNoRoom, expectSaidInPlace, rgb, statusRegions, styleOf, token,
+} from "./support/style.ts";
+import "../src/styles.css";
 
 const FRAME = "p1";
 const KIT = "p2";
 const SIMILAR = 0.87;
+const NONE = "none";
 
 const candidate = (id: string, productId: string, overrides: Partial<MatchCandidate> = {}): MatchCandidate => ({
   id: matchCandidateIdSchema.parse(id),
@@ -78,9 +84,79 @@ describe("Match review", () => {
     const frame = group(screen, "Acme X5 frame");
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" }))
       .toHaveAttribute("href", "https://mall.example/c1");
-    await expect.element(frame.getByText("Same product: same model and size")).toBeVisible();
+    await expect.element(frame.getByText(/Same product: same model and size/u)).toBeVisible();
     await expect.element(frame.getByText("87% similar, on mall")).toBeVisible();
     await expect.element(group(screen, "Acme X5 kit").getByText("Not judged yet")).toBeVisible();
+  });
+
+  it.each([
+    [LlmVerdict.Same, "Same product", "✓", "--color-good"],
+    [LlmVerdict.Variant, "A variant", "≈", "--color-info"],
+    [LlmVerdict.Different, "Different product", "≠", "--color-ink-muted"],
+    [LlmVerdict.Unjudged, "Not judged yet", "?", "--color-ink-muted"],
+  ])("shows a %s verdict as a badge: its words, its glyph and its colour", async (llmVerdict, words, glyph, ink) => {
+    const llmReason = llmVerdict === LlmVerdict.Unjudged ? null : "same model and size";
+    const screen = await renderApp(scripted([candidate("c1", FRAME, { llmVerdict, llmReason })]).client, "/matches");
+    await screen.getByRole("checkbox", { name: "Show candidates judged different" }).click();
+    await expectBadge(group(screen, "Acme X5 frame").getByText(words, { exact: true }), glyph, ink);
+  });
+
+  it("dashes the not judged badge, and only that one", async () => {
+    const screen = await renderApp(scripted([
+      candidate("c1", FRAME),
+      candidate("c2", FRAME, { llmVerdict: LlmVerdict.Unjudged, llmReason: null }),
+    ]).client, "/matches");
+    const border = (words: string) => {
+      const badge = group(screen, "Acme X5 frame").getByText(words, { exact: true }).element().parentElement;
+      return badge === null ? "" : getComputedStyle(badge).borderTopStyle;
+    };
+    await expect.element(group(screen, "Acme X5 frame").getByText("Not judged yet", { exact: true })).toBeVisible();
+    expect(border("Not judged yet")).toBe("dashed");
+    expect(border("Same product")).toBe("solid");
+  });
+
+  it("frames the first candidate waiting for review, and only that one", async () => {
+    const screen = await renderApp(
+      scripted([candidate("c1", FRAME), candidate("c2", FRAME)], [candidate("c3", KIT)]).client, "/matches",
+    );
+    const framed = (name: string) => {
+      const item = screen.getByRole("listitem").filter({ hasText: name });
+      const parts = [...item.element().querySelectorAll("*")];
+      return parts.some((part) => getComputedStyle(part, "::after").content !== NONE);
+    };
+    await expect.element(screen.getByRole("link", { name: "Acme X5 c3" })).toBeVisible();
+    expect([framed("Acme X5 c1"), framed("Acme X5 c2"), framed("Acme X5 c3")]).toEqual([true, false, false]);
+  });
+
+  it("says Accepting… on the accepted candidate while it is on its way, holding its reject button", async () => {
+    const api = scripted([candidate("c1", FRAME)]);
+    const accepting = gate();
+    const added = reply(wire.addedListing, accepted, HttpStatus.Created);
+    api.on(at(apiRoutes.acceptCandidate, { candidateId: "c1" }), heldBy(accepting, added));
+    const screen = await renderApp(api.client, "/matches");
+    await screen.getByRole("button", { name: "Accept Acme X5 c1" }).click();
+    await expect.element(screen.getByRole("button", { name: "Accepting Acme X5 c1" })).toHaveTextContent("Accepting…");
+    const reject = screen.getByRole("button", { name: "Reject Acme X5 c1" });
+    await expect.element(reject).toHaveTextContent("Reject");
+    await expect.element(reject).toHaveAttribute("aria-disabled", "true");
+    accepting.release();
+  });
+
+  it("says Rejecting… on the rejected candidate while it is on its way", async () => {
+    const api = scripted([candidate("c1", FRAME)]);
+    const rejecting = gate();
+    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), heldBy(rejecting, noContent));
+    const screen = await renderApp(api.client, "/matches");
+    await screen.getByRole("button", { name: "Reject Acme X5 c1" }).click();
+    await expect.element(screen.getByRole("button", { name: "Rejecting Acme X5 c1" })).toHaveTextContent("Rejecting…");
+    rejecting.release();
+  });
+
+  it("sets the similarity in the readout face", async () => {
+    const screen = await renderApp(scripted([candidate("c1", FRAME)]).client, "/matches");
+    const similar = group(screen, "Acme X5 frame").getByText("87%", { exact: true });
+    await expect.element(similar).toBeVisible();
+    expect(styleOf(similar).fontFamily).toContain("Martian Mono");
   });
 
   it("hides candidates judged different until asked to show them", async () => {
@@ -92,7 +168,7 @@ describe("Match review", () => {
     const toggle = screen.getByRole("checkbox", { name: "Show candidates judged different" });
     await expect.element(toggle).not.toBeChecked();
     await toggle.click();
-    await expect.element(frame.getByText("Different product: another frame size")).toBeVisible();
+    await expect.element(frame.getByText(/Different product: another frame size/u)).toBeVisible();
     await toggle.click();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c2" })).not.toBeInTheDocument();
   });
@@ -112,7 +188,7 @@ describe("Match review", () => {
     const screen = await renderApp(api.client, "/matches");
     await screen.getByRole("button", { name: "Accept Acme X5 c1" }).click();
     await expect.element(screen.getByRole("status").filter({ hasText: "Added" }))
-      .toHaveTextContent("Added Acme X5 c1 to Acme X5 frame.");
+      .toHaveTextContent("Done Added Acme X5 c1 to Acme X5 frame.");
     await expect.element(screen.getByRole("link", { name: "Acme X5 c1" })).not.toBeInTheDocument();
   });
 
@@ -129,7 +205,9 @@ describe("Match review", () => {
     await expect.element(frame.getByRole("listitem")).toHaveFocus();
     await frame.getByRole("button", { name: "Reject Acme X5 c2" }).click();
     await expect.element(frame.getByRole("heading", { level: 2, name: "Acme X5 frame" })).toHaveFocus();
-    await expect.element(frame.getByRole("status")).toHaveTextContent("Rejected Acme X5 c2.");
+    await expect.element(frame.getByRole("status").filter({ hasText: "Rejected" }))
+      .toHaveTextContent("Done Rejected Acme X5 c2.");
+    expect(styleOf(frame.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
   });
 
   it("rejects a candidate and drops it from the queue", async () => {
@@ -161,8 +239,112 @@ describe("Match review", () => {
       .toHaveAttribute("aria-disabled", "true");
     searched.release();
     await expect.element(frame.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
-    await expect.element(frame.getByRole("status"))
-      .toHaveTextContent("Saved 1 candidates. The search failed on bazaar (blocked).");
+    await expect.element(frame.getByRole("status").filter({ hasText: "Saved" }))
+      .toHaveTextContent("Partial Saved 1 candidates. The search failed on bazaar (blocked).");
+  });
+
+  const blocked = { pluginId: pluginIdSchema.parse("bazaar"), error: { kind: StoreErrorKind.Blocked, detail: "no" } };
+
+  const searchWith = async (saved: MatchCandidate[], failedSearches: (typeof blocked)[]) => {
+    const api = scripted([]);
+    api.on(at(apiRoutes.findMatches, { productId: FRAME }), reply(wire.found, {
+      candidates: saved, failedSearches, foreignResults: [],
+    }));
+    const screen = await renderApp(api.client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    await frame.getByRole("button", { name: "Find matches" }).click();
+    return frame;
+  };
+
+  it.each([
+    ["find matches", at(apiRoutes.findMatches, { productId: FRAME }), "Find matches"],
+    ["accept", at(apiRoutes.acceptCandidate, { candidateId: "c1" }), "Accept Acme X5 c1"],
+    ["reject", at(apiRoutes.rejectCandidate, { candidateId: "c1" }), "Reject Acme X5 c1"],
+  ])("says a restart on %s in a status region that was already there", async (_action, route, name) => {
+    const api = scripted([candidate("c1", FRAME)]);
+    api.on(route, failWith(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, "restarting"));
+    const screen = await renderApp(api.client, "/matches");
+    const button = group(screen, "Acme X5 frame").getByRole("button", { name });
+    await expect.element(button).toBeVisible();
+    const regions = statusRegions();
+    await button.click();
+    await expectSaidInPlace(group(screen, "Acme X5 frame").getByText("Restarting", { exact: true }), regions);
+  });
+
+  it("after a keyboard review, outlines the row it lands on but not the heading", async () => {
+    const api = scripted([candidate("c1", FRAME), candidate("c2", FRAME)]);
+    api.on(at(apiRoutes.rejectCandidate, { candidateId: "c1" }), () => {
+      api.on(at(apiRoutes.listCandidates, { productId: FRAME }), reply(wire.candidates, [candidate("c2", FRAME)]));
+      return noContent();
+    });
+    rejectedLeaving(api, "c2");
+    const screen = await renderApp(api.client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    const press = async (name: string) => {
+      const button = frame.getByRole("button", { name });
+      await expect.element(button).toBeVisible();
+      button.element().focus();
+      await userEvent.keyboard("{Enter}");
+    };
+    await press("Reject Acme X5 c1");
+    const row = frame.getByRole("listitem");
+    await expect.element(row).toHaveFocus();
+    expect(row.element().matches(":focus-visible")).toBe(true);
+    expect(styleOf(row).outlineStyle).toBe("solid");
+    await press("Reject Acme X5 c2");
+    const heading = frame.getByRole("heading", { level: 2, name: "Acme X5 frame" });
+    await expect.element(heading).toHaveFocus();
+    expect(heading.element().matches(":focus-visible")).toBe(true);
+    expect(styleOf(heading).outlineStyle).toBe("none");
+  });
+
+  it("leaves no gap for the empty notice regions around a candidate", async () => {
+    const screen = await renderApp(scripted([candidate("c1", FRAME)]).client, "/matches");
+    await expect.element(screen.getByRole("link", { name: "Acme X5 c1" })).toBeVisible();
+    expectEmptyRegionsTakeNoRoom();
+  });
+
+  it("keeps saying a later outcome in its status region after a failed search", async () => {
+    const api = scripted([candidate("c1", FRAME)]);
+    api.on(at(apiRoutes.findMatches, { productId: FRAME }), reply(wire.found, {
+      candidates: [],
+      failedSearches: [
+        { pluginId: pluginIdSchema.parse("bazaar"), error: { kind: StoreErrorKind.Blocked, detail: "no" } },
+      ],
+      foreignResults: [],
+    }));
+    rejectedLeaving(api, "c1");
+    const screen = await renderApp(api.client, "/matches");
+    const frame = group(screen, "Acme X5 frame");
+    await frame.getByRole("button", { name: "Find matches" }).click();
+    await expect.element(frame.getByRole("alert")).toBeVisible();
+    const regions = statusRegions();
+    await frame.getByRole("button", { name: "Reject Acme X5 c1" }).click();
+    await expectSaidInPlace(frame.getByText("Done", { exact: true }), regions);
+  });
+
+  it("says Done, in the status tone, when no search failed", async () => {
+    const frame = await searchWith([candidate("c1", FRAME)], []);
+    await expect.element(frame.getByRole("status").filter({ hasText: "Saved" })).toHaveTextContent(
+      "Done Saved 1 candidates.",
+    );
+    expect(styleOf(frame.getByText("Done", { exact: true })).color).toBe(rgb(token("--color-ink-muted")));
+  });
+
+  it("says Partial, as a warning, when some candidates were saved and a search failed", async () => {
+    const frame = await searchWith([candidate("c1", FRAME)], [blocked]);
+    await expect.element(frame.getByRole("status").filter({ hasText: "Saved" })).toHaveTextContent(
+      "Partial Saved 1 candidates. The search failed on bazaar (blocked).",
+    );
+    expect(styleOf(frame.getByText("Partial", { exact: true })).color).toBe(rgb(token("--color-warning")));
+  });
+
+  it("says Failed, as an alert, when nothing was saved and a search failed", async () => {
+    const frame = await searchWith([], [blocked]);
+    await expect.element(frame.getByRole("alert")).toHaveTextContent(
+      "Failed Saved 0 candidates. The search failed on bazaar (blocked).",
+    );
+    expect(styleOf(frame.getByText("Failed", { exact: true })).color).toBe(rgb(token("--color-critical")));
   });
 
   it("says when no candidate is waiting for review", async () => {
@@ -193,7 +375,7 @@ describe("Match review", () => {
     const screen = await renderApp(api.client, "/matches");
     const button = screen.getByRole("button", { name: `${action === "accept" ? "Accept" : "Reject"} Acme X5 c1` });
     await button.click();
-    await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(said);
+    await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(`Refused ${said}`);
     await expect.element(button).toHaveFocus();
   });
 
@@ -207,20 +389,23 @@ describe("Match review", () => {
   });
 
   it.each([
-    [HttpStatus.Conflict, ApiErrorKind.AlreadySuggested,
-      "Another search saved candidates for this product meanwhile. Search again."],
-    [HttpStatus.Conflict, ApiErrorKind.NoSourceListing,
-      "This product has no listing added by URL to search from. Add one first."],
-    [HttpStatus.NotFound, ApiErrorKind.ProductNotFound, "This product is not watched any more."],
-    [HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting,
-      "fpving is restarting its plugins for a settings change. Try again in a moment."],
-  ] satisfies [number, PlainErrorKind, string][])("explains a refused search: %d %s", async (status, kind, said) => {
+    [HttpStatus.Conflict, ApiErrorKind.AlreadySuggested, Role.Alert,
+      "Refused Another search saved candidates for this product meanwhile. Search again."],
+    [HttpStatus.Conflict, ApiErrorKind.NoSourceListing, Role.Alert,
+      "Refused This product has no listing added by URL to search from. Add one first."],
+    [HttpStatus.NotFound, ApiErrorKind.ProductNotFound, Role.Alert, "Refused This product is not watched any more."],
+    [HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, Role.Status,
+      "Restarting fpving is restarting its plugins for a settings change. Try again in a moment."],
+  ] satisfies [number, PlainErrorKind, Role, string][])("explains a refused search: %d %s", async (
+    status, kind, role, said,
+  ) => {
     const api = scripted([]);
     api.on(at(apiRoutes.findMatches, { productId: FRAME }), failWith(status, kind, "refused"));
     const screen = await renderApp(api.client, "/matches");
     const find = group(screen, "Acme X5 frame").getByRole("button", { name: "Find matches" });
     await find.click();
-    await expect.element(group(screen, "Acme X5 frame").getByRole("alert")).toHaveTextContent(said);
+    const told = group(screen, "Acme X5 frame").getByRole(role).filter({ hasText: said });
+    await expect.element(told).toHaveTextContent(said);
     await expect.element(find).toHaveFocus();
   });
 });
