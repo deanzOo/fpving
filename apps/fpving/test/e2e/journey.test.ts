@@ -5,14 +5,14 @@ import { LlmVerdict, ok } from "@fpving/core";
 import { fakeCurrencyRates, fakeLlmJudge, fakeNotifier } from "@fpving/core/testing";
 import { chromium } from "playwright";
 import type { ConsoleMessage, Page } from "playwright";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { startApp } from "../../src/app/start.ts";
 import { PLUGINS_FILE } from "../../src/plugins/config.ts";
 import { freePort, FX } from "../support/app-fixtures.ts";
-import { FIXTURE_PLUGIN_DIR, localHttpClient, ORIGIN_ENV } from "../support/fixture-gateway.ts";
+import { FIXTURE_PLUGIN_DIR, localHttpClient } from "../support/fixture-gateway.ts";
 import { startLocalServer } from "../support/local-server.ts";
 import type { LocalServer } from "../support/local-server.ts";
-import { fixturePlugin, spawnSourceWorker } from "../support/plugin-workers.ts";
+import { fixturePlugin, spawnSourceWorkerAt } from "../support/plugin-workers.ts";
 
 const STEP_TIMEOUT_MS = 30_000;
 const DROPPED_PRICE_MINOR = 1499;
@@ -100,8 +100,6 @@ beforeAll(async () => {
   cleanups.push(async () => rm(root, { recursive: true, force: true, maxRetries: RM_RETRIES }));
   const server = await startLocalServer();
   cleanups.push(async () => server.close());
-  vi.stubEnv(ORIGIN_ENV, server.origin);
-  cleanups.push(async () => Promise.resolve(vi.unstubAllEnvs()));
   const dataDir = join(root, "data");
   await mkdir(dataDir);
   const plugins = [fixturePlugin(Store.SourcePlugin), { path: FIXTURE_PLUGIN_DIR }];
@@ -109,7 +107,13 @@ beforeAll(async () => {
   const notifier = fakeNotifier();
   const started = await startApp(
     { PORT: String(await freePort()), DATA_DIR: dataDir },
-    { llm, rates: fakeCurrencyRates(ok(RATES)), notifier, http: localHttpClient(), spawn: spawnSourceWorker },
+    {
+      llm,
+      rates: fakeCurrencyRates(ok(RATES)),
+      notifier,
+      http: localHttpClient(),
+      spawn: spawnSourceWorkerAt(server.origin),
+    },
   );
   if (!started.ok) {
     throw new Error(started.error.message);

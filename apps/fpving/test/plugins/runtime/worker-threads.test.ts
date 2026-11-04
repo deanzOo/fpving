@@ -1,6 +1,6 @@
 import { pluginIdSchema } from "@fpving/core";
 import { err, ok, StoreErrorKind } from "@fpving/plugin-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PluginEntry } from "../../../src/plugins/config.ts";
 import { startPluginHost } from "../../../src/plugins/runtime/host.ts";
 import type { PluginHost } from "../../../src/plugins/runtime/host.ts";
@@ -16,6 +16,7 @@ const CAPABLE = pluginIdSchema.parse("capable-shop");
 const GARBAGE = pluginIdSchema.parse("garbage-shop");
 const HANGING = pluginIdSchema.parse("hanging-shop");
 const CRASHING = pluginIdSchema.parse("crashing-shop");
+const READS_ENV = pluginIdSchema.parse("env-shop");
 
 const startReal = (entries: readonly PluginEntry[], callTimeoutMs = CALL_TIMEOUT_MS) => {
   const { services, mocks } = fakeServices();
@@ -143,5 +144,20 @@ describe("Plugin worker failures on real threads", () => {
     expect(await host.fetchListing(CRASHING, "https://crashing.example/p/1")).toEqual(
       err({ kind: StoreErrorKind.Network, detail: "the plugin host is shut down" }),
     );
+  });
+});
+
+describe("Plugin worker environment", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("gives a plugin none of the host's environment, so a host secret never reaches it", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "host-secret");
+    const { host } = startReal([fixturePlugin("reads-env")]);
+    const started = await host;
+    const listing = await started.fetchListing(READS_ENV, "https://env.example/p/1");
+    await started.shutdown();
+    expect(listing.ok && listing.value.title).toBe("Variables: none");
   });
 });
