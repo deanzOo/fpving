@@ -4,6 +4,7 @@ import {
   createServer,
   GuardRefusal,
   CLIENT_ERROR,
+  CONTENT_SECURITY_POLICY,
   INTERNAL_ERROR,
   MAX_REQUEST_BODY_BYTES,
   NO_ROUTE,
@@ -192,6 +193,19 @@ describe("HTTP server shell", () => {
       ]);
       expect(loggedFailure.safeParse(logger.events[0]?.fields).success).toBe(true);
     });
+
+    it.each(["/%zz", "/%E0%A4%A", "/api/%zz"])(
+      "answers the malformed percent-escape %s with 400 in the error envelope and the security headers",
+      async (url) => {
+        const response = await server.inject({ method: "GET", url, headers: { host: LOCAL } });
+        expect(response.statusCode).toBe(BAD_REQUEST);
+        expect(apiErrorSchema.parse(response.json()).error.kind).toBe(ApiErrorKind.InvalidRequest);
+        expect(response.headers["content-security-policy"]).toBe(CONTENT_SECURITY_POLICY);
+        expect(response.headers["x-content-type-options"]).toBe("nosniff");
+        expect(response.headers["referrer-policy"]).toBe("no-referrer");
+        expect(response.headers["content-type"]).toContain("application/json");
+      },
+    );
 
     it("answers an unknown route with 404 in the error envelope", async () => {
       const response = await server.inject({ method: "GET", url: "/api/nope", headers: { host: LOCAL } });

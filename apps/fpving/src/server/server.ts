@@ -64,6 +64,7 @@ const READ_METHODS: readonly string[] = ["GET", "HEAD", "OPTIONS"];
 const HTTP_SCHEME = "http://";
 const CROSS_SITE_FETCHES: readonly string[] = ["cross-site", "same-site"];
 const FASTIFY_ERROR_CODE = "FST_";
+const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 
 /** What {@link createServer} needs. */
 export interface ServerOptions {
@@ -98,8 +99,9 @@ const clientErrorSchema = z.object({
  * `cross-site` or `same-site`; one with neither, such as from curl, is served. No CORS header is ever sent. Bodies
  * over {@link MAX_REQUEST_BODY_BYTES} get 413. A 4xx error Fastify raised (validation, body limit, content type)
  * answers its message; another 4xx keeps its status, answers {@link CLIENT_ERROR} and logs its message; any other
- * error answers 500 with {@link INTERNAL_ERROR} and logs it. An unknown path answers 404. Every refusal is an
- * {@link apiError} envelope.
+ * error answers 500 with {@link INTERNAL_ERROR} and logs it. An unknown path answers 404. A malformed percent-escape
+ * in the path answers 400 before any route or guard runs, since no route can be found for it and the answer reveals
+ * nothing. Every refusal is an {@link apiError} envelope.
  *
  * @param options - The port, the logger, the readiness check and the UI folder.
  * @returns The server, not yet listening.
@@ -107,7 +109,14 @@ const clientErrorSchema = z.object({
 export const createServer = (options: ServerOptions) => {
   const { port, logger, isReady, openWhileStarting, uiRoot } = options;
   const allowedHosts: readonly string[] = LOCAL_HOSTNAMES.map((name) => `${name}:${String(port)}`);
-  const server = fastify({ logger: false, bodyLimit: MAX_REQUEST_BODY_BYTES }).withTypeProvider<ZodTypeProvider>();
+  const server = fastify({
+    logger: false,
+    bodyLimit: MAX_REQUEST_BODY_BYTES,
+    frameworkErrors: (error, _request, reply) => {
+      reply.raw.writeHead(HttpStatus.BadRequest, { ...SECURITY_HEADERS, "content-type": JSON_CONTENT_TYPE })
+        .end(JSON.stringify(apiError(ApiErrorKind.InvalidRequest, error.message)));
+    },
+  }).withTypeProvider<ZodTypeProvider>();
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
   server.addHook("onRequest", async (request, reply) => {
