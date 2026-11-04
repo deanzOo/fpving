@@ -34,6 +34,11 @@ const SHAPE_CLASS = String.raw`\brounded-|\bshadow-`;
 const SHAPE_MESSAGE = "Design system shape rule: radius or shadow class. No pills, and the one shadow is on Confirm. "
   + "Use a primitive, which carries its radius, or extend one.";
 
+const BARE_SHADOW_CLASS = String.raw`(?:^|[\s:!])(?:drop-)?shadow(?:$|[\s!])`;
+
+const LITERAL_PAINT_MESSAGE = "Design system rule 1 (only tokens): literal fill or stroke. "
+  + "Pass a token in an expression, such as a prop from apps/ui/src/ui/chart-theme.tsx.";
+
 const INLINE_STYLE_MESSAGE = "Design system rule 1 (only tokens): inline style outside apps/ui/src/ui. "
   + "Use a token or type-* utility, or extend a primitive.";
 
@@ -64,10 +69,25 @@ export const UI_CLASS_RULES = [
   { pattern: SHAPE_CLASS, message: SHAPE_MESSAGE },
 ] as const;
 
+/** The class patterns banned in a stylesheet's `@apply`, where every class is a whole token. */
+export const UI_APPLY_RULES = [...UI_CLASS_RULES, { pattern: BARE_SHADOW_CLASS, message: SHAPE_MESSAGE }] as const;
+
 /** The `no-restricted-syntax` entries for `apps/ui/src` outside the primitives in `apps/ui/src/ui`. */
 export const uiScreenGuards = [
   ...uiSourceGuards,
   ...UI_CLASS_RULES.flatMap(({ pattern, message }) => stringGuard(pattern, message)),
+  {
+    selector: `JSXAttribute[name.name="className"] Literal[value=/${BARE_SHADOW_CLASS}/]`,
+    message: SHAPE_MESSAGE,
+  },
+  {
+    selector: `JSXAttribute[name.name="className"] TemplateElement[value.raw=/${BARE_SHADOW_CLASS}/]`,
+    message: SHAPE_MESSAGE,
+  },
+  {
+    selector: "JSXAttribute[name.name=/^(?:fill|stroke)$/][value.type=\"Literal\"]",
+    message: LITERAL_PAINT_MESSAGE,
+  },
   { selector: "JSXAttribute[name.name=\"style\"]", message: INLINE_STYLE_MESSAGE },
   ...Object.entries(PRIMITIVE_FOR_NATIVE).map(([element, primitive]) => ({
     selector: `JSXOpeningElement[name.name="${element}"]`,

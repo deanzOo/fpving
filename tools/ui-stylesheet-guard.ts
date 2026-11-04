@@ -1,6 +1,6 @@
 import { glob, readFile } from "node:fs/promises";
 import { join, sep } from "node:path";
-import { RAW_COLOUR, RAW_COLOUR_MESSAGE, UI_CLASS_RULES } from "./ui-guards.ts";
+import { RAW_COLOUR, RAW_COLOUR_MESSAGE, UI_APPLY_RULES } from "./ui-guards.ts";
 
 const GENERATED_TOKENS = "tokens.css";
 const PRIMITIVES = `ui${sep}`;
@@ -11,7 +11,7 @@ const matches = (text: string, pattern: string): string[] =>
   [...text.matchAll(new RegExp(pattern, GLOBAL_IGNORE_CASE))].map(([found]) => found.trim());
 
 const appliedClassFindings = (css: string): string[] =>
-  (css.match(APPLY) ?? []).flatMap((rule) => rule.split(/\s+/u).slice(1)).flatMap((name) => UI_CLASS_RULES
+  (css.match(APPLY) ?? []).flatMap((rule) => rule.split(/\s+/u).slice(1)).flatMap((name) => UI_APPLY_RULES
     .filter(({ pattern }) => matches(name, pattern).length > 0)
     .map(({ message }) => `${name}: ${message}`));
 

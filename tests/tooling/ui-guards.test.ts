@@ -49,7 +49,7 @@ describe("Design system guards", () => {
       ["a hex value in a primitive", "export const c = \"#ff0000\";\n", PRIMITIVE_TS],
       ["an arbitrary hex class in a primitive", classOn("bg-[#ff0000]"), PRIMITIVE_TSX],
     ])("rejects %s and names the rule and the token to use", async (_case, code, filePath) => {
-      const [message] = await guardMessages(code, filePath);
+      const message = (await guardMessages(code, filePath)).join();
       expect(message).toContain("Design system rule 1");
       expect(message).toContain("tokens.json");
     });
@@ -236,6 +236,53 @@ describe("Design system guards", () => {
     });
   });
 
+  describe("Bare shadows", () => {
+    it.each([
+      ["shadow", classOn("shadow")],
+      ["drop-shadow", classOn("drop-shadow")],
+      ["shadow among other classes", classOn("flex shadow type-body")],
+      ["shadow behind a variant", classOn("hover:shadow")],
+      ["shadow in a template", "export const v = (n: string) => <div className={`shadow ${n}`} />;\n"],
+      ["shadow after a template hole", "export const v = (n: string) => <div className={`${n} drop-shadow`} />;\n"],
+      ["shadow in a conditional", "export const v = (n: boolean) => <div className={n ? \"shadow\" : \"\"} />;\n"],
+    ])("rejects %s in a screen and names the rule and what to use", async (_case, code) => {
+      const [message] = await guardMessages(code, SCREEN_TSX);
+      expect(message).toContain("Design system shape rule");
+      expect(message).toContain("primitive");
+    });
+
+    it("accepts the word shadow in copy", async () => {
+      const code = "export const v = <input aria-label=\"shadow\" className=\"type-body\" />;\n";
+      expect(await guardMessages(code, PRIMITIVE_TSX)).toEqual([]);
+      expect(await guardMessages("export const c = \"shadow\";\n", SCREEN_TS)).toEqual([]);
+    });
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages(classOn("shadow"), PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
+  describe("Literal fill and stroke", () => {
+    it.each([
+      ["a named fill", "export const v = <path fill=\"red\" />;\n"],
+      ["a named stroke", "export const v = <path stroke=\"blue\" />;\n"],
+      ["a literal variable", "export const v = <path stroke=\"var(--color-ink)\" />;\n"],
+    ])("rejects %s in a screen and names the rule and what to use", async (_case, code) => {
+      const [message] = await guardMessages(code, SCREEN_TSX);
+      expect(message).toContain("Design system rule 1");
+      expect(message).toContain("chart-theme.tsx");
+    });
+
+    it("accepts a value in an expression in a screen", async () => {
+      const code = "declare const color: string;\nexport const v = <path fill={color} stroke={color} />;\n";
+      expect(await guardMessages(code, SCREEN_TSX)).toEqual([]);
+    });
+
+    it("does not apply to a primitive", async () => {
+      expect(await guardMessages("export const v = <path fill=\"none\" />;\n", PRIMITIVE_TSX)).toEqual([]);
+    });
+  });
+
   describe("Inline styles", () => {
     it.each([
       ["a colour", "{ color: \"red\" }"],
@@ -274,7 +321,8 @@ describe("Design system guards", () => {
       expect(findings.filter((finding) => /^(?:tokens|clean)\.css/u.test(finding))).toEqual([]);
     });
 
-    it.each(["text-sm", "font-bold", "opacity-50", "text-red-500", "bg-[red]", "[color:red]", "rounded-full"])(
+    it.each(["text-sm", "font-bold", "opacity-50", "text-red-500", "bg-[red]", "[color:red]", "rounded-full",
+      "drop-shadow"])(
       "reports %s in an @apply, with the rule and what to use",
       async (banned) => {
         const findings = await stylesheetFindings(STYLESHEET_FIXTURES);

@@ -13,3 +13,7 @@
 .applied {
   @apply text-sm font-bold opacity-50 text-red-500 bg-[red] [color:red] rounded-full;
 }
+
+.bare {
+  @apply drop-shadow;
+}

@@ -65,7 +65,8 @@ Lint, in `eslint.config.ts` with the patterns and messages in `tools/ui-guards.t
 | JSX `<button>`, `<input>`, `<select>`, `<textarea>`, `<table>`, `<dialog>` | Outside `ui/` | The primitive the message names |
 | `opacity-*` classes | Outside `ui/` | `aria-disabled` and a changed label, through `Button` |
 | `text-xs` through `text-9xl`, every font weight, `leading-*` and `tracking-*` | Outside `ui/` | A `type-*` utility |
-| `rounded-*` and `shadow-*`: no pills, and the one shadow is on `Confirm` | Outside `ui/` | A primitive, which carries its radius |
+| `rounded-*`, `shadow-*`, and a bare `shadow` or `drop-shadow` written in a `className`: no pills, and the one shadow is on `Confirm` | Outside `ui/` | A primitive, which carries its radius |
+| A literal `fill` or `stroke` prop, such as `fill="red"` | Outside `ui/` | A token in an expression, such as a prop from `chart-theme.tsx` |
 | The `style` prop | Outside `ui/` | A token or `type-*` utility, or a primitive |
 
 Variants such as `has-[p]:mt-2` and arbitrary layout sizes such as `w-[137px]` stay allowed.
