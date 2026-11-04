@@ -303,6 +303,31 @@ describe("Plain HTTP access for plugins", () => {
   const credentialsSent = (init: RequestInit | undefined): (string | null)[] =>
     ["authorization", "proxy-authorization", "cookie"].map((name) => headerOf(init, name));
 
+  it("sends only accept, accept-language and the user agent past a redirect to another origin", async () => {
+    const { client, requests } = replying(redirectTo("https://cdn.example/b"), () => new Response("ok"));
+    await client.get("https://shop.example/a", {
+      headers: { "accept": "text/html", "accept-language": "he", "x-api-key": "secret", "x-shop": "1" },
+    });
+    expect([...new Headers(requests[1]?.init.headers).keys()].sort())
+      .toEqual(["accept", "accept-language", "user-agent"]);
+  });
+
+  it("does not send a custom header again when a redirect comes back to the first origin", async () => {
+    const { client, requests } = replying(
+      redirectTo("https://cdn.example/b"),
+      redirectTo("https://shop.example/c"),
+      () => new Response("ok"),
+    );
+    await client.get("https://shop.example/a", { headers: { "x-api-key": "secret" } });
+    expect(headerOf(requests.at(-1)?.init, "x-api-key")).toBeNull();
+  });
+
+  it("keeps a custom header on a redirect to the same origin", async () => {
+    const { client, requests } = replying(redirectTo("/b"), () => new Response("ok"));
+    await client.get("https://shop.example/a", { headers: { "x-api-key": "secret" } });
+    expect(headerOf(requests[1]?.init, "x-api-key")).toBe("secret");
+  });
+
   it("keeps the plugin's credentials on a redirect to the same origin", async () => {
     const { client, requests } = replying(redirectTo("/b"), () => new Response(""));
     await client.get("https://shop.example/a", { headers: CREDENTIALS });
@@ -329,11 +354,5 @@ describe("Plain HTTP access for plugins", () => {
     const chain = ["https://shop.example/a", "https://other.example/b", "https://shop.example/c"];
     expect(requests.map(({ url }) => url)).toEqual(chain);
     expect(credentialsSent(requests.at(-1)?.init)).toEqual([null, null, null]);
-  });
-
-  it("forwards a custom header such as x-api-key on a redirect to another origin, as fetch does", async () => {
-    const { client, requests } = replying(redirectTo("https://other.example/b"), () => new Response(""));
-    await client.get("https://shop.example/a", { headers: { "x-api-key": "k" } });
-    expect(headerOf(requests[1]?.init, "x-api-key")).toBe("k");
   });
 });
