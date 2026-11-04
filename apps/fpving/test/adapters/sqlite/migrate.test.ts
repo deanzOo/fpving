@@ -133,7 +133,7 @@ describe("SQLite migrations", () => {
     migrate(path);
     const before = readFileSync(path);
     expect(migrate(path)).toEqual({ backupPath: null });
-    expect(readFileSync(path)).toEqual(before);
+    expect(readFileSync(path).equals(before)).toBe(true);
     expect(backups(dir)).toEqual([]);
   });
 
