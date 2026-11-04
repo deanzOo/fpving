@@ -3,6 +3,6 @@
   "minTokens": 50,
   "path": ["."],
   "gitignore": true,
-  "ignore": ["**/.git/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "**/reports/**", "**/tests/**/fixtures/**", "apps/fpving/drizzle/**", "apps/ui/src/tokens.css", "pnpm-lock.yaml"],
+  "ignore": ["**/.git/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "**/reports/**", "**/tests/**/fixtures/**", "apps/fpving/drizzle/**", "apps/ui/src/tokens.css", "pnpm-lock.yaml", "**/CHANGELOG.md"],
   "reporters": ["console"]
 }
