@@ -107,7 +107,7 @@ Store methods never throw for expected failures. They resolve to `err({ kind, de
 | `network`             | Any other transport failure.                                                                                        |
 | `unsupported_ship_to` | The store does not ship to `ctx.shipTo`.                                                                            |
 
-`rawPage` exists only on `parse_failed`. The host saves it to `DATA_DIR/debug/<plugin id>/<time>-<hash>.html`, where the hash is a SHA-256 prefix of the URL; a page over five megabytes is not saved. The result your store returned still reaches core unchanged.
+`rawPage` exists only on `parse_failed`. The host saves it to `DATA_DIR/debug/<plugin id>/<time>-<hash>.html`, where the hash is a SHA-256 prefix of the URL; a page over five megabytes is not saved. Each save deletes that plugin's pages older than 30 days, then its oldest until they fit 100 megabytes, so copy a page you want to keep. The result your store returned still reaches core unchanged.
 
 ## Host-provided context
 

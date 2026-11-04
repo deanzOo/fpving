@@ -7,12 +7,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createFileDebugSink,
   DebugSinkRefusal,
+  MAX_DEBUG_FOLDER_BYTES,
   MAX_DEBUG_PAGE_BYTES,
 } from "../../../src/adapters/debug/file-debug-sink.ts";
 
 const NOW = new Date("2026-10-29T10:11:12.345Z");
 const STAMP = "2026-10-29T10-11-12-345Z";
 const SHOP = pluginIdSchema.parse("example-shop");
+const OTHER = pluginIdSchema.parse("other-shop");
+const PAGE_BYTES = 1000;
+const PAGES_UNDER_CAP = 3;
+const EDGE_PAGES = 2;
+const HUNDRED_MB = 104_857_600;
 const URL_1 = "https://shop.example.com/p/1?ref=../../x";
 const HTML = "<html>no price</html>";
 const OWNER_ONLY_DIR = 0o700;
@@ -76,6 +82,69 @@ describe("File debug sink", () => {
     const result = await sink().savePage(SHOP, URL_1, "€".repeat(Math.ceil(MAX_DEBUG_PAGE_BYTES / EURO_BYTES)));
     expect(result).toEqual(err({ kind: PortErrorKind.DebugWriteFailed, detail: DebugSinkRefusal.TooLarge }));
     expect(await readdir(dataDir)).toEqual([]);
+  });
+
+  describe("Bounding a plugin's folder", () => {
+    const DAY_MS = 86_400_000;
+    const KEPT_DAYS = 30;
+    const PAGE = "x".repeat(PAGE_BYTES);
+    const FOLDER_CAP = PAGE_BYTES * PAGES_UNDER_CAP;
+    const folder = (id: string) => join(dataDir, "debug", id);
+    const at = (time: number) => createFileDebugSink({
+      dataDir,
+      clock: { now: () => new Date(time) },
+      maxFolderBytes: FOLDER_CAP,
+    });
+    const pagesIn = async (id: string) => (await readdir(folder(id))).sort();
+    const nameAt = (time: number) => new Date(time).toISOString().replaceAll(/[:.]/gu, "-");
+    const START = Date.parse("2026-10-01T00:00:00.000Z");
+
+    it("deletes a plugin's pages older than 30 days when it saves a new one", async () => {
+      await at(START).savePage(SHOP, "https://shop.example/old", "old");
+      await at(START + KEPT_DAYS * DAY_MS + 1).savePage(SHOP, "https://shop.example/new", "new");
+      const pages = await pagesIn(SHOP);
+      expect(pages).toHaveLength(1);
+      expect(pages[0]).toContain(nameAt(START + KEPT_DAYS * DAY_MS + 1));
+    });
+
+    it("keeps a page exactly 30 days old", async () => {
+      await at(START).savePage(SHOP, "https://shop.example/old", "old");
+      await at(START + KEPT_DAYS * DAY_MS).savePage(SHOP, "https://shop.example/new", "new");
+      expect(await pagesIn(SHOP)).toHaveLength(EDGE_PAGES);
+    });
+
+    it("deletes the oldest pages until the folder is under its size cap, keeping the newest", async () => {
+      const times = Array.from({ length: PAGES_UNDER_CAP + 1 }, (_, index) => START + index);
+      for (const time of times) {
+        await at(time).savePage(SHOP, `https://shop.example/${String(time)}`, PAGE);
+      }
+      const pages = await pagesIn(SHOP);
+      expect(pages).toHaveLength(PAGES_UNDER_CAP);
+      expect(pages.some((name) => name.startsWith(nameAt(START)))).toBe(false);
+      expect(pages.at(-1)).toContain(nameAt(START + PAGES_UNDER_CAP));
+    });
+
+    it("keeps the page it just saved even when that page alone is over the cap", async () => {
+      await at(START).savePage(SHOP, "https://shop.example/a", PAGE);
+      await at(START + 1).savePage(SHOP, "https://shop.example/b", PAGE.repeat(PAGES_UNDER_CAP + 1));
+      const pages = await pagesIn(SHOP);
+      expect(pages).toHaveLength(1);
+      expect(pages[0]).toContain(nameAt(START + 1));
+    });
+
+    it("leaves another plugin's pages and files that are not pages alone", async () => {
+      await at(START).savePage(OTHER, "https://other.example/a", "other");
+      await at(START).savePage(SHOP, "https://shop.example/a", "old");
+      await writeFile(join(folder(SHOP), "notes.txt"), PAGE.repeat(PAGES_UNDER_CAP + 1));
+      await at(START + KEPT_DAYS * DAY_MS + 1).savePage(SHOP, "https://shop.example/b", "new");
+      expect(await pagesIn(OTHER)).toHaveLength(1);
+      expect(await pagesIn(SHOP)).toContain("notes.txt");
+      expect(await pagesIn(SHOP)).toHaveLength(EDGE_PAGES);
+    });
+
+    it("caps a folder at 100 megabytes unless told otherwise", () => {
+      expect(MAX_DEBUG_FOLDER_BYTES).toBe(HUNDRED_MB);
+    });
   });
 
   it("answers a write the file system refuses with debug_write_failed instead of rejecting", async () => {
