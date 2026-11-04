@@ -58,6 +58,7 @@ export const fakeGateway = () => {
   const plugins: readonly [PluginId, string][] = [[SHOP, SHOP_DOMAIN], [OTHER, OTHER_DOMAIN]];
   const gateway: StoreGateway = {
     declaredDomains: () => plugins.map(([, domain]) => domain),
+    isLoaded: () => true,
     pluginFor: (url) => plugins.find(([, domain]) => new URL(url).hostname === domain)?.[0] ?? null,
     fetchListing: async (_pluginId, url) => {
       await script.fetching;

@@ -99,6 +99,12 @@ export const describeStoreGatewayContract = (makeSubject: () => Promise<StoreGat
       expect(owners()).toEqual(expect.arrayContaining([...searchable]));
     });
 
+    it("says a plugin is loaded only while it can answer calls", () => {
+      const { gateway, searchablePlugin, fetchOnlyPlugin, disabledPlugin } = subject;
+      expect([searchablePlugin, fetchOnlyPlugin].map((id) => gateway.isLoaded(id))).toEqual([true, true]);
+      expect([disabledPlugin, UNKNOWN_PLUGIN].map((id) => gateway.isLoaded(id))).toEqual([false, false]);
+    });
+
     it("searches a searchable plugin and returns valid candidates", async () => {
       const result = await subject.gateway.search(subject.searchablePlugin, QUERY);
       expect(succeeded(searchCandidateSchema.array()).safeParse(result).success).toBe(true);

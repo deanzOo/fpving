@@ -137,6 +137,10 @@ const scanPlugin = async (
   let succeeded = 0;
   let failed = 0;
   for (const listing of backingOff ? [] : listings) {
+    if (!deps.stores.isLoaded(pluginId)) {
+      errorKind = StoreErrorKind.Network;
+      break;
+    }
     const result = await deps.stores.fetchListing(pluginId, listing.url);
     if (!result.ok && result.error.kind === StoreErrorKind.Blocked) {
       failed += 1;
@@ -247,6 +251,9 @@ const evaluateProduct = async (
  *   It stops the plugin's scan, adds one to its consecutive blocks and backs it off for 15 minutes, doubling with
  *   each consecutive block up to 24 hours. A plugin still backing off is not fetched. Any successful fetch clears
  *   the blocks and the backoff; other failures leave them as they are.
+ * - **Plugin not loaded.** That says nothing about the listing, so its status and streaks stay as they were. It stops
+ *   the plugin's scan before the next fetch and the run is `failed` with a `network` error, unless a fetch had already
+ *   succeeded. A fetch in flight when the plugin goes down still counts as that fetch's failure.
  * - **Scan runs.** Each plugin with listings records one run, timed by the clock: `blocked` when it was backing off
  *   or a fetch was blocked, else `ok` when any fetch succeeded, else `failed` with the last store error.
  * - **Alerts.** After every plugin finished, each product's fetched listings are evaluated one at a time in scan

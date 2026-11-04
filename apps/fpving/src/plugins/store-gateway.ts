@@ -54,6 +54,7 @@ export const createPluginStoreGateway = (options: PluginStoreGatewayOptions): St
 
   return {
     declaredDomains: () => host.registry.declaredDomains(),
+    isLoaded: (pluginId) => loaded(pluginId) !== undefined,
     pluginFor: (url) => host.registry.pluginFor(url),
     fetchListing: async (pluginId, url) => {
       if (loaded(pluginId) === undefined) {
