@@ -46,14 +46,14 @@ const INVALID_OUTPUT = "invalid plugin output";
 export const WORKER_ENTRY = new URL("./worker-entry.js", import.meta.url);
 
 /**
- * Spawns plugin workers from a worker entry file.
+ * Spawns plugin workers from a worker entry file, each with an empty environment so no host secret reaches a plugin.
  *
  * @param entry - The worker entry module.
  * @param execArgv - Node options for the worker, such as a source condition in tests.
  * @returns The spawner.
  */
 export const spawnWorker = (entry: URL, execArgv: readonly string[] = []): SpawnWorker => (data) =>
-  new Worker(entry, { workerData: data, execArgv: [...execArgv] });
+  new Worker(entry, { workerData: data, execArgv: [...execArgv], env: {} });
 
 /** What the host needs to start the plugins. */
 export interface PluginHostOptions {

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pluginIdSchema } from "@fpving/core";
 import type { StoreGateway } from "@fpving/core";
-import { vi } from "vitest";
 import { createFileDebugSink } from "../../src/adapters/debug/file-debug-sink.ts";
 import { createDomainLimiter } from "../../src/adapters/transport/domain-limiter.ts";
 import { createFetchHttpClient } from "../../src/adapters/transport/fetch-http-client.ts";
@@ -17,7 +16,7 @@ import { createPluginStoreGateway } from "../../src/plugins/store-gateway.ts";
 import { fakeServices } from "../plugins/runtime/fake-worker.ts";
 import { startLocalServer } from "./local-server.ts";
 import type { LocalServer } from "./local-server.ts";
-import { fixturePlugin, spawnSourceWorker } from "./plugin-workers.ts";
+import { fixturePlugin, spawnSourceWorkerAt } from "./plugin-workers.ts";
 
 /** The id of the test-only plugin in `test/fixture-plugin`. */
 export const FIXTURE_SHOP = pluginIdSchema.parse("fixture-shop");
@@ -27,9 +26,6 @@ export const CAPABLE_SHOP = pluginIdSchema.parse("capable-shop");
 
 /** When the fixture gateway's debug sink stamps its files. */
 export const FIXTURE_NOW = new Date("2026-10-29T10:11:12.345Z");
-
-/** The variable the fixture plugin reads the local server's origin from. */
-export const ORIGIN_ENV = "FPVING_FIXTURE_ORIGIN";
 
 /** The folder of the test-only plugin in `test/fixture-plugin`. */
 export const FIXTURE_PLUGIN_DIR = fileURLToPath(new URL("../fixture-plugin", import.meta.url));
@@ -70,13 +66,12 @@ export const startFixtureGateway = async (extra: readonly PluginEntry[] = []): P
   }
   const { services, mocks } = fakeServices();
   const http = localHttpClient();
-  vi.stubEnv(ORIGIN_ENV, server.origin);
   const host = await startPluginHost({
     entries: config.value.entries,
     services: { ...services, http },
     shipTo: "IL",
     currencyPreference: "USD",
-    spawn: spawnSourceWorker,
+    spawn: spawnSourceWorkerAt(server.origin),
     loadTimeoutMs: LOAD_TIMEOUT_MS,
   });
   const debugSink = createFileDebugSink({ dataDir, clock: { now: () => FIXTURE_NOW } });
@@ -89,7 +84,6 @@ export const startFixtureGateway = async (extra: readonly PluginEntry[] = []): P
     warn: mocks.warn,
     close: async () => {
       await host.shutdown();
-      vi.unstubAllEnvs();
       await server.close();
       await rm(dataDir, { recursive: true, force: true });
     },

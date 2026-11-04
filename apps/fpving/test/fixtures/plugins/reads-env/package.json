@@ -1,0 +1,1 @@
+{ "name": "reads-env", "type": "module", "main": "index.mjs", "private": true }

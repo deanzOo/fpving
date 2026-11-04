@@ -1,4 +1,6 @@
-// Test-only plugin for the static pages of test/support/local-server.ts; the origin comes from FPVING_FIXTURE_ORIGIN.
+// Test-only plugin for the static pages of test/support/local-server.ts; the origin comes from workerData.
+import { workerData } from "node:worker_threads";
+
 export const manifest = {
   id: "fixture-shop",
   displayName: "Fixture Shop",
@@ -41,7 +43,7 @@ export const createStore = (ctx) => ({
     };
   },
   search: async () => {
-    const origin = process.env.FPVING_FIXTURE_ORIGIN ?? "";
+    const origin = workerData.fixtureOrigin;
     const page = await read(ctx, `${origin}/fixture/search`);
     if (!page.ok) return page;
     const candidates = [...page.value.matchAll(RESULT)].map(([, href, title]) => ({ url: new URL(href, origin).href, title }));
