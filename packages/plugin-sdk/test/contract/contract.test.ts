@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { checkStorePluginContract } from "../../src/contract/check-contract.ts";
 import { runStorePluginContract } from "../../src/contract/run-contract.ts";
 import type { ContractFixtures } from "../../src/contract/fixtures.ts";
 import type { PluginContext } from "../../src/context.ts";
 import { StoreErrorKind } from "../../src/errors.ts";
-import { ShippingUnknown } from "../../src/listing.ts";
+import type { StoreError } from "../../src/errors.ts";
+import { fetchedListingSchema, searchCandidateSchema, ShippingUnknown } from "../../src/listing.ts";
 import type { SearchCandidate } from "../../src/listing.ts";
-import { PluginCapability } from "../../src/manifest.ts";
+import { manifestSchema, PluginCapability } from "../../src/manifest.ts";
 import type { PluginManifest } from "../../src/manifest.ts";
 import type { Store, StorePlugin } from "../../src/plugin.ts";
 import { err, ok } from "../../src/result.ts";
@@ -84,10 +86,23 @@ const withStore = (store: (ctx: PluginContext) => Store, override: Partial<Plugi
   createStore: store,
 });
 
+const relabelling = (from: StoreErrorKind, to: (detail: string) => StoreError): StorePlugin => withStore((ctx) => ({
+  fetchListing: async (url) => {
+    const result = await fetchListing(ctx)(url);
+    return !result.ok && result.error.kind === from ? err(to(result.error.detail)) : result;
+  },
+  search: search(ctx),
+}));
+
+const unparsed = (): StoreError => ({ kind: StoreErrorKind.ParseFailed, detail: "no listing", rawPage: "x" });
+
 const failedChecks = async (plugin: StorePlugin, kit: ContractFixtures = fixtures): Promise<string[]> =>
   (await checkStorePluginContract(plugin, kit)).map((failure) => failure.check);
 
 const SEARCH_CHECK = "returns schema-valid candidates for the search fixture";
+
+const zodText = <T>(parsed: z.ZodSafeParseResult<T>): string =>
+  parsed.success ? "" : z.prettifyError(parsed.error);
 
 runStorePluginContract(goodPlugin, fixtures);
 
@@ -97,17 +112,22 @@ describe("Store plugin contract kit", () => {
   });
 
   it("fails an invalid manifest", async () => {
-    const plugin = withStore((ctx) => goodPlugin.createStore(ctx), { id: "Example Shop" });
-    expect(await failedChecks(plugin)).toEqual(["declares a schema-valid manifest"]);
+    const invalid = { ...manifest, id: "Example Shop" };
+    const plugin = withStore((ctx) => goodPlugin.createStore(ctx), invalid);
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: "declares a schema-valid manifest",
+      message: `invalid manifest:\n${zodText(manifestSchema.safeParse(invalid))}`,
+    }]);
   });
 
   it("fails the manifest check instead of throwing when the manifest is malformed at runtime", async () => {
     const malformed = { ...manifest };
     Reflect.deleteProperty(malformed, "capabilities");
     const plugin = { manifest: malformed, createStore: goodPlugin.createStore.bind(goodPlugin) };
-    const failures = await checkStorePluginContract(plugin, fixtures);
-    expect(failures.map((failure) => failure.check)).toEqual(["declares a schema-valid manifest"]);
-    expect(failures[0]?.message).toContain("capabilities");
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: "declares a schema-valid manifest",
+      message: `invalid manifest:\n${zodText(manifestSchema.safeParse(malformed))}`,
+    }]);
   });
 
   it("reports a malformed fixture url as a fixture error and runs no plugin checks", async () => {
@@ -136,7 +156,15 @@ describe("Store plugin contract kit", () => {
       "parses the in-stock fixture into a schema-valid listing that is in stock",
       "reports inStock false for the out-of-stock fixture",
     ]);
-    expect(failures[0]?.message).toContain("itemPrice.amountMinor");
+    const listing = {
+      title: "Example frame",
+      itemPrice: { amountMinor: 0, currency: "USD" },
+      shipping: ShippingUnknown,
+      inStock: true,
+      images: [],
+    };
+    const parsed = fetchedListingSchema.safeParse(listing);
+    expect(failures[0]?.message).toBe(`returned an invalid listing:\n${zodText(parsed)}`);
   });
 
   it("fails a plugin that reads stock the wrong way round", async () => {
@@ -146,34 +174,46 @@ describe("Store plugin contract kit", () => {
         return result.ok ? ok({ ...result.value, inStock: !result.value.inStock }) : result;
       },
     }), { capabilities: [PluginCapability.FetchListing] });
-    expect(await failedChecks(plugin)).toEqual([
-      "parses the in-stock fixture into a schema-valid listing that is in stock",
-      "reports inStock false for the out-of-stock fixture",
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([
+      {
+        check: "parses the in-stock fixture into a schema-valid listing that is in stock",
+        message: "expected inStock true, got false",
+      },
+      { check: "reports inStock false for the out-of-stock fixture", message: "expected inStock false, got true" },
     ]);
   });
 
   it("fails a plugin that ignores the 404 status", async () => {
-    const plugin = withStore((ctx) => ({
-      fetchListing: async (url) => {
-        const result = await fetchListing(ctx)(url);
-        const notFound = !result.ok && result.error.kind === StoreErrorKind.NotFound;
-        return notFound ? err({ kind: StoreErrorKind.ParseFailed, detail: "no listing", rawPage: "x" }) : result;
-      },
-      search: search(ctx),
-    }));
-    expect(await failedChecks(plugin)).toEqual(["returns not_found for the 404 fixture"]);
+    const plugin = relabelling(StoreErrorKind.NotFound, unparsed);
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: "returns not_found for the 404 fixture",
+      message: "expected a not_found error, got parse_failed: no listing",
+    }]);
+  });
+
+  it("fails a plugin that does not recognise the captcha page", async () => {
+    const plugin = relabelling(StoreErrorKind.Blocked, unparsed);
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: "returns blocked for the captcha fixture",
+      message: "expected a blocked error, got parse_failed: no listing",
+    }]);
   });
 
   it("fails a plugin that hides a host timeout", async () => {
-    const plugin = withStore((ctx) => ({
-      fetchListing: async (url) => {
-        const result = await fetchListing(ctx)(url);
-        const timedOut = !result.ok && result.error.kind === StoreErrorKind.Timeout;
-        return timedOut ? err({ kind: StoreErrorKind.ParseFailed, detail: "empty page" }) : result;
-      },
-      search: search(ctx),
-    }));
-    expect(await failedChecks(plugin)).toEqual(["returns timeout when the host http client and browser time out"]);
+    const emptyPage = { kind: StoreErrorKind.ParseFailed, detail: "empty page" };
+    const plugin = relabelling(StoreErrorKind.Timeout, () => emptyPage);
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: "returns timeout when the host http client and browser time out",
+      message: "expected a timeout error, got parse_failed: empty page",
+    }]);
+  });
+
+  it("names the host timeout to a plugin that passes its detail on under another kind", async () => {
+    const plugin = relabelling(StoreErrorKind.Timeout, (detail) => ({ kind: StoreErrorKind.Network, detail }));
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: "returns timeout when the host http client and browser time out",
+      message: "expected a timeout error, got network: the contract kit timed out the request",
+    }]);
   });
 
   it.each([
@@ -218,7 +258,9 @@ describe("Store plugin contract kit", () => {
     }));
     const failures = await checkStorePluginContract(plugin, fixtures);
     expect(failures).toHaveLength(Object.keys(fixtures.listings).length);
-    expect(failures[0]?.message).toContain("no fixture page for https://shop.example.com/p/in-stock?ref=elsewhere");
+    expect(failures[0]?.message).toBe(
+      "expected a listing, got network: no fixture page for https://shop.example.com/p/in-stock?ref=elsewhere",
+    );
   });
 
   it("answers a malformed request url with a network error instead of throwing", async () => {
@@ -246,12 +288,18 @@ describe("Store plugin contract kit", () => {
   });
 
   it("fails a search plugin when the fixtures have no search query", async () => {
-    expect(await failedChecks(goodPlugin, fixturesWithoutSearch)).toEqual([SEARCH_CHECK]);
+    expect(await checkStorePluginContract(goodPlugin, fixturesWithoutSearch)).toEqual([{
+      check: SEARCH_CHECK,
+      message: "the manifest declares search but the fixtures have no searchQuery",
+    }]);
   });
 
   it("fails a search that returns an error", async () => {
     const plugin = withStore((ctx) => ({ fetchListing: fetchListing(ctx), search: search(ctx, "https://other.example.com/?q=") }));
-    expect(await failedChecks(plugin)).toEqual([SEARCH_CHECK]);
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: SEARCH_CHECK,
+      message: "expected candidates, got network: no fixture page for https://other.example.com/?q=frame",
+    }]);
   });
 
   it.each<[string, SearchCandidate[]]>([
@@ -262,7 +310,11 @@ describe("Store plugin contract kit", () => {
       fetchListing: fetchListing(ctx),
       search: () => Promise.resolve(ok(candidates)),
     }));
-    expect(await failedChecks(plugin)).toEqual([SEARCH_CHECK]);
+    const parsed = z.array(searchCandidateSchema).nonempty().safeParse(candidates);
+    expect(await checkStorePluginContract(plugin, fixtures)).toEqual([{
+      check: SEARCH_CHECK,
+      message: `returned invalid candidates:\n${zodText(parsed)}`,
+    }]);
   });
 
   it("skips the search check when the manifest does not declare search", async () => {
