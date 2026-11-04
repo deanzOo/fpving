@@ -83,6 +83,13 @@ describe("Domain entities", () => {
     expect(scanRunSchema.safeParse({ ...run, outcome: ScanOutcome.Blocked, errorKind: null }).success).toBe(false);
   });
 
+  it("explains a scan run whose error kind does not agree with its outcome", () => {
+    const blocked = scanRunSchema.safeParse({ ...run, outcome: ScanOutcome.Blocked, errorKind: null });
+    expect(blocked.error?.issues.map((issue) => issue.message)).toEqual([
+      "errorKind must be null exactly when the outcome is ok",
+    ]);
+  });
+
   it("requires an llm reason exactly when a candidate was judged", () => {
     const unjudged = { ...candidate, llmVerdict: LlmVerdict.Unjudged, llmReason: null };
     expect(matchCandidateSchema.safeParse(unjudged).success).toBe(true);
@@ -90,6 +97,13 @@ describe("Domain entities", () => {
     expect(matchCandidateSchema.safeParse(judged).success).toBe(true);
     expect(matchCandidateSchema.safeParse({ ...unjudged, llmReason: "Why." }).success).toBe(false);
     expect(matchCandidateSchema.safeParse({ ...judged, llmReason: null }).success).toBe(false);
+  });
+
+  it("explains a candidate whose llm reason does not agree with its verdict", () => {
+    const judged = matchCandidateSchema.safeParse({ ...candidate, llmVerdict: LlmVerdict.Same, llmReason: null });
+    expect(judged.error?.issues.map((issue) => issue.message)).toEqual([
+      "llmReason must be null exactly when llmVerdict is unjudged",
+    ]);
   });
 
   it("keeps a candidate similarity score between 0 and 1", () => {
