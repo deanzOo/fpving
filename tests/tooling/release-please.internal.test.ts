@@ -9,4 +9,11 @@ describe("Release-please config", () => {
     const config: unknown = JSON.parse(await readFile(CONFIG, "utf8"));
     expect(config).toMatchObject({ "initial-version": FIRST_VERSION });
   });
+
+  it("releases the UI as a package, so a UI-only change reaches a changelog", async () => {
+    const config: unknown = JSON.parse(await readFile(CONFIG, "utf8"));
+    const manifest: unknown = JSON.parse(await readFile(".release-please-manifest.json", "utf8"));
+    expect(config).toMatchObject({ packages: { "apps/ui": {} } });
+    expect(manifest).toMatchObject({ "apps/ui": "0.0.0" });
+  });
 });
