@@ -1,7 +1,7 @@
 const MODEL_NUMBER_WEIGHT = 0.6;
 const WORD_WEIGHT = 1 - MODEL_NUMBER_WEIGHT;
 
-const SEPARATORS = /[\s,;:()[\]{}+&|"']+/u;
+const SEPARATORS = /[\s,;:()[\]{}+&|"']/u;
 const JOINERS = /[-_]/gu;
 const EDGE_PUNCTUATION = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 const DIGIT = /\p{N}/u;
