@@ -12,7 +12,8 @@ import { priceDrop } from "./price-drop.js";
  * them. `incoming` is the one just observed.
  * `productListings` holds the product's listings with their newest snapshots; the listing's own entry is replaced by
  * the incoming snapshot, or added if absent. History entries that are the incoming snapshot or not older than it are
- * ignored. `rates` is null when no exchange rates were ever fetched; see {@link evaluateCheapest}.
+ * ignored; an entry observed at the same instant is older only when listed before the incoming snapshot. `rates` is
+ * null when no exchange rates were ever fetched; see {@link evaluateCheapest}.
  */
 export interface EvaluateInput {
   listing: Listing;
@@ -56,7 +57,11 @@ export const evaluateCheapest = (input: CheapestInput): Evaluation => {
  */
 export const evaluate = (input: EvaluateInput): Evaluation => {
   const { listing, incoming, now } = input;
-  const history = input.history.filter((snapshot) => snapshot.observedAt < incoming.observedAt);
+  const position = input.history.findIndex((snapshot) => snapshot.id === incoming.id);
+  const history = input.history.filter(
+    (snapshot, index) =>
+      snapshot.observedAt < incoming.observedAt || (index < position && snapshot.observedAt <= incoming.observedAt),
+  );
   const productListings = [
     ...input.productListings.filter((entry) => entry.listing.id !== listing.id),
     { listing, latest: incoming },

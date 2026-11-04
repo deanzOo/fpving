@@ -286,6 +286,33 @@ describe("Back in stock alert", () => {
     expect(back(history, arriving("s2", HUNDRED)).alerts).toEqual([]);
   });
 
+  it("compares with the later listed of earlier snapshots that share an observed instant", () => {
+    const outOfStock = priced("s1", HUNDRED, { inStock: false });
+    const inStock = priced("s0", HUNDRED);
+    expect(back([inStock, outOfStock], arriving("s2", HUNDRED)).alerts.map((alert) => alert.kind)).toEqual([
+      AlertKind.BackInStock,
+    ]);
+    expect(back([outOfStock, inStock], arriving("s2", HUNDRED)).alerts).toEqual([]);
+  });
+
+  it("counts a snapshot listed before the incoming one at the same instant as earlier", () => {
+    const incoming = arriving("s2", HUNDRED);
+    const history = [arriving("s1", HUNDRED, { inStock: false }), incoming];
+    expect(back(history, incoming).alerts.map((alert) => alert.kind)).toEqual([AlertKind.BackInStock]);
+  });
+
+  it("ignores a snapshot listed after the incoming one at the same instant", () => {
+    const incoming = arriving("s2", HUNDRED);
+    const history = [incoming, arriving("s3", HUNDRED, { inStock: false })];
+    expect(back(history, incoming).alerts).toEqual([]);
+  });
+
+  it("ignores a snapshot listed before the incoming one but observed after it", () => {
+    const incoming = arriving("s2", HUNDRED);
+    const history = [priced("s3", HUNDRED, { observedAt: NOW, inStock: false }), incoming];
+    expect(back(history, incoming).alerts).toEqual([]);
+  });
+
   it("never compares snapshots quoted for different destinations", () => {
     expect(back([priced("s1", HUNDRED, { inStock: false, shipTo: "US" })], arriving("s2", HUNDRED)).alerts).toEqual([]);
   });
