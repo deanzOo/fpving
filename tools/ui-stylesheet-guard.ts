@@ -1,9 +1,9 @@
 import { glob, readFile } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { join, posix, sep } from "node:path";
 import { RAW_COLOUR, RAW_COLOUR_MESSAGE, UI_APPLY_RULES } from "./ui-guards.ts";
 
 const GENERATED_TOKENS = "tokens.css";
-const PRIMITIVES = `ui${sep}`;
+const PRIMITIVES = `ui${posix.sep}`;
 const APPLY = /@apply\s[^;]+/gu;
 const GLOBAL_IGNORE_CASE = "giu";
 
@@ -22,13 +22,14 @@ const appliedClassFindings = (css: string): string[] =>
  * only a test calls.
  *
  * @param folder - The folder to search.
- * @returns One line per finding: the file, what was found, the rule and what to use instead.
+ * @returns One line per finding: the file with `/` separators, what was found, the rule and what to use instead.
  * @throws Error when the folder holds no stylesheet to check, so an empty scan cannot pass.
  */
 export const stylesheetFindings = async (folder: string): Promise<string[]> => {
   const findings: string[] = [];
   let scanned = 0;
-  for await (const file of glob("**/*.css", { cwd: folder })) {
+  for await (const found of glob("**/*.css", { cwd: folder })) {
+    const file = found.replaceAll(sep, posix.sep);
     if (file !== GENERATED_TOKENS) {
       scanned += 1;
       const css = await readFile(join(folder, file), "utf8");
