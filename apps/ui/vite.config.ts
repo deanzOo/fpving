@@ -37,7 +37,7 @@ export default defineConfig({
   test: {
     name: "ui",
     include: ["test/**/*.test.{ts,tsx}"],
-    setupFiles: ["test/support/console-guard.ts"],
+    setupFiles: ["test/support/console-guard.ts", "test/support/pointer-reset.ts"],
     browser: {
       enabled: true,
       headless: true,
