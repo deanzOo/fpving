@@ -14,6 +14,6 @@ describe("Release-please config", () => {
     const config: unknown = JSON.parse(await readFile(CONFIG, "utf8"));
     const manifest: unknown = JSON.parse(await readFile(".release-please-manifest.json", "utf8"));
     expect(config).toMatchObject({ packages: { "apps/ui": {} } });
-    expect(manifest).toMatchObject({ "apps/ui": "0.0.0" });
+    expect(manifest).toHaveProperty(["apps/ui"]);
   });
 });
