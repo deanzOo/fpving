@@ -33,6 +33,21 @@ describe("Rendering the behaviour spec", () => {
     expect(md).toBe("## Core\n\n### A\n- a1\n\n### B\n- b1\n");
   });
 
+  it("orders a project's modules by file path, whatever order they finished in", () => {
+    const a = module([suite("A", [test("a1")])], "test/a.test.ts");
+    const b = module([suite("B", [test("b1")])], "test/b.test.ts");
+    expect(renderSpec([b, a])).toBe(renderSpec([a, b]));
+    expect(renderSpec([b, a])).toBe("## Core\n\n### A\n- a1\n\n### B\n- b1\n");
+  });
+
+  it("orders projects as the page declares them, whatever order they finished in", () => {
+    const app = module([suite("In app", [test("a1")])], "test/a.test.ts", "app");
+    const core = module([suite("In core", [test("c1")])], "test/c.test.ts", "core");
+    const sdk = module([suite("In sdk", [test("s1")])], "test/s.test.ts", "plugin-sdk");
+    expect(renderSpec([app, sdk, core]))
+      .toBe("## Core\n\n### In core\n- c1\n\n## Plugin SDK\n\n### In sdk\n- s1\n\n## App\n\n### In app\n- a1\n");
+  });
+
   it("titles module-level tests after their file, not its path", () => {
     const md = renderSpec([module([test("top level")], "test/import-tax.test.ts")]);
     expect(md).toBe("## Core\n\n### Import tax\n- top level\n");

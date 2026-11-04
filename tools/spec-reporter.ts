@@ -27,6 +27,7 @@ const PROJECT_TITLES = new Map([
   ["e2e", "End to end"],
 ]);
 const INTERNAL_SUFFIX = ".internal.test.ts";
+const PATH_LOCALE = "en";
 const TEST_FILE_SUFFIX = /\.test\.ts$/;
 const SKIPPED = "skipped";
 const PROJECT_HEADING_LEVEL = 2;
@@ -73,7 +74,7 @@ const renderModule = (module: SpecModule, lines: string[]): void => {
 
 export const renderSpec = (modules: readonly SpecModule[]): string => {
   const projects = new Map<string, string[]>();
-  for (const module of modules) {
+  for (const module of modules.toSorted((a, b) => a.relativeModuleId.localeCompare(b.relativeModuleId, PATH_LOCALE))) {
     const title = PROJECT_TITLES.get(module.project.name);
     if (title === undefined || module.relativeModuleId.endsWith(INTERNAL_SUFFIX)) continue;
     if (![...module.children].some(hasTests)) continue;
@@ -81,7 +82,7 @@ export const renderSpec = (modules: readonly SpecModule[]): string => {
     renderModule(module, lines);
     projects.set(title, lines);
   }
-  const lines = [...projects.values()].flat().slice(1);
+  const lines = [...PROJECT_TITLES.values()].flatMap((title) => projects.get(title) ?? []).slice(1);
   return lines.length > 0 ? `${lines.join("\n")}\n` : "";
 };
 
