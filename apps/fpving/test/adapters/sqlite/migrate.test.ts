@@ -201,6 +201,32 @@ describe("SQLite migrations", () => {
     expect(kept).not.toContain(future(FUTURE_YEAR));
   });
 
+  it("keeps the append order of price snapshots in its backup", () => {
+    const dir = tempDir();
+    const path = join(dir, "fpving.db");
+    const appended = ["s4", "s5", "s3"];
+    migrate(path);
+    const client = new Database(path);
+    client.prepare("insert into products (id, name, created_at) values ('p1', 'Goggles', 1)").run();
+    client
+      .prepare(
+        "insert into listings (id, product_id, plugin_id, url, title, status, origin, added_at, failure_streak, "
+        + "not_found_streak) values ('l1', 'p1', 'shop', 'https://shop.example/1', 'Goggles', 'active', 'manual', 1, 0, 0)",
+      )
+      .run();
+    for (const id of appended) {
+      client
+        .prepare("insert into price_snapshots values (?, 'l1', 1, 'IL', 100, 'USD', 'unknown', null, null, 1)")
+        .run(id);
+    }
+    client.close();
+    const { backupPath } = migrate(path, migrationsWith("CREATE TABLE extra (id integer);"));
+    const backup = new Database(backupPath ?? "", { readonly: true });
+    const ids = backup.prepare("select id from price_snapshots order by rowid").pluck().all();
+    backup.close();
+    expect(ids).toEqual(appended);
+  });
+
   it("rolls back a failing migration, keeps the backup intact and names it in the error", () => {
     const dir = tempDir();
     const path = join(dir, "fpving.db");

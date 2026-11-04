@@ -15,7 +15,7 @@ import {
 } from "@fpving/core";
 import type { DuplicateUrl, Listing, NotFound, PriceSnapshot, Repository, Result } from "@fpving/core";
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, max, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -57,7 +57,8 @@ const SCANNED_STATUSES = [ListingStatus.Active, ListingStatus.Stale];
 const ACTIVE = { status: ListingStatus.Active, failureStreak: 0, notFoundStreak: 0 };
 
 const older = alias(priceSnapshots, "older");
-const tied = alias(priceSnapshots, "tied");
+const appendOrder = sql`${priceSnapshots}.rowid`;
+const olderAppendOrder = sql`${older}.rowid`;
 
 const settle = async <T>(work: () => T): Promise<T> =>
   new Promise((resolve) => {
@@ -247,7 +248,7 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
         settle(() =>
           db.select().from(priceSnapshots)
             .where(and(eq(priceSnapshots.listingId, listingId), gte(priceSnapshots.observedAt, since)))
-            .orderBy(asc(priceSnapshots.observedAt))
+            .orderBy(asc(priceSnapshots.observedAt), asc(appendOrder))
             .all()
             .map(fromSnapshotRow)),
       latestPerListing: async (productId) =>
@@ -256,7 +257,7 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
             ...getTableColumns(priceSnapshots),
             rank: sql<number>`row_number() over (
               partition by ${priceSnapshots.listingId}
-              order by ${priceSnapshots.observedAt} desc, ${priceSnapshots.id} desc
+              order by ${priceSnapshots.observedAt} desc, ${appendOrder} desc
             )`.as("rank"),
           }).from(priceSnapshots)
             .innerJoin(listings, eq(listings.id, priceSnapshots.listingId))
@@ -268,26 +269,27 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
         settle(() => {
           const scanned = and(isNull(products.archivedAt), inArray(listings.status, SCANNED_STATUSES));
           const ofProduct = eq(products.id, listings.productId);
-          const newestBefore = db.select({ at: max(older.observedAt) }).from(older)
-            .where(and(eq(older.listingId, listings.id), lt(older.observedAt, since)));
-          const seedId = db.select({ id: max(tied.id) }).from(tied)
-            .where(and(eq(tied.listingId, listings.id), eq(tied.observedAt, newestBefore)));
+          const seedId = db.select({ id: older.id }).from(older)
+            .where(and(eq(older.listingId, listings.id), lt(older.observedAt, since)))
+            .orderBy(desc(older.observedAt), desc(olderAppendOrder))
+            .limit(1);
           return db.select(getTableColumns(priceSnapshots)).from(priceSnapshots)
-            .where(and(
-              inArray(
-                priceSnapshots.listingId,
-                db.select({ id: listings.id }).from(listings).innerJoin(products, ofProduct).where(scanned),
+            .where(or(
+              and(
+                inArray(
+                  priceSnapshots.listingId,
+                  db.select({ id: listings.id }).from(listings).innerJoin(products, ofProduct).where(scanned),
+                ),
+                gte(priceSnapshots.observedAt, since),
               ),
-              gte(priceSnapshots.observedAt, since),
-            ))
-            .unionAll(db.select(getTableColumns(priceSnapshots)).from(priceSnapshots)
-              .where(inArray(
+              inArray(
                 priceSnapshots.id,
                 db.select({ id: sql<string>`(${seedId})` }).from(listings)
                   .innerJoin(products, ofProduct)
                   .where(scanned),
-              )))
-            .orderBy(asc(priceSnapshots.listingId), asc(priceSnapshots.observedAt), asc(priceSnapshots.id))
+              ),
+            ))
+            .orderBy(asc(priceSnapshots.listingId), asc(priceSnapshots.observedAt), asc(appendOrder))
             .all()
             .map(fromSnapshotRow);
         }),

@@ -426,18 +426,22 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.snapshots.listSince(l1.id, JAN_2)).toEqual([atJan2, unknownShipping]);
       });
 
-      it("picks the snapshot with the greater id by code point when two share an observed instant", async () => {
+      const appendTied = async (): Promise<void> => {
         for (const id of ["s4", "s5", "s3"]) {
           await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
         }
-        expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot("s5", l1.id, JAN_2)]);
+      };
+
+      it("picks the snapshot appended last when several share an observed instant, whatever their ids", async () => {
+        await appendTied();
+        expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot("s3", l1.id, JAN_2)]);
       });
 
-      it("picks the snapshot id outside the basic plane over one inside it on an observed instant tie", async () => {
-        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
-          await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
-        }
-        expect(await repo.snapshots.latestPerListing(p1.id)).toEqual([snapshot(ASTRAL_ID_HIGH, l1.id, JAN_2)]);
+      it("returns snapshots that share an observed instant in the order they were appended", async () => {
+        await appendTied();
+        expect(await repo.snapshots.listSince(l1.id, JAN_2)).toEqual(
+          ["s4", "s5", "s3"].map((id) => snapshot(id, l1.id, JAN_2)),
+        );
       });
 
       it("refuses a snapshot for a listing that does not exist", async () => {
@@ -491,26 +495,27 @@ export const describeRepositoryContract = (makeRepository: () => Promise<Reposit
         expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([s1, ofStale]);
       });
 
-      const seedAstralTie = async (): Promise<void> => {
+      const seedTied = async (): Promise<void> => {
         await seed();
-        for (const id of [ASTRAL_ID_HIGH, ASTRAL_ID_LOW]) {
+        for (const id of ["s4", "s5", "s3"]) {
           await repo.snapshots.append(snapshot(id, l1.id, JAN_2));
         }
       };
 
-      it("orders snapshots from the instant on that share an observed instant by id in code point order", async () => {
-        await seedAstralTie();
+      it("orders snapshots from the instant on that share an observed instant by when they were appended", async () => {
+        await seedTied();
         expect(await repo.snapshots.listForTrend(JAN_2)).toEqual([
           s1,
-          snapshot(ASTRAL_ID_LOW, l1.id, JAN_2),
-          snapshot(ASTRAL_ID_HIGH, l1.id, JAN_2),
+          snapshot("s4", l1.id, JAN_2),
+          snapshot("s5", l1.id, JAN_2),
+          snapshot("s3", l1.id, JAN_2),
           s2,
         ]);
       });
 
-      it("picks the earlier snapshot with the greater id by code point on an observed instant tie", async () => {
-        await seedAstralTie();
-        expect(await repo.snapshots.listForTrend(JAN_3)).toEqual([snapshot(ASTRAL_ID_HIGH, l1.id, JAN_2), s2]);
+      it("picks the earlier snapshot appended last on an observed instant tie", async () => {
+        await seedTied();
+        expect(await repo.snapshots.listForTrend(JAN_3)).toEqual([snapshot("s3", l1.id, JAN_2), s2]);
       });
     });
 

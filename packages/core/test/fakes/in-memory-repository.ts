@@ -31,6 +31,9 @@ const byCodePoint = (a: string, b: string): number => Buffer.compare(Buffer.from
 const newestFirst = <T extends { readonly id: string }>(rows: Iterable<T>, at: (row: T) => Date): T[] =>
   [...rows].toSorted((a, b) => at(b).getTime() - at(a).getTime() || byCodePoint(b.id, a.id));
 
+const newestAppendedFirst = (rows: Iterable<PriceSnapshot>): PriceSnapshot[] =>
+  [...rows].toReversed().toSorted((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
+
 /** A {@link Repository} held in memory that enforces references and unique ids the way a database would, for tests. */
 export const inMemoryRepository = (): Repository => {
   const products = new Map<string, Product>();
@@ -222,7 +225,7 @@ export const inMemoryRepository = (): Repository => {
         ),
       latestPerListing: async (productId) => {
         const latest = new Map<string, PriceSnapshot>();
-        for (const row of newestFirst(snapshots.values(), (s) => s.observedAt)) {
+        for (const row of newestAppendedFirst(snapshots.values())) {
           if (listings.get(row.listingId)?.productId === productId && !latest.has(row.listingId)) {
             latest.set(row.listingId, row);
           }
@@ -232,15 +235,14 @@ export const inMemoryRepository = (): Repository => {
       listForTrend: async (since) => {
         const scoped = [...snapshots.values()].filter((row) => scanned(listings.get(row.listingId)));
         const seeds = new Map<string, PriceSnapshot>();
-        for (const row of newestFirst(scoped.filter((s) => s.observedAt < since), (s) => s.observedAt)) {
+        for (const row of newestAppendedFirst(scoped.filter((s) => s.observedAt < since))) {
           if (!seeds.has(row.listingId)) {
             seeds.set(row.listingId, row);
           }
         }
         return Promise.resolve(copy([...seeds.values(), ...scoped.filter((s) => s.observedAt >= since)].toSorted(
           (a, b) =>
-            byCodePoint(a.listingId, b.listingId) || a.observedAt.getTime() - b.observedAt.getTime()
-            || byCodePoint(a.id, b.id),
+            byCodePoint(a.listingId, b.listingId) || a.observedAt.getTime() - b.observedAt.getTime(),
         )));
       },
     },

@@ -587,6 +587,15 @@ describe("Scanning listings", () => {
       await expectOnlyL2BecomesCheapest({ listings: [l1, l2], bases: [tied], answers: [[l2, fetched(LOWEST)]] });
     });
 
+    it("ranks an evaluated listing on its fetched price when an older snapshot shares its instant", async () => {
+      const tied = snapshot(l1, LOWEST, { id: snapshotIdSchema.parse("zz-l1"), observedAt: NOW });
+      await expectOnlyL2BecomesCheapest({
+        listings: [l1, l2],
+        bases: [tied],
+        answers: [[l1, fetched(PRICE)], [l2, fetched(LOWER)]],
+      });
+    });
+
     it("stores the product's cheapest listing only when it changed", async () => {
       const calls: unknown[] = [];
       const wrap = (repository: Repository): Repository => ({

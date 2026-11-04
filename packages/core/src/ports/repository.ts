@@ -100,18 +100,21 @@ export interface ListingRepository {
 export interface SnapshotRepository {
   /** Appends a snapshot of an existing listing. */
   append(snapshot: PriceSnapshot): Promise<Result<void, NotFound>>;
-  /** A listing's snapshots observed at or after `since`, oldest first. */
+  /**
+   * A listing's snapshots observed at or after `since`, oldest first. Snapshots observed at the same instant come in
+   * the order they were appended.
+   */
   listSince(listingId: ListingId, since: Date): Promise<PriceSnapshot[]>;
   /**
    * The newest snapshot of each of a product's listings that has one, in no particular order. Of snapshots observed
-   * at the same instant, the one with the greater id by code point is the newest.
+   * at the same instant, the one appended last is the newest.
    */
   latestPerListing(productId: ProductId): Promise<PriceSnapshot[]>;
   /**
    * Every snapshot of an active or stale listing of a product that is not archived observed at or after `since`, plus
    * each such listing's newest snapshot before `since`, ordered by listing id by code point, then oldest first, then
-   * by id in code point order. Of snapshots before `since` observed at the same instant, the one with the greater id
-   * by code point is the newest.
+   * in the order they were appended. Of snapshots before `since` observed at the same instant, the one appended last
+   * is the newest.
    */
   listForTrend(since: Date): Promise<PriceSnapshot[]>;
 }
@@ -216,7 +219,7 @@ export interface SettingsRepository {
  * - Every other broken reference, such as an alert naming a missing snapshot or a candidate for a missing product,
  *   and an id that is already stored are bugs: the promise rejects.
  * - Instants are UTC `Date`s, stored as integer epoch milliseconds, so they round-trip to the millisecond. The
- *   order of rows with equal instants is unspecified, except where a method names an id tiebreak.
+ *   order of rows with equal instants is unspecified, except where a method names a tiebreak.
  */
 export interface Repository {
   /** Products. */
