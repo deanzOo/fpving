@@ -1,6 +1,8 @@
 import { apiRoutes } from "@fpving/app/api-routes";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
+import { ESC_GUIDE, ESC_PIECE_GUIDES } from "../../src/esc-guide.ts";
+import { EscPiece } from "../../src/esc-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "../../src/motor-guide.ts";
 import { buildMotor, MAGNET_POLES, MotorPiece, PHASES, STATOR_SLOTS } from "../../src/motor-model.ts";
 import { fakeApi, reply, wire } from "../support/fake-api.ts";
@@ -28,6 +30,10 @@ const open = async () => {
 
 describe("Motor model", () => {
   const motor = buildMotor();
+
+  it("is seen from a low angle, side on", () => {
+    expect(motor.elevation).toBeLessThan(Math.PI / PHASES / PAIR);
+  });
 
   it("has a 2207's 12 slots, 14 magnets and 3 phases", () => {
     expect(STATOR_SLOTS % PHASES).toBe(0);
@@ -146,6 +152,27 @@ describe("Atlas", () => {
     await expect.element(screen.getByText(/Slowed right down/u)).toBeVisible();
     await off.click(POLL);
     await expect.element(screen.getByRole("button", { name: "Power on" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("switches to the ESC, with its own pieces and no power switch, and back to the motor", async () => {
+    const screen = await open();
+    await screen.getByRole("button", { name: "ESC", exact: true }).click(POLL);
+    await expect.element(screen.getByRole("heading", { level: 2, name: ESC_GUIDE.name })).toBeVisible();
+    await expect.element(screen.getByRole("img", { name: /ESC/u })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Power on" })).not.toBeInTheDocument();
+    const { name, specs } = ESC_PIECE_GUIDES[EscPiece.Capacitor];
+    await screen.getByRole("button", { name, exact: true }).click(POLL);
+    await expect.element(screen.getByText(specs)).toBeVisible();
+    await screen.getByRole("button", { name: "Motor", exact: true }).click(POLL);
+    await expect.element(screen.getByRole("heading", { level: 2, name: MOTOR_GUIDE.name })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Power on" })).toBeVisible();
+  });
+
+  it("marks the part shown as current", async () => {
+    const screen = await open();
+    const parts = screen.getByRole("navigation", { name: "Parts" });
+    await expect.element(parts.getByRole("button", { name: "Motor" })).toHaveAttribute("aria-current", "true");
+    await expect.element(parts.getByRole("button", { name: "ESC" })).toHaveAttribute("aria-current", "false");
   });
 
   it("says when 3D is unavailable and keeps every piece's text reachable", async () => {
