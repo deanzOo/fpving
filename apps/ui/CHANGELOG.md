@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/deanzOo/fpving/compare/ui-v0.1.0...ui-v0.2.0) (2026-11-07)
+
+
+### Features
+
+* **ui:** add the parts atlas with a 3d motor ([#53](https://github.com/deanzOo/fpving/issues/53)) ([1b06a35](https://github.com/deanzOo/fpving/commit/1b06a3500e37491b658642e1e78472685ccf12b1))
+
 ## 0.1.0 (2026-11-04)
 
 
