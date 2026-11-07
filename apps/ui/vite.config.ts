@@ -36,8 +36,6 @@ export default defineConfig({
   build: { outDir: "dist/web", emptyOutDir: true },
   optimizeDeps: { entries: ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"] },
   test: {
-    name: "ui",
-    include: ["test/**/*.test.{ts,tsx}"],
     setupFiles: ["test/support/console-guard.ts", "test/support/pointer-reset.ts"],
     browser: {
       enabled: true,

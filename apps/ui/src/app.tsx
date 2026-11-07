@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent, RouterProvider } from "@tanstack/react-router";
 import type { RouterHistory } from "@tanstack/react-router";
 import { useState } from "react";
 import { Alerts } from "./alerts.tsx";
@@ -26,6 +26,11 @@ const matchesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/matc
 const alertsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts });
 const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsScreen });
 const pluginsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/plugins", component: Plugins });
+const atlasRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/atlas",
+  component: lazyRouteComponent(async () => import("./atlas.tsx"), "Atlas"),
+});
 
 const routeTree = rootRoute.addChildren([
   watchlistRoute,
@@ -34,6 +39,7 @@ const routeTree = rootRoute.addChildren([
   alertsRoute,
   settingsRoute,
   pluginsRoute,
+  atlasRoute,
 ]);
 
 const createAppRouter = (history: RouterHistory) =>

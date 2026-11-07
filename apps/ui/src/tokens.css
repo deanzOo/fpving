@@ -34,6 +34,18 @@
   --color-series-8: #b54a4b;
   --color-chart-grid: var(--color-line);
   --color-chart-axis: var(--color-line-strong);
+  --color-model-bell: #8a97a3;
+  --color-model-base: #2a3239;
+  --color-model-steel: #c3cad0;
+  --color-model-steel-dark: #6f7880;
+  --color-model-lamination: #83898f;
+  --color-model-copper: #c8743a;
+  --color-model-nylon: #e8e8e0;
+  --color-model-north: #b23a35;
+  --color-model-south: #2b5c9c;
+  --color-model-phase-a: #c23a2e;
+  --color-model-phase-b: #a8760f;
+  --color-model-phase-c: #2f6fc4;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --spacing: 4px;
@@ -86,6 +98,18 @@
     --color-series-6: #47944c;
     --color-series-7: #4a79c6;
     --color-series-8: #bb5757;
+    --color-model-bell: #8a97a3;
+    --color-model-base: #2a3239;
+    --color-model-steel: #c3cad0;
+    --color-model-steel-dark: #6f7880;
+    --color-model-lamination: #83898f;
+    --color-model-copper: #c8743a;
+    --color-model-nylon: #e8e8e0;
+    --color-model-north: #b23a35;
+    --color-model-south: #2b5c9c;
+    --color-model-phase-a: #d1483c;
+    --color-model-phase-b: #e3b341;
+    --color-model-phase-c: #3f7fd1;
     --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
   }
 }
@@ -120,6 +144,18 @@
   --color-series-6: #47944c;
   --color-series-7: #4a79c6;
   --color-series-8: #bb5757;
+  --color-model-bell: #8a97a3;
+  --color-model-base: #2a3239;
+  --color-model-steel: #c3cad0;
+  --color-model-steel-dark: #6f7880;
+  --color-model-lamination: #83898f;
+  --color-model-copper: #c8743a;
+  --color-model-nylon: #e8e8e0;
+  --color-model-north: #b23a35;
+  --color-model-south: #2b5c9c;
+  --color-model-phase-a: #d1483c;
+  --color-model-phase-b: #e3b341;
+  --color-model-phase-c: #3f7fd1;
   --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 

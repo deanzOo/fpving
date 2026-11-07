@@ -7,6 +7,11 @@ const SOURCE_CONDITIONS = ["@fpving/source"];
 const E2E_TIMEOUT_MS = 180_000;
 const APP_TIMEOUT_MS = 30_000;
 const E2E_TESTS = "test/e2e/**/*.test.ts";
+const UI_ROOT = "apps/ui";
+const UI_3D_TIMEOUT_MS = 60_000;
+const UI_3D_POLL_MS = 20_000;
+const UI_CONFIG = "apps/ui/vite.config.ts";
+const UI_3D_TESTS = "test/3d/**/*.test.{ts,tsx}";
 
 export default defineConfig({
   ssr: { resolve: { conditions: SOURCE_CONDITIONS } },
@@ -36,7 +41,27 @@ export default defineConfig({
           hookTimeout: E2E_TIMEOUT_MS,
         },
       },
-      "apps/ui/vite.config.ts",
+      {
+        extends: UI_CONFIG,
+        root: UI_ROOT,
+        test: {
+          name: "ui",
+          include: ["test/**/*.test.{ts,tsx}"],
+          exclude: [...configDefaults.exclude, UI_3D_TESTS],
+        },
+      },
+      {
+        extends: UI_CONFIG,
+        root: UI_ROOT,
+        test: {
+          name: "ui-3d",
+          include: [UI_3D_TESTS],
+          maxWorkers: 1,
+          sequence: { groupOrder: 1 },
+          testTimeout: UI_3D_TIMEOUT_MS,
+          expect: { poll: { timeout: UI_3D_POLL_MS } },
+        },
+      },
       { extends: true, test: { name: "tooling", include: ["tests/tooling/**/*.test.ts", "tools/**/*.test.ts"] } },
     ],
     coverage: {
