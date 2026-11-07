@@ -15,7 +15,6 @@ const HALF = 0.5;
 const SOME_FRAMES = 2;
 const PHASES = 3;
 const POLL = { timeout: 20_000 };
-const POINTER_TEST_MS = 40_000;
 const FINISH = { token: "model-steel", roughness: 0.5, metalness: 0.5 };
 
 const model = (): Model<"low" | "high"> => ({
@@ -44,7 +43,11 @@ const model = (): Model<"low" | "high"> => ({
 const stages: ModelStage<"low" | "high">[] = [];
 const hosts: HTMLElement[] = [];
 
-const mount = (handlers: { onHover?: (id: string | null) => void; onPick?: (id: string | null) => void } = {}) => {
+const mount = (handlers: {
+  onHover?: (id: string | null) => void;
+  onPick?: (id: string | null) => void;
+  onFrame?: () => void;
+} = {}) => {
   const host = document.createElement("div");
   host.style.width = `${String(HOST_SIDE)}px`;
   host.style.height = `${String(HOST_SIDE)}px`;
@@ -56,7 +59,7 @@ const mount = (handlers: { onHover?: (id: string | null) => void; onPick?: (id: 
     model: model(),
     onHover: handlers.onHover ?? vi.fn(),
     onPick: handlers.onPick ?? vi.fn(),
-    onFrame: vi.fn(),
+    onFrame: handlers.onFrame ?? vi.fn(),
   });
   if (stage === null) {
     throw new Error("the test browser has no WebGL");
@@ -113,7 +116,7 @@ describe("Model stage", () => {
     expect(stage.pieceAt(left + OFF_MODEL, top + OFF_MODEL)).toBeNull();
   });
 
-  it("lifts each piece by its offset as it comes apart, and brings it back", { timeout: POLL.timeout }, async () => {
+  it("lifts each piece by its offset as it comes apart, and brings it back", async () => {
     const { stage } = mount();
     const together = stage.boxOf("high").top;
     const lowTogether = stage.boxOf("low");
@@ -128,7 +131,7 @@ describe("Model stage", () => {
     await expect.poll(() => Math.abs(stage.boxOf("high").top - together) < 1, POLL).toBe(true);
   });
 
-  it("reports a click on a piece, and on empty space as nothing", { timeout: POINTER_TEST_MS }, async () => {
+  it("reports a click on a piece, and on empty space as nothing", async () => {
     const onPick = vi.fn();
     const { canvas, stage } = mount({ onPick });
     await userEvent.click(canvas, { position: centre(stage.boxOf("low")), timeout: POLL.timeout });
@@ -137,7 +140,7 @@ describe("Model stage", () => {
     await expect.poll(() => onPick.mock.lastCall, POLL).toEqual([null]);
   });
 
-  it("treats a drag as turning the model, not as a click", { timeout: POINTER_TEST_MS }, async () => {
+  it("treats a drag as turning the model, not as a click", async () => {
     const onPick = vi.fn();
     const { canvas, stage } = mount({ onPick });
     const before = stage.boxOf("low");
@@ -151,37 +154,24 @@ describe("Model stage", () => {
     await expect.poll(() => stage.boxOf("low").width, POLL).not.toBe(before.width);
   });
 
-  it("reports what the pointer is over, and nothing once it leaves", { timeout: POINTER_TEST_MS }, async () => {
+  it("reports what the pointer is over, and nothing once it leaves", async () => {
     const onHover = vi.fn();
     const { canvas, stage } = mount({ onHover });
     await userEvent.hover(canvas, { position: centre(stage.boxOf("low")), timeout: POLL.timeout });
     await expect.poll(() => onHover.mock.lastCall, POLL).toEqual(["low"]);
-    await userEvent.unhover(canvas, { timeout: POLL.timeout });
+    await userEvent.unhover(canvas);
     await expect.poll(() => onHover.mock.lastCall, POLL).toEqual([null]);
   });
 
   it("calls back after drawing a frame, so an overlay can follow the model", async () => {
     const onFrame = vi.fn();
-    const host = document.createElement("div");
-    document.body.append(host);
-    hosts.push(host);
-    const stage = createModelStage({ host, label: "x", model: model(), onHover: vi.fn(), onPick: vi.fn(), onFrame });
-    if (stage !== null) {
-      stages.push(stage);
-    }
+    mount({ onFrame });
     await expect.poll(() => onFrame.mock.calls.length).toBeGreaterThan(0);
   });
 
   it("keeps drawing while powered and comes to rest when power is off", async () => {
     const onFrame = vi.fn();
-    const host = document.createElement("div");
-    document.body.append(host);
-    hosts.push(host);
-    const stage = createModelStage({ host, label: "x", model: model(), onHover: vi.fn(), onPick: vi.fn(), onFrame });
-    if (stage === null) {
-      throw new Error("the test browser has no WebGL");
-    }
-    stages.push(stage);
+    const { stage } = mount({ onFrame });
     await expect.poll(() => onFrame.mock.calls.length, POLL).toBeGreaterThan(0);
     const before = onFrame.mock.calls.length;
     stage.setPowered(true);
@@ -194,17 +184,11 @@ describe("Model stage", () => {
       });
       return onFrame.mock.calls.length === seen;
     }, POLL).toBe(true);
-  }, POLL.timeout);
+  });
 
   it("redraws in the new colours when the theme changes", async () => {
     const onFrame = vi.fn();
-    const host = document.createElement("div");
-    document.body.append(host);
-    hosts.push(host);
-    const stage = createModelStage({ host, label: "x", model: model(), onHover: vi.fn(), onPick: vi.fn(), onFrame });
-    if (stage !== null) {
-      stages.push(stage);
-    }
+    mount({ onFrame });
     await expect.poll(() => onFrame.mock.calls.length).toBeGreaterThan(0);
     const seen = onFrame.mock.calls.length;
     applyTheme(Theme.Dark);

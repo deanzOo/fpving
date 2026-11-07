@@ -68,7 +68,7 @@ export interface ModelStageOptions<Id extends string> {
   readonly model: Model<Id>;
   readonly onHover: (id: Id | null) => void;
   readonly onPick: (id: Id | null) => void;
-  readonly onFrame: () => void;
+  readonly onFrame: (boxOf: (id: Id) => ScreenBox) => void;
 }
 
 /** A running 3D view of a model. */
@@ -389,32 +389,6 @@ export const createModelStage = <Id extends string>(options: ModelStageOptions<I
     dirty = true;
   });
 
-  renderer.setAnimationLoop((time) => {
-    const step = Math.min((time - previous) / MOTION.millisecondsPerSecond, MOTION.maxStep);
-    previous = time;
-    if (exploded !== explodeTarget) {
-      exploded = approach(exploded, explodeTarget, MOTION.explodeRate, step);
-      placePieces();
-      frameCamera();
-      renderer.shadowMap.needsUpdate = true;
-      dirty = true;
-    }
-    const spinTarget = powered ? 1 : 0;
-    if (spin > 0 || spinTarget > 0) {
-      spin = approach(spin, spinTarget, MOTION.spinRate, step);
-      rotor += spin * step * MOTION.turnsPerSecond;
-      placePieces();
-      glowPhases();
-      dirty = true;
-    }
-    controls.update();
-    if (dirty) {
-      dirty = false;
-      renderer.render(scene, camera);
-      onFrame();
-    }
-  });
-
   const raycaster = new Raycaster();
   const pointer = new Vector2();
   const groups = parts.map(({ group }) => group);
@@ -491,6 +465,32 @@ export const createModelStage = <Id extends string>(options: ModelStageOptions<I
     }
     return { left, top, width: right - left, height: bottom - top };
   };
+
+  renderer.setAnimationLoop((time) => {
+    const step = Math.min((time - previous) / MOTION.millisecondsPerSecond, MOTION.maxStep);
+    previous = time;
+    if (exploded !== explodeTarget) {
+      exploded = approach(exploded, explodeTarget, MOTION.explodeRate, step);
+      placePieces();
+      frameCamera();
+      renderer.shadowMap.needsUpdate = true;
+      dirty = true;
+    }
+    const spinTarget = powered ? 1 : 0;
+    if (spin > 0 || spinTarget > 0) {
+      spin = approach(spin, spinTarget, MOTION.spinRate, step);
+      rotor += spin * step * MOTION.turnsPerSecond;
+      placePieces();
+      glowPhases();
+      dirty = true;
+    }
+    controls.update();
+    if (dirty) {
+      dirty = false;
+      renderer.render(scene, camera);
+      onFrame(boxOf);
+    }
+  });
 
   return {
     setExplode: (amount) => {

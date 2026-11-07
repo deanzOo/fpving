@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createModelStage } from "./model-stage.ts";
 import type { Model, ModelStage } from "./model-stage.ts";
 import { Notice, NoticeTone } from "./notice.tsx";
@@ -26,7 +26,6 @@ interface ModelViewProps<Id extends string> {
 export const ModelView = <Id extends string>({
   label, build, nameOf, selected, onSelect, exploded, powered,
 }: ModelViewProps<Id>) => {
-  const host = useRef<HTMLDivElement>(null);
   const reticle = useRef<HTMLDivElement>(null);
   const stage = useRef<ModelStage<Id> | null>(null);
   const shown = useRef(selected);
@@ -39,29 +38,23 @@ export const ModelView = <Id extends string>({
     shown.current = selected;
   });
 
-  useEffect(() => {
-    const container = host.current;
-    if (container === null) {
-      return undefined;
-    }
+  const startIn = useCallback((host: HTMLDivElement) => {
     const created = createModelStage({
-      host: container,
+      host,
       label,
       model: build(),
       onHover: setHovered,
       onPick: (id) => {
         pick.current(id === shown.current ? null : id);
       },
-      onFrame: () => {
+      onFrame: (boxOf) => {
         const element = reticle.current;
         if (element !== null && shown.current !== null) {
-          const box = stage.current?.boxOf(shown.current);
-          if (box !== undefined) {
-            element.style.left = `${String(box.left - BRACKET_PADDING_PIXELS)}px`;
-            element.style.top = `${String(box.top - BRACKET_PADDING_PIXELS)}px`;
-            element.style.width = `${String(box.width + BRACKET_PADDING_PIXELS + BRACKET_PADDING_PIXELS)}px`;
-            element.style.height = `${String(box.height + BRACKET_PADDING_PIXELS + BRACKET_PADDING_PIXELS)}px`;
-          }
+          const { left, top, width, height } = boxOf(shown.current);
+          element.style.left = `${String(left - BRACKET_PADDING_PIXELS)}px`;
+          element.style.top = `${String(top - BRACKET_PADDING_PIXELS)}px`;
+          element.style.width = `${String(width + BRACKET_PADDING_PIXELS + BRACKET_PADDING_PIXELS)}px`;
+          element.style.height = `${String(height + BRACKET_PADDING_PIXELS + BRACKET_PADDING_PIXELS)}px`;
         }
       },
     });
@@ -92,7 +85,7 @@ export const ModelView = <Id extends string>({
   }
   return (
     <div className="relative h-full min-h-96 overflow-hidden">
-      <div ref={host} className="size-full" />
+      <div ref={startIn} className="size-full" />
       <p aria-hidden="true" className="pointer-events-none absolute left-2 top-2 text-signal type-label">
         {hovered === null ? "" : nameOf(hovered)}
       </p>
