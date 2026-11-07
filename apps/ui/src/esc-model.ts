@@ -118,7 +118,7 @@ const positions = ({ first, step, count }: Steps): number[] =>
 
 const FET = {
   columns: { first: 4, step: 5.2, count: 3 },
-  rows: { first: 3.2, step: 5.2, count: 2 },
+  rows: { first: 3.6, step: 5, count: 2 },
   width: 4.4,
   depth: 4.8,
   height: 1,
@@ -191,7 +191,7 @@ const motorPads = (): ModelMesh[] => [{
 }];
 
 const POWER = { x: 4.2, z: 17.6, width: 5, depth: 3.4, height: 0.1 } as const;
-const LEAD = { radius: 1.2, segments: 48, sides: 12, rise: 1.4, out: 8, far: 32, spread: 2.2, drop: -3 } as const;
+const LEAD = { radius: 1.2, segments: 48, sides: 12, rise: 1.4, out: 6, far: 15, spread: 1.6, drop: -1 } as const;
 
 const batteryPads = (): ModelMesh[] => {
   const lead = (side: number): BufferGeometry => {
@@ -214,7 +214,7 @@ const batteryPads = (): ModelMesh[] => {
   ];
 };
 
-const CAP = { radius: 4, length: 14, z: 25, y: 4.6, sides: 32, lip: 0.4, leg: 0.3, legLength: 7, legX: 3 } as const;
+const CAP = { radius: 4, length: 14, z: 24, y: 7.5, sides: 32, lip: 0.4, leg: 0.3, legLength: 7, legX: 3 } as const;
 
 const capacitor = (): ModelMesh[] => {
   const can = new CylinderGeometry(CAP.radius, CAP.radius, CAP.length, CAP.sides).rotateZ(QUARTER_TURN)
