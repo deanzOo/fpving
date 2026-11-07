@@ -45,6 +45,7 @@ const QUARTER_TURN = Math.PI * HALF;
 const EVERY_OTHER = 2;
 const POLE_PAIRS = MAGNET_POLES * HALF;
 const MOUNT_HOLES = 4;
+const SIDE_ON = 0.3;
 
 const FINISH = {
   bell: { token: "model-bell", roughness: 0.34, metalness: 0.8 },
@@ -565,6 +566,7 @@ export const buildMotor = (): Model<MotorPiece> => {
     meshes: readonly ModelMesh[],
   ): ModelPiece<MotorPiece> => ({ id, offset, spins, meshes });
   return {
+    elevation: SIDE_ON,
     phases: PHASES,
     polePairs: POLE_PAIRS,
     pieces: [
