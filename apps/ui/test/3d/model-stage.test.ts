@@ -52,6 +52,7 @@ const mount = (handlers: {
   onHover?: (id: string | null) => void;
   onPick?: (id: string | null) => void;
   onFrame?: () => void;
+  elevation?: number;
 } = {}) => {
   const host = document.createElement("div");
   host.style.width = `${String(HOST_SIDE)}px`;
@@ -61,7 +62,7 @@ const mount = (handlers: {
   const stage = createModelStage({
     host,
     label: "A test model",
-    model: model(),
+    model: model(handlers.elevation),
     onHover: handlers.onHover ?? vi.fn(),
     onPick: handlers.onPick ?? vi.fn(),
     onFrame: handlers.onFrame ?? vi.fn(),
@@ -222,19 +223,7 @@ describe("Model stage", () => {
 describe("Model stage view", () => {
   it("looks at the model from its own elevation, so a flat part can be seen from above", () => {
     const heightFrom = (elevation: number): number => {
-      const host = document.createElement("div");
-      host.style.width = `${String(HOST_SIDE)}px`;
-      host.style.height = `${String(HOST_SIDE)}px`;
-      document.body.append(host);
-      hosts.push(host);
-      const stage = createModelStage({
-        host, label: "x", model: model(elevation), onHover: vi.fn(), onPick: vi.fn(), onFrame: vi.fn(),
-      });
-      if (stage === null) {
-        throw new Error("the test browser has no WebGL");
-      }
-      stages.push(stage);
-      const { height, width } = stage.boxOf("low");
+      const { height, width } = mount({ elevation }).stage.boxOf("low");
       return height / width;
     };
     expect(heightFrom(HIGH_VIEW)).toBeGreaterThan(heightFrom(LOW_VIEW));
