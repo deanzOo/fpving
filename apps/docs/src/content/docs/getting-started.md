@@ -48,13 +48,14 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
 - The plugin list in `DATA_DIR/plugins.json`, the check of each plugin's `sdkVersion` against the SDK, and the map from declared domains to plugins. The plugin host loads each listed plugin in its own worker thread, with call deadlines, one restart and a status for each plugin; the store gateway routes core's fetches and searches to it, and the pages a plugin cannot parse are saved under `DATA_DIR/debug/`.
 - Environment config: `apps/fpving` parses `PORT`, `DATA_DIR`, an optional `ANTHROPIC_API_KEY` and `LOG_LEVEL`, and reports every invalid variable by name without echoing a value.
 - `pnpm worktree:init`, which gives each git worktree its own `.env` with a stable port and data directory. See [Contributing](../contributing/).
-- The UI in `apps/ui`: the app shell with its navigation and six screens.
+- The UI in `apps/ui`: the app shell with its navigation and seven screens.
   - Watchlist: paste a store URL to watch a product, see each product's cheapest landed cost, its 30-day price trend and its unread alerts, and start a scan with the last scan's result beside it. A URL another product already watches links to that product.
   - Product: rename it, stop watching it (after a confirm step), see each listing's store, latest price, shipping, landed cost, stock and status, remove a listing, add one by URL, and a chart of each listing's landed cost over time.
   - Matches: the pending match candidates of every product, with the judge's verdict and reason and the similarity, to accept or reject, and a search for more per product. Candidates judged different are hidden until you ask to see them.
   - Alerts: every alert newest first or only the unread ones, marking one or all of them read.
   - Settings: every setting in one form.
   - Plugins: each `plugins.json` entry with its state (loaded, disabled with the reason, or backing off and when it retries), its domains and its stale and not scanned listing counts, plus rows for the listings of a plugin no longer in `plugins.json`, plus rejected entries and an unusable `plugins.json`.
+  - Atlas: a 3D motor to turn, take apart and click, with what each piece does, how it works, what goes wrong and what to look at. It also shows the coils taking turns, slowed right down.
 - The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health` and the domain routes (the watchlist, products, listings, match candidates, alerts, settings, plugins, scan now), refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
 
 To work on it, follow the setup in [Contributing](../contributing/).

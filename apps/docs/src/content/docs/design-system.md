@@ -36,7 +36,9 @@ The primitives live in `apps/ui/src/ui/`. If one nearly fits, extend it instead 
 | `Notice`, `Done` | One announced sentence about what just happened, with a tag. `Done` is the tagged outcome of something the user did. |
 | `EmptyState` | What a list, table or chart shows when it has nothing: a tag and a sentence that says what to do. |
 | `NavBar`, `ThemeSwitch` | The app's navigation and its theme choice. Used once, by the layout. |
-| `ScanStatus` | Scan now with its status line, the one place the interface moves. |
+| `ScanStatus` | Scan now with its status line, the one place the interface moves on its own. |
+| `ModelView` | A 3D model to turn, take apart and click, with brackets on the selected piece. Always pair it with a list of the same pieces, for keyboards, screen readers and browsers without WebGL. |
+| `Slider` | A labelled range from 0 to 100. |
 | `Sparkline` | The small price trend in a row. |
 | `chart-theme.tsx` | The series order, grid, axis, line, legend and tooltip for a price chart. |
 | `LINK` | The classes of a text link, for a router `Link` or an anchor. |

@@ -33,7 +33,7 @@ describe("App shell", () => {
   it("shows a navigation landmark with a link to every screen", async () => {
     const screen = await renderApp(scripted().client);
     const nav = screen.getByRole("navigation", { name: "Main" });
-    for (const name of ["Watchlist", "Matches", "Alerts", "Settings", "Plugins"]) {
+    for (const name of ["Watchlist", "Matches", "Alerts", "Settings", "Plugins", "Atlas"]) {
       await expect.element(nav.getByRole("link", { name, exact: false })).toBeVisible();
     }
     await expect.element(screen.getByRole("main")).toBeVisible();
