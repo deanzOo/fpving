@@ -333,9 +333,12 @@ export const createModelStage = <Id extends string>(options: ModelStageOptions<I
     for (const { piece, materials, group } of parts) {
       const { ghost, tinted } = lookOf(piece.id, selected, hovered);
       for (const material of materials) {
-        material.transparent = ghost;
+        if (material.transparent !== ghost) {
+          material.transparent = ghost;
+          material.depthWrite = !ghost;
+          material.needsUpdate = true;
+        }
         material.opacity = ghost ? LOOK.ghostOpacity : 1;
-        material.depthWrite = !ghost;
         material.emissive.copy(tinted ? tint : new Color());
         material.emissiveIntensity = tinted ? LOOK.tint : 0;
       }

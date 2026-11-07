@@ -12,6 +12,8 @@ const HOST_SIDE = 400;
 const OFF_MODEL = 4;
 const DRAG = 80;
 const HALF = 0.5;
+const PIXEL_CHANNELS = 4;
+const OPAQUE = 255;
 const SOME_FRAMES = 2;
 const PHASES = 3;
 const POLL = { timeout: 20_000 };
@@ -184,6 +186,24 @@ describe("Model stage", () => {
       });
       return onFrame.mock.calls.length === seen;
     }, POLL).toBe(true);
+  });
+
+  it("really fades the other pieces when one is selected, so what is behind them shows through", async () => {
+    const alpha = { value: -1 };
+    const pixel = new Uint8Array(PIXEL_CHANNELS);
+    const { canvas, stage } = mount({
+      onFrame: () => {
+        const context = canvas.getContext("webgl2");
+        const { x, y } = centre(stage.boxOf("high"));
+        context?.readPixels(x, canvas.height - y, 1, 1, context.RGBA, context.UNSIGNED_BYTE, pixel);
+        alpha.value = pixel[PIXEL_CHANNELS - 1] ?? -1;
+      },
+    });
+    await expect.poll(() => alpha.value).toBe(OPAQUE);
+    stage.setSelected("low");
+    await expect.poll(() => alpha.value).toBeLessThan(OPAQUE * HALF);
+    stage.setSelected(null);
+    await expect.poll(() => alpha.value).toBe(OPAQUE);
   });
 
   it("redraws in the new colours when the theme changes", async () => {
