@@ -37,6 +37,12 @@ describe("Design tokens stylesheet", () => {
     expect(chosen).toContain("--color-signal: #62c3cd;");
   });
 
+  it("gives a model's materials their own colours, with marks that hold up in both themes", () => {
+    expect(section("@theme static")).toContain("--color-model-copper: #c8743a;");
+    expect(section("@theme static")).toContain("--color-model-phase-b: #a8760f;");
+    expect(section(":root[data-theme=\"dark\"]")).toContain("--color-model-phase-b: #e3b341;");
+  });
+
   it("resolves an alias to the variable it names, once, in the light theme", () => {
     expect(section("@theme static")).toContain("--color-chart-grid: var(--color-line);");
     expect(css.match(/--color-chart-axis:/gu)).toHaveLength(1);
