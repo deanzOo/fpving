@@ -46,6 +46,13 @@
   --color-model-phase-a: #c23a2e;
   --color-model-phase-b: #a8760f;
   --color-model-phase-c: #2f6fc4;
+  --color-model-pcb: #1d2329;
+  --color-model-gold: #c9a443;
+  --color-model-chip: #2a2e33;
+  --color-model-positive: #c23a2e;
+  --color-model-negative: #33373c;
+  --color-model-grommet: #55505e;
+  --color-model-capacitor: #2d3f6b;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --spacing: 4px;
@@ -110,6 +117,13 @@
     --color-model-phase-a: #d1483c;
     --color-model-phase-b: #e3b341;
     --color-model-phase-c: #3f7fd1;
+    --color-model-pcb: #1d2329;
+    --color-model-gold: #c9a443;
+    --color-model-chip: #2a2e33;
+    --color-model-positive: #c23a2e;
+    --color-model-negative: #33373c;
+    --color-model-grommet: #55505e;
+    --color-model-capacitor: #2d3f6b;
     --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
   }
 }
@@ -156,6 +170,13 @@
   --color-model-phase-a: #d1483c;
   --color-model-phase-b: #e3b341;
   --color-model-phase-c: #3f7fd1;
+  --color-model-pcb: #1d2329;
+  --color-model-gold: #c9a443;
+  --color-model-chip: #2a2e33;
+  --color-model-positive: #c23a2e;
+  --color-model-negative: #33373c;
+  --color-model-grommet: #55505e;
+  --color-model-capacitor: #2d3f6b;
   --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 

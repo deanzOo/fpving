@@ -46,9 +46,13 @@ export interface ModelPiece<Id extends string> {
   readonly meshes: readonly ModelMesh[];
 }
 
-/** A model made of pieces; `polePairs` sets how fast its `phases` cycle against the rotor. */
+/**
+ * A model made of pieces, seen from `elevation` radians above its side; `polePairs` sets how fast its `phases` cycle
+ * against the rotor.
+ */
 export interface Model<Id extends string> {
   readonly pieces: readonly ModelPiece<Id>[];
+  readonly elevation: number;
   readonly phases: number;
   readonly polePairs: number;
 }
@@ -86,7 +90,6 @@ const VIEW = {
   near: 1,
   far: 900,
   azimuth: 0.72,
-  elevation: 0.3,
   heightMargin: 1.05,
   widthMargin: 0.92,
   compactHeight: 1.1,
@@ -378,9 +381,9 @@ export const createModelStage = <Id extends string>(options: ModelStageOptions<I
   };
 
   camera.position.set(
-    Math.cos(VIEW.elevation) * Math.sin(VIEW.azimuth),
-    Math.sin(VIEW.elevation),
-    Math.cos(VIEW.elevation) * Math.cos(VIEW.azimuth),
+    Math.cos(model.elevation) * Math.sin(VIEW.azimuth),
+    Math.sin(model.elevation),
+    Math.cos(model.elevation) * Math.cos(VIEW.azimuth),
   );
   applyColours();
   placePieces();

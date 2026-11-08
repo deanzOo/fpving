@@ -12,6 +12,8 @@ const HOST_SIDE = 400;
 const OFF_MODEL = 4;
 const DRAG = 80;
 const HALF = 0.5;
+const LOW_VIEW = 0.1;
+const HIGH_VIEW = 1.2;
 const PIXEL_CHANNELS = 4;
 const OPAQUE = 255;
 const SOME_FRAMES = 2;
@@ -19,7 +21,8 @@ const PHASES = 3;
 const POLL = { timeout: 20_000 };
 const FINISH = { token: "model-steel", roughness: 0.5, metalness: 0.5 };
 
-const model = (): Model<"low" | "high"> => ({
+const model = (elevation = LOW_VIEW): Model<"low" | "high"> => ({
+  elevation,
   phases: 2,
   polePairs: 2,
   pieces: [
@@ -49,6 +52,7 @@ const mount = (handlers: {
   onHover?: (id: string | null) => void;
   onPick?: (id: string | null) => void;
   onFrame?: () => void;
+  elevation?: number;
 } = {}) => {
   const host = document.createElement("div");
   host.style.width = `${String(HOST_SIDE)}px`;
@@ -58,7 +62,7 @@ const mount = (handlers: {
   const stage = createModelStage({
     host,
     label: "A test model",
-    model: model(),
+    model: model(handlers.elevation),
     onHover: handlers.onHover ?? vi.fn(),
     onPick: handlers.onPick ?? vi.fn(),
     onFrame: handlers.onFrame ?? vi.fn(),
@@ -213,6 +217,16 @@ describe("Model stage", () => {
     const seen = onFrame.mock.calls.length;
     applyTheme(Theme.Dark);
     await expect.poll(() => onFrame.mock.calls.length).toBeGreaterThan(seen);
+  });
+});
+
+describe("Model stage view", () => {
+  it("looks at the model from its own elevation, so a flat part can be seen from above", () => {
+    const heightFrom = (elevation: number): number => {
+      const { height, width } = mount({ elevation }).stage.boxOf("low");
+      return height / width;
+    };
+    expect(heightFrom(HIGH_VIEW)).toBeGreaterThan(heightFrom(LOW_VIEW));
   });
 });
 
