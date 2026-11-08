@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "./esc-guide.ts";
 import { buildEsc, EscPiece } from "./esc-model.ts";
+import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "./frame-guide.ts";
+import { buildFrame, FramePiece } from "./frame-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "./motor-guide.ts";
 import type { PartGuide } from "./motor-guide.ts";
 import { buildMotor, MotorPiece } from "./motor-model.ts";
@@ -42,6 +44,16 @@ const ESC: AtlasPart<EscPiece> = {
   pieces: Object.values(EscPiece),
   guide: ESC_GUIDE,
   pieceGuides: ESC_PIECE_GUIDES,
+  powers: false,
+};
+
+const FRAME: AtlasPart<FramePiece> = {
+  label: "3D model of a quad frame. Every piece is also in the list of pieces.",
+  intro: "Shown here: a typical 5 inch true X freestyle frame.",
+  build: buildFrame,
+  pieces: Object.values(FramePiece),
+  guide: FRAME_GUIDE,
+  pieceGuides: FRAME_PIECE_GUIDES,
   powers: false,
 };
 
@@ -135,6 +147,7 @@ const PartAtlas = <Id extends string>({ part }: { readonly part: AtlasPart<Id> }
 const PARTS = [
   { name: "Motor", show: () => <PartAtlas part={MOTOR} /> },
   { name: "ESC", show: () => <PartAtlas part={ESC} /> },
+  { name: "Frame", show: () => <PartAtlas part={FRAME} /> },
 ] as const;
 
 /**
