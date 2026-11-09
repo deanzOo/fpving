@@ -242,16 +242,15 @@ export const createModelStage = <Id extends string>(options: ModelStageOptions<I
     return { piece, group, materials, bounds: new Box3().setFromObject(group) };
   });
 
-  const radius = parts.reduce(
-    (widest, { bounds }) => Math.max(
-      widest,
-      Math.abs(bounds.min.x),
-      Math.abs(bounds.max.x),
-      Math.abs(bounds.min.z),
-      Math.abs(bounds.max.z),
-    ),
-    0,
-  );
+  const ground = model.pieces.flatMap(({ meshes }) => meshes.flatMap(({ geometry }) => {
+    const position = geometry.getAttribute("position");
+    return Array.from({ length: position.count }, (_vertex, index) =>
+      ({ x: position.getX(index), z: position.getZ(index) }));
+  }));
+  const radius = ground.reduce((widest, { x, z }) => Math.max(widest, Math.hypot(x, z)), 0);
+  const along = ground.map(({ x, z }) => x * Math.sin(VIEW.azimuth) + z * Math.cos(VIEW.azimuth));
+  const depth = along.reduce((far, at) => Math.max(far, at), -Infinity)
+    - along.reduce((near, at) => Math.min(near, at), Infinity);
   const lowAt = (amount: number): number =>
     Math.min(...parts.map(({ piece, bounds }) => bounds.min.y + piece.offset * amount));
   const highAt = (amount: number): number =>
@@ -298,7 +297,9 @@ export const createModelStage = <Id extends string>(options: ModelStageOptions<I
 
   const lens = TWO * Math.tan(MathUtils.degToRad(VIEW.fov) * HALF);
   const distanceAt = (amount: number): number => {
-    const height = Math.max(highAt(amount) - lowAt(amount), radius * VIEW.compactHeight);
+    const seen = (highAt(amount) - lowAt(amount)) * Math.cos(model.elevation)
+      + depth * Math.sin(model.elevation);
+    const height = Math.max(seen, radius * VIEW.compactHeight);
     const byHeight = (height * VIEW.heightMargin) / lens;
     const byWidth = (radius * TWO * VIEW.widthMargin) / (lens * camera.aspect);
     return Math.max(byHeight, byWidth) + radius * VIEW.nearSide;

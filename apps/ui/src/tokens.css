@@ -53,6 +53,8 @@
   --color-model-negative: #33373c;
   --color-model-grommet: #55505e;
   --color-model-capacitor: #2d3f6b;
+  --color-model-carbon: #34383d;
+  --color-model-strap: #7a2e36;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --spacing: 4px;
@@ -124,6 +126,8 @@
     --color-model-negative: #33373c;
     --color-model-grommet: #55505e;
     --color-model-capacitor: #2d3f6b;
+    --color-model-carbon: #34383d;
+    --color-model-strap: #7a2e36;
     --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
   }
 }
@@ -177,6 +181,8 @@
   --color-model-negative: #33373c;
   --color-model-grommet: #55505e;
   --color-model-capacitor: #2d3f6b;
+  --color-model-carbon: #34383d;
+  --color-model-strap: #7a2e36;
   --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 

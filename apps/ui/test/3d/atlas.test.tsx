@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "../../src/esc-guide.ts";
 import { EscPiece } from "../../src/esc-model.ts";
+import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "../../src/frame-guide.ts";
+import { FramePiece } from "../../src/frame-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "../../src/motor-guide.ts";
 import { buildMotor, MAGNET_POLES, MotorPiece, PHASES, STATOR_SLOTS } from "../../src/motor-model.ts";
 import { fakeApi, reply, wire } from "../support/fake-api.ts";
@@ -154,13 +156,16 @@ describe("Atlas", () => {
     await expect.element(screen.getByRole("button", { name: "Power on" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("switches to the ESC, with its own pieces and no power switch, and back to the motor", async () => {
+  it.each([
+    { part: "ESC", model: /ESC/u, guide: ESC_GUIDE, piece: ESC_PIECE_GUIDES[EscPiece.Capacitor] },
+    { part: "Frame", model: /frame/u, guide: FRAME_GUIDE, piece: FRAME_PIECE_GUIDES[FramePiece.Arms] },
+  ])("switches to the $part, with its own pieces and no power switch, and back to the motor", async (shown) => {
     const screen = await open();
-    await screen.getByRole("button", { name: "ESC", exact: true }).click(POLL);
-    await expect.element(screen.getByRole("heading", { level: 2, name: ESC_GUIDE.name })).toBeVisible();
-    await expect.element(screen.getByRole("img", { name: /ESC/u })).toBeVisible();
+    await screen.getByRole("button", { name: shown.part, exact: true }).click(POLL);
+    await expect.element(screen.getByRole("heading", { level: 2, name: shown.guide.name })).toBeVisible();
+    await expect.element(screen.getByRole("img", { name: shown.model })).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Power on" })).not.toBeInTheDocument();
-    const { name, specs } = ESC_PIECE_GUIDES[EscPiece.Capacitor];
+    const { name, specs } = shown.piece;
     await screen.getByRole("button", { name, exact: true }).click(POLL);
     await expect.element(screen.getByText(specs)).toBeVisible();
     await screen.getByRole("button", { name: "Motor", exact: true }).click(POLL);

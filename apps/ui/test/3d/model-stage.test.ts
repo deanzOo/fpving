@@ -18,6 +18,9 @@ const PIXEL_CHANNELS = 4;
 const OPAQUE = 255;
 const SOME_FRAMES = 2;
 const PHASES = 3;
+const WIDE_HOST = 640;
+const CROSS = { length: 100, thickness: 2 } as const;
+const EIGHTH_TURN = Math.PI * HALF * HALF;
 const POLL = { timeout: 20_000 };
 const FINISH = { token: "model-steel", roughness: 0.5, metalness: 0.5 };
 
@@ -53,16 +56,18 @@ const mount = (handlers: {
   onPick?: (id: string | null) => void;
   onFrame?: () => void;
   elevation?: number;
+  model?: Model<"low" | "high">;
+  width?: number;
 } = {}) => {
   const host = document.createElement("div");
-  host.style.width = `${String(HOST_SIDE)}px`;
+  host.style.width = `${String(handlers.width ?? HOST_SIDE)}px`;
   host.style.height = `${String(HOST_SIDE)}px`;
   document.body.append(host);
   hosts.push(host);
   const stage = createModelStage({
     host,
     label: "A test model",
-    model: model(handlers.elevation),
+    model: handlers.model ?? model(handlers.elevation),
     onHover: handlers.onHover ?? vi.fn(),
     onPick: handlers.onPick ?? vi.fn(),
     onFrame: handlers.onFrame ?? vi.fn(),
@@ -227,6 +232,26 @@ describe("Model stage view", () => {
       return height / width;
     };
     expect(heightFrom(HIGH_VIEW)).toBeGreaterThan(heightFrom(LOW_VIEW));
+  });
+
+  it.each([
+    { view: "low", elevation: LOW_VIEW },
+    { view: "high", elevation: HIGH_VIEW },
+  ])("keeps a model that reaches out diagonally, like a true X frame, inside a $view view", ({ elevation }) => {
+    const bar = (turn: number) => new BoxGeometry(CROSS.length, CROSS.thickness, CROSS.thickness).rotateY(turn);
+    const cross: Model<"low" | "high"> = {
+      ...model(elevation),
+      pieces: [{ id: "low", offset: 0, spins: false, meshes: [{ geometry: bar(EIGHTH_TURN), finish: FINISH }] }, {
+        id: "high", offset: 0, spins: false, meshes: [{ geometry: bar(-EIGHTH_TURN), finish: FINISH }],
+      }],
+    };
+    const { stage } = mount({ model: cross, width: WIDE_HOST });
+    for (const id of ["low", "high"] as const) {
+      const { left, top, width, height } = stage.boxOf(id);
+      expect(Math.min(left, top)).toBeGreaterThanOrEqual(0);
+      expect(left + width).toBeLessThanOrEqual(WIDE_HOST);
+      expect(top + height).toBeLessThanOrEqual(HOST_SIDE);
+    }
   });
 });
 
