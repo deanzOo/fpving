@@ -2,17 +2,11 @@ import { Box3 } from "three";
 import { describe, expect, it } from "vitest";
 import { BOLT_PIECE_GUIDES } from "../src/bolts-guide.ts";
 import { BoltPiece, buildBolts } from "../src/bolts-model.ts";
+import { boxOf as pieceBox } from "./support/model-box.ts";
 
 describe("Bolts model", () => {
   const bolts = buildBolts();
-  const boxOf = (id: BoltPiece): Box3 => {
-    const box = new Box3();
-    for (const { geometry } of bolts.pieces.find((piece) => piece.id === id)?.meshes ?? []) {
-      geometry.computeBoundingBox();
-      box.union(geometry.boundingBox ?? new Box3());
-    }
-    return box;
-  };
+  const boxOf = (id: BoltPiece): Box3 => pieceBox(bolts, id);
 
   it("builds every fastener the guide describes, and no others", () => {
     expect(bolts.pieces.map(({ id }) => id)).toEqual(Object.values(BoltPiece));
