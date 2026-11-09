@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "./bolts-guide.ts";
+import { BoltPiece, buildBolts } from "./bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "./esc-guide.ts";
 import { buildEsc, EscPiece } from "./esc-model.ts";
 import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "./frame-guide.ts";
@@ -7,6 +9,7 @@ import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "./motor-guide.ts";
 import type { PartGuide } from "./motor-guide.ts";
 import { buildMotor, MotorPiece } from "./motor-model.ts";
 import { Button, ButtonSize, ButtonVariant } from "./ui/button.tsx";
+import { DataTable } from "./ui/data-table.tsx";
 import type { Model } from "./ui/model-stage.ts";
 import { ModelView } from "./ui/model-view.tsx";
 import { Panel } from "./ui/panel.tsx";
@@ -25,6 +28,7 @@ interface AtlasPart<Id extends string> {
   readonly guide: PartGuide;
   readonly pieceGuides: Readonly<Record<Id, PartGuide>>;
   readonly powers: boolean;
+  readonly comesApart: boolean;
 }
 
 const MOTOR: AtlasPart<MotorPiece> = {
@@ -35,6 +39,7 @@ const MOTOR: AtlasPart<MotorPiece> = {
   guide: MOTOR_GUIDE,
   pieceGuides: MOTOR_PIECE_GUIDES,
   powers: true,
+  comesApart: true,
 };
 
 const ESC: AtlasPart<EscPiece> = {
@@ -45,6 +50,7 @@ const ESC: AtlasPart<EscPiece> = {
   guide: ESC_GUIDE,
   pieceGuides: ESC_PIECE_GUIDES,
   powers: false,
+  comesApart: true,
 };
 
 const FRAME: AtlasPart<FramePiece> = {
@@ -55,7 +61,39 @@ const FRAME: AtlasPart<FramePiece> = {
   guide: FRAME_GUIDE,
   pieceGuides: FRAME_PIECE_GUIDES,
   powers: false,
+  comesApart: true,
 };
+
+const BOLTS: AtlasPart<BoltPiece> = {
+  label: "3D model of a row of FPV fasteners. Every one is also in the list of pieces.",
+  intro: "Shown here: the screws and nuts a typical 5 inch quad is put together with.",
+  build: buildBolts,
+  pieces: Object.values(BoltPiece),
+  guide: BOLTS_GUIDE,
+  pieceGuides: BOLT_PIECE_GUIDES,
+  powers: false,
+  comesApart: false,
+};
+
+const BoltSizes = () => (
+  <section className="mt-8">
+    <h2 className="type-heading">Common sizes</h2>
+    <div className="mt-4">
+      <DataTable
+        caption="Common FPV bolt sizes"
+        rows={BOLT_SIZES}
+        rowKey={({ fastener }) => fastener}
+        rowHeader={{ header: "Fastener", cell: ({ fastener }) => fastener }}
+        columns={[
+          { header: "Thread", cell: ({ thread }) => thread },
+          { header: "Length", cell: ({ length }) => length },
+          { header: "Where", cell: ({ where }) => where },
+          { header: "Watch for", cell: ({ watch }) => watch },
+        ]}
+      />
+    </div>
+  </section>
+);
 
 const Fact = ({ title, children }: { readonly title: string; readonly children: string }) => (
   <>
@@ -73,7 +111,9 @@ const PartAtlas = <Id extends string>({ part }: { readonly part: AtlasPart<Id> }
   return (
     <>
       <p className="mt-2 text-ink-muted type-body">
-        Turn the part, take it apart and click a piece to see what it does. {part.intro}
+        {part.comesApart ? "Turn the part, take it apart" : "Turn the part"} and click a piece to see what it does.
+        {" "}
+        {part.intro}
       </p>
       <div className="mt-4 grid gap-4 lg:grid-cols-[10rem_minmax(0,1fr)_18rem]">
         <div className="order-3 lg:order-1">
@@ -109,14 +149,20 @@ const PartAtlas = <Id extends string>({ part }: { readonly part: AtlasPart<Id> }
             />
           </Panel>
           <div className="flex flex-wrap items-center gap-3">
-            <Slider label="Explode" value={exploded} onChange={setExploded} />
-            <Button
-              onClick={() => {
-                setExploded(exploded === APART ? 0 : APART);
-              }}
-            >
-              {exploded === APART ? "Put together" : "Take apart"}
-            </Button>
+            {part.comesApart
+              ? (
+                  <>
+                    <Slider label="Explode" value={exploded} onChange={setExploded} />
+                    <Button
+                      onClick={() => {
+                        setExploded(exploded === APART ? 0 : APART);
+                      }}
+                    >
+                      {exploded === APART ? "Put together" : "Take apart"}
+                    </Button>
+                  </>
+                )
+              : null}
             {part.powers
               ? (
                   <Button
@@ -148,6 +194,15 @@ const PARTS = [
   { name: "Motor", show: () => <PartAtlas part={MOTOR} /> },
   { name: "ESC", show: () => <PartAtlas part={ESC} /> },
   { name: "Frame", show: () => <PartAtlas part={FRAME} /> },
+  {
+    name: "Bolts",
+    show: () => (
+      <>
+        <PartAtlas part={BOLTS} />
+        <BoltSizes />
+      </>
+    ),
+  },
 ] as const;
 
 /**
