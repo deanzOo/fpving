@@ -8,6 +8,8 @@ import { EscPiece } from "../../src/esc-model.ts";
 import { FC_GUIDE, FC_PIECE_GUIDES } from "../../src/fc-guide.ts";
 import { FcPiece } from "../../src/fc-model.ts";
 import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "../../src/frame-guide.ts";
+import { ANALOG_GUIDE, ANALOG_PIECE_GUIDES, DIGITAL_GUIDE, DIGITAL_PIECE_GUIDES } from "../../src/video-guide.ts";
+import { AnalogPiece, DigitalPiece } from "../../src/video-model.ts";
 import { FramePiece } from "../../src/frame-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "../../src/motor-guide.ts";
 import { buildMotor, MAGNET_POLES, MotorPiece, PHASES, STATOR_SLOTS } from "../../src/motor-model.ts";
@@ -168,6 +170,18 @@ describe("Atlas", () => {
       model: /flight controller/u,
       guide: FC_GUIDE,
       piece: FC_PIECE_GUIDES[FcPiece.BootButton],
+    },
+    {
+      part: "Analog video",
+      model: /analog video/u,
+      guide: ANALOG_GUIDE,
+      piece: ANALOG_PIECE_GUIDES[AnalogPiece.Antenna],
+    },
+    {
+      part: "Digital video",
+      model: /digital video/u,
+      guide: DIGITAL_GUIDE,
+      piece: DIGITAL_PIECE_GUIDES[DigitalPiece.Heatsink],
     },
     { part: "Frame", model: /frame/u, guide: FRAME_GUIDE, piece: FRAME_PIECE_GUIDES[FramePiece.Arms] },
     { part: "Bolts", model: /fasteners/u, guide: BOLTS_GUIDE, piece: BOLT_PIECE_GUIDES[BoltPiece.PropNut] },
