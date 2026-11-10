@@ -1,6 +1,8 @@
 import { apiRoutes } from "@fpving/app/api-routes";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
+import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "../../src/bolts-guide.ts";
+import { BoltPiece } from "../../src/bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "../../src/esc-guide.ts";
 import { EscPiece } from "../../src/esc-model.ts";
 import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "../../src/frame-guide.ts";
@@ -159,6 +161,7 @@ describe("Atlas", () => {
   it.each([
     { part: "ESC", model: /ESC/u, guide: ESC_GUIDE, piece: ESC_PIECE_GUIDES[EscPiece.Capacitor] },
     { part: "Frame", model: /frame/u, guide: FRAME_GUIDE, piece: FRAME_PIECE_GUIDES[FramePiece.Arms] },
+    { part: "Bolts", model: /fasteners/u, guide: BOLTS_GUIDE, piece: BOLT_PIECE_GUIDES[BoltPiece.PropNut] },
   ])("switches to the $part, with its own pieces and no power switch, and back to the motor", async (shown) => {
     const screen = await open();
     await screen.getByRole("button", { name: shown.part, exact: true }).click(POLL);
@@ -171,6 +174,26 @@ describe("Atlas", () => {
     await screen.getByRole("button", { name: "Motor", exact: true }).click(POLL);
     await expect.element(screen.getByRole("heading", { level: 2, name: MOTOR_GUIDE.name })).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Power on" })).toBeVisible();
+  });
+
+  it("shows the bolts without taking them apart, since a single fastener does not come apart", async () => {
+    const screen = await open();
+    await screen.getByRole("button", { name: "Bolts", exact: true }).click(POLL);
+    await expect.element(screen.getByRole("img", { name: /fasteners/u })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Take apart" })).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("slider", { name: "Explode" })).not.toBeInTheDocument();
+  });
+
+  it("lists common bolt sizes in a table under the bolts", async () => {
+    const screen = await open();
+    await screen.getByRole("button", { name: "Bolts", exact: true }).click(POLL);
+    const table = screen.getByRole("table", { name: "Common FPV bolt sizes" });
+    for (const { fastener, thread } of BOLT_SIZES) {
+      await expect.element(table.getByRole("rowheader", { name: fastener })).toBeVisible();
+      const row = table.getByRole("row").filter({ hasText: fastener });
+      await expect.element(row).toBeVisible();
+      expect(row.element().textContent).toContain(thread);
+    }
   });
 
   it("marks the part shown as current", async () => {

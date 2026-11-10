@@ -2,6 +2,7 @@ import { Box3, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { FRAME_PIECE_GUIDES } from "../src/frame-guide.ts";
 import { buildFrame, FramePiece, WHEELBASE } from "../src/frame-model.ts";
+import { boxOf as pieceBox } from "./support/model-box.ts";
 
 const FIVE_INCH = { least: 180, most: 230 } as const;
 const SIDE_ON = { divisor: 6 } as const;
@@ -11,14 +12,7 @@ const ROUND_TIP = 0;
 
 describe("Frame model", () => {
   const frame = buildFrame();
-  const boxOf = (id: FramePiece): Box3 => {
-    const box = new Box3();
-    for (const { geometry } of frame.pieces.find((piece) => piece.id === id)?.meshes ?? []) {
-      geometry.computeBoundingBox();
-      box.union(geometry.boundingBox ?? new Box3());
-    }
-    return box;
-  };
+  const boxOf = (id: FramePiece): Box3 => pieceBox(frame, id);
 
   it("builds every piece the guide describes, and no others", () => {
     expect(frame.pieces.map(({ id }) => id)).toEqual(Object.values(FramePiece));
