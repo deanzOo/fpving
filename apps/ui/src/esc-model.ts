@@ -1,16 +1,20 @@
-import {
-  BoxGeometry,
-  CatmullRomCurve3,
-  CylinderGeometry,
-  ExtrudeGeometry,
-  Path,
-  Shape,
-  TorusGeometry,
-  TubeGeometry,
-  Vector3,
-} from "three";
+import { CatmullRomCurve3, CylinderGeometry, TubeGeometry, Vector3 } from "three";
 import type { BufferGeometry } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import {
+  block,
+  board,
+  FROM_ABOVE,
+  grommets,
+  HALF,
+  merged,
+  PCB_FINISH,
+  positions,
+  QUADRANTS,
+  QUARTER_TURN,
+  SIDES,
+  stackConnector,
+  TOP,
+} from "./pcb-model.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
 /** The pieces of the 4-in-1 ESC, in the order the atlas lists them. */
@@ -34,20 +38,8 @@ export const MOTORS = 4;
 /** How many power switches each motor has: a high and a low one for each of its three phases. */
 export const MOSFETS_PER_MOTOR = 6;
 
-const WHOLE_TURN = Math.PI + Math.PI;
-const HALF = 0.5;
-const QUARTER_TURN = Math.PI * HALF;
-const FROM_ABOVE = 0.78;
-const SIDES = [-1, 1] as const;
-const QUADRANTS = SIDES.flatMap((x) => SIDES.map((z) => ({ x, z })));
-
 const FINISH = {
-  pcb: { token: "model-pcb", roughness: 0.55, metalness: 0.1 },
-  gold: { token: "model-gold", roughness: 0.3, metalness: 1 },
-  chip: { token: "model-chip", roughness: 0.6, metalness: 0.1 },
-  steel: { token: "model-steel", roughness: 0.3, metalness: 1 },
-  plastic: { token: "model-nylon", roughness: 0.55, metalness: 0 },
-  grommet: { token: "model-grommet", roughness: 0.8, metalness: 0 },
+  ...PCB_FINISH,
   sleeve: { token: "model-capacitor", roughness: 0.45, metalness: 0.2 },
   positive: { token: "model-positive", roughness: 0.55, metalness: 0 },
   negative: { token: "model-negative", roughness: 0.55, metalness: 0 },
@@ -63,58 +55,7 @@ const OFFSET = {
   grommets: -8,
 } as const;
 
-const BOARD = { side: 40, corner: 2.5, thickness: 1.6, hole: 1.6, holeAt: 15.25, curve: 12 } as const;
-const TOP = BOARD.thickness;
-
-interface Block {
-  readonly x: number;
-  readonly z: number;
-  readonly width: number;
-  readonly depth: number;
-  readonly height: number;
-}
-
-const block = ({ x, z, width, depth, height }: Block, base: number = TOP): BufferGeometry =>
-  new BoxGeometry(width, height, depth).translate(x, base + height * HALF, z);
-
-const merged = (geometries: readonly BufferGeometry[]): BufferGeometry => {
-  const geometry = mergeGeometries([...geometries]);
-  for (const part of geometries) {
-    part.dispose();
-  }
-  return geometry;
-};
-
-const board = (): ModelMesh[] => {
-  const half = BOARD.side * HALF;
-  const inner = half - BOARD.corner;
-  const shape = new Shape();
-  shape.moveTo(-inner, -half);
-  shape.lineTo(inner, -half);
-  shape.absarc(inner, -inner, BOARD.corner, -QUARTER_TURN, 0, false);
-  shape.lineTo(half, inner);
-  shape.absarc(inner, inner, BOARD.corner, 0, QUARTER_TURN, false);
-  shape.lineTo(-inner, half);
-  shape.absarc(-inner, inner, BOARD.corner, QUARTER_TURN, Math.PI, false);
-  shape.lineTo(-half, -inner);
-  shape.absarc(-inner, -inner, BOARD.corner, Math.PI, Math.PI + QUARTER_TURN, false);
-  for (const { x, z } of QUADRANTS) {
-    shape.holes.push(new Path().absarc(x * BOARD.holeAt, z * BOARD.holeAt, BOARD.hole, 0, WHOLE_TURN, true));
-  }
-  const geometry = new ExtrudeGeometry(shape, {
-    depth: BOARD.thickness,
-    curveSegments: BOARD.curve,
-    bevelEnabled: false,
-  });
-  geometry.rotateX(QUARTER_TURN);
-  geometry.translate(0, BOARD.thickness, 0);
-  return [{ geometry, finish: FINISH.pcb }];
-};
-
-interface Steps { readonly first: number; readonly step: number; readonly count: number }
-
-const positions = ({ first, step, count }: Steps): number[] =>
-  Array.from({ length: count }, (_none, index) => first + index * step);
+const BOARD_SIDE = 40;
 
 const FET = {
   columns: { first: 4, step: 5.2, count: 3 },
@@ -159,28 +100,7 @@ const currentSensor = (): ModelMesh[] => {
   ];
 };
 
-const CONNECTOR = { z: -17, width: 9.6, depth: 3.6, height: 2.6, pins: 8, pitch: 1, pin: 0.3, pinHeight: 1.6 } as const;
-
-const fcConnector = (): ModelMesh[] => {
-  const pins = Array.from({ length: CONNECTOR.pins }, (_none, pin) => block({
-    x: (pin - (CONNECTOR.pins - 1) * HALF) * CONNECTOR.pitch,
-    z: CONNECTOR.z,
-    width: CONNECTOR.pin,
-    depth: CONNECTOR.pin,
-    height: CONNECTOR.pinHeight,
-  }, TOP + CONNECTOR.height * HALF));
-  const housing = block({
-    x: 0,
-    z: CONNECTOR.z,
-    width: CONNECTOR.width,
-    depth: CONNECTOR.depth,
-    height: CONNECTOR.height,
-  });
-  return [
-    { geometry: housing, finish: FINISH.plastic },
-    { geometry: merged(pins), finish: FINISH.gold },
-  ];
-};
+const CONNECTOR_Z = -17;
 
 const PAD = { x: 18.4, rows: { first: 3, step: 3.4, count: 3 }, width: 2.6, depth: 2.6, height: 0.08 } as const;
 
@@ -232,16 +152,6 @@ const capacitor = (): ModelMesh[] => {
   ];
 };
 
-const GROMMET = { radius: 2.4, tube: 1, radial: 12, tubular: 32 } as const;
-
-const grommets = (): ModelMesh[] => [{
-  geometry: merged(QUADRANTS.map(({ x, z }) =>
-    new TorusGeometry(GROMMET.radius, GROMMET.tube, GROMMET.radial, GROMMET.tubular)
-      .rotateX(QUARTER_TURN)
-      .translate(x * BOARD.holeAt, BOARD.thickness * HALF, z * BOARD.holeAt))),
-  finish: FINISH.grommet,
-}];
-
 /**
  * Builds a typical 30.5×30.5 mm 4-in-1 ESC for a 5 inch quad, from its dimensions in millimetres: six MOSFETs, a gate
  * driver and a processor for each motor, with the capacitor and battery leads at the back.
@@ -256,12 +166,12 @@ export const buildEsc = (): Model<EscPiece> => {
     phases: 0,
     polePairs: 0,
     pieces: [
-      piece(EscPiece.Board, 0, board()),
+      piece(EscPiece.Board, 0, board(BOARD_SIDE)),
       piece(EscPiece.Mosfets, OFFSET.mosfets, mosfets()),
       piece(EscPiece.GateDrivers, OFFSET.drivers, chips(DRIVER)),
       piece(EscPiece.Processors, OFFSET.processors, chips(PROCESSOR)),
       piece(EscPiece.CurrentSensor, OFFSET.sensor, currentSensor()),
-      piece(EscPiece.FcConnector, OFFSET.connector, fcConnector()),
+      piece(EscPiece.FcConnector, OFFSET.connector, stackConnector(CONNECTOR_Z)),
       piece(EscPiece.MotorPads, 0, motorPads()),
       piece(EscPiece.BatteryPads, 0, batteryPads()),
       piece(EscPiece.Capacitor, OFFSET.capacitor, capacitor()),

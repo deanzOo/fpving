@@ -55,7 +55,7 @@ The monorepo, build tooling and CI, plus the domain layer in `@fpving/core` and 
   - Alerts: every alert newest first or only the unread ones, marking one or all of them read.
   - Settings: every setting in one form.
   - Plugins: each `plugins.json` entry with its state (loaded, disabled with the reason, or backing off and when it retries), its domains and its stale and not scanned listing counts, plus rows for the listings of a plugin no longer in `plugins.json`, plus rejected entries and an unusable `plugins.json`.
-  - Atlas: a 3D motor, a 4-in-1 ESC, a 5 inch frame and a set of bolts to turn, take apart and click, with what each piece does, how it works, what goes wrong and what to look at. The bolts come with a table of common sizes. The motor also shows its coils taking turns, slowed right down.
+  - Atlas: a 3D motor, a 4-in-1 ESC, a flight controller, a 5 inch frame and a set of bolts to turn, take apart and click, with what each piece does, how it works, what goes wrong and what to look at. The bolts come with a table of common sizes. The motor also shows its coils taking turns, slowed right down.
 - The app shell: `startApp` wires every adapter into core, and a Fastify server on `127.0.0.1` answers `GET /api/health` and the domain routes (the watchlist, products, listings, match candidates, alerts, settings, plugins, scan now), refuses requests addressed to other hosts or sent from other sites, and shuts down cleanly on Ctrl+C or SIGTERM.
 
 To work on it, follow the setup in [Contributing](../contributing/).
