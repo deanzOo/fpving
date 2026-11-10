@@ -44,7 +44,7 @@ describe("Digital video model", () => {
 describe.each([
   { name: "Analog video", video: buildAnalogVideo() },
   { name: "Digital video", video: buildDigitalVideo() },
-])("$name model", ({ video }) => {
+])("Video model for $name", ({ video }) => {
   it("has nothing that spins and no phases to light", () => {
     expect(video.phases).toBe(0);
     expect(video.pieces.some(({ spins }) => spins)).toBe(false);
