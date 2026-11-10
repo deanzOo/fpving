@@ -1,6 +1,6 @@
 import { apiRoutes } from "@fpving/app/api-routes";
-import { describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { page, userEvent } from "vitest/browser";
 import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "../../src/bolts-guide.ts";
 import { BoltPiece } from "../../src/bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "../../src/esc-guide.ts";
@@ -20,6 +20,7 @@ const ATLAS = "/atlas";
 const UNREAD = "?unread=true";
 const PAIR = 2;
 const POLL = { timeout: 20_000 };
+const PHONE = { width: 375, height: 812 } as const;
 
 const scripted = () => {
   const api = fakeApi();
@@ -202,6 +203,16 @@ describe("Atlas", () => {
       await expect.element(row).toBeVisible();
       expect(row.element().textContent).toContain(thread);
     }
+  });
+
+  it("fits every part's button on a phone, so the page never scrolls sideways", async () => {
+    const { width, height } = { width: innerWidth, height: innerHeight };
+    onTestFinished(async () => page.viewport(width, height));
+    await page.viewport(PHONE.width, PHONE.height);
+    const screen = await open();
+    const parts = screen.getByRole("navigation", { name: "Parts" }).element();
+    expect(parts.scrollWidth).toBeLessThanOrEqual(parts.clientWidth);
+    expect(document.documentElement.scrollWidth).toBe(PHONE.width);
   });
 
   it("marks the part shown as current", async () => {

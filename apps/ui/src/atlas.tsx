@@ -230,7 +230,7 @@ export const Atlas = () => {
   return (
     <section>
       <h1 className="type-title">Atlas</h1>
-      <nav aria-label="Parts" className="mt-3 flex gap-1">
+      <nav aria-label="Parts" className="mt-3 flex flex-wrap gap-1">
         {PARTS.map((part) => (
           <Button
             key={part.name}
