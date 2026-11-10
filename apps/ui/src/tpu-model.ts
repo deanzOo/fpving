@@ -1,6 +1,7 @@
 import { CylinderGeometry, ExtrudeGeometry, Path, Shape } from "three";
 import type { BufferGeometry } from "three";
-import { block, HALF, merged, QUARTER_TURN, SIDES } from "./pcb-model.ts";
+import { merged } from "./geometry.ts";
+import { block, HALF, QUARTER_TURN, SIDES } from "./pcb-model.ts";
 import type { Model, ModelFinish, ModelPiece } from "./ui/model-stage.ts";
 
 /** The printed TPU parts, in the order the atlas lists them. */
@@ -76,7 +77,7 @@ const antennaMount = (): BufferGeometry => {
     .rotateX(-QUARTER_TURN)
     .rotateX(-ANTENNA.tilt)
     .translate(0, ANTENNA.padHeight, 0);
-  return merged([pad.toNonIndexed(), sleeve]);
+  return merged([pad, sleeve]);
 };
 
 const GUARD = { width: 16, height: 10, wall: 2.4, slot: 5, length: 22 } as const;

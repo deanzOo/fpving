@@ -1,6 +1,6 @@
 import { CylinderGeometry, ExtrudeGeometry, Path, Shape } from "three";
 import type { BufferGeometry } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { merged } from "./geometry.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
 /** The pieces of the frame, in the order the atlas lists them. */
@@ -57,14 +57,6 @@ const ARMS_AT = BODY.bottom;
 const STANDOFFS_AT = BODY.bottom;
 const TOP_AT = STANDOFFS_AT + STANDOFF.height;
 const SLOT = { z: 15, halfWidth: 11, halfDepth: 1.5 } as const;
-
-const merged = (geometries: readonly BufferGeometry[]): BufferGeometry => {
-  const geometry = mergeGeometries([...geometries]);
-  for (const part of geometries) {
-    part.dispose();
-  }
-  return geometry;
-};
 
 const roundedRect = (halfX: number, halfY: number, corner: number): Shape => {
   const shape = new Shape();

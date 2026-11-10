@@ -1,7 +1,8 @@
 import { CylinderGeometry } from "three";
 import type { BufferGeometry } from "three";
 import { at, tube } from "./cable-model.ts";
-import { block, HALF, merged, PCB_FINISH, positions, QUARTER_TURN, SIDES } from "./pcb-model.ts";
+import { merged } from "./geometry.ts";
+import { block, HALF, PCB_FINISH, positions, QUARTER_TURN, SIDES } from "./pcb-model.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
 /** The pieces of the battery, in the order the atlas lists them. */

@@ -1,12 +1,12 @@
 import { CatmullRomCurve3, CylinderGeometry, TubeGeometry, Vector3 } from "three";
 import type { BufferGeometry } from "three";
+import { merged } from "./geometry.ts";
 import {
   block,
   board,
   FROM_ABOVE,
   grommets,
   HALF,
-  merged,
   PCB_FINISH,
   positions,
   QUADRANTS,
