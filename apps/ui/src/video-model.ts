@@ -1,5 +1,6 @@
-import { CatmullRomCurve3, CylinderGeometry, TubeGeometry, Vector3 } from "three";
-import type { BufferGeometry } from "three";
+import { CylinderGeometry } from "three";
+import type { BufferGeometry, Vector3 } from "three";
+import { at, tube } from "./cable-model.ts";
 import { block, board, HALF, merged, PCB_FINISH, positions, QUARTER_TURN, SIDES, TOP } from "./pcb-model.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
@@ -40,11 +41,6 @@ const FINISH = {
   shield: { token: "model-steel-dark", roughness: 0.35, metalness: 1 },
   casing: { token: "model-bell", roughness: 0.4, metalness: 0.8 },
 } as const satisfies Readonly<Record<string, ModelFinish>>;
-
-const at = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z);
-
-const tube = (points: readonly Vector3[], radius: number): BufferGeometry =>
-  new TubeGeometry(new CatmullRomCurve3([...points]), ROUND, radius, ROUND * HALF);
 
 const alongZ = (radius: number, length: number, x: number, y: number, z: number): BufferGeometry =>
   new CylinderGeometry(radius, radius, length, ROUND).rotateX(QUARTER_TURN).translate(x, y, z);

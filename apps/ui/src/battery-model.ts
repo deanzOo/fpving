@@ -1,5 +1,6 @@
-import { CatmullRomCurve3, CylinderGeometry, TubeGeometry, Vector3 } from "three";
+import { CylinderGeometry } from "three";
 import type { BufferGeometry } from "three";
+import { at, tube } from "./cable-model.ts";
 import { block, HALF, merged, PCB_FINISH, positions, QUARTER_TURN, SIDES } from "./pcb-model.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
@@ -36,11 +37,6 @@ const STEP = PACK.cell + PACK.gap;
 const TOP = PACK.wrap + CELLS * STEP;
 
 const OFFSET = { wrap: 18, xt60: 6, balance: 4 } as const;
-
-const at = (x: number, y: number, z: number): Vector3 => new Vector3(x, y, z);
-
-const tube = (points: readonly Vector3[], radius: number): BufferGeometry =>
-  new TubeGeometry(new CatmullRomCurve3([...points]), ROUND, radius, ROUND * HALF);
 
 const cells = (): ModelMesh[] => positions({ first: PACK.wrap, step: STEP, count: CELLS }).map((base) => ({
   geometry: block({ x: 0, z: 0, width: PACK.length, depth: PACK.width, height: PACK.cell }, base),
