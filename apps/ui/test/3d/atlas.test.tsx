@@ -1,6 +1,8 @@
 import { apiRoutes } from "@fpving/app/api-routes";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
+import { BATTERY_GUIDE, BATTERY_PIECE_GUIDES } from "../../src/battery-guide.ts";
+import { BatteryPiece } from "../../src/battery-model.ts";
 import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "../../src/bolts-guide.ts";
 import { BoltPiece } from "../../src/bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "../../src/esc-guide.ts";
@@ -185,6 +187,7 @@ describe("Atlas", () => {
       piece: DIGITAL_PIECE_GUIDES[DigitalPiece.Heatsink],
     },
     { part: "Frame", model: /frame/u, guide: FRAME_GUIDE, piece: FRAME_PIECE_GUIDES[FramePiece.Arms] },
+    { part: "Battery", model: /battery/u, guide: BATTERY_GUIDE, piece: BATTERY_PIECE_GUIDES[BatteryPiece.BalanceLead] },
     { part: "Bolts", model: /fasteners/u, guide: BOLTS_GUIDE, piece: BOLT_PIECE_GUIDES[BoltPiece.PropNut] },
   ])("switches to the $part, with its own pieces and no power switch, and back to the motor", async (shown) => {
     const screen = await open();

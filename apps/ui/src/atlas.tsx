@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { BATTERY_GUIDE, BATTERY_PIECE_GUIDES } from "./battery-guide.ts";
+import { BatteryPiece, buildBattery } from "./battery-model.ts";
 import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "./bolts-guide.ts";
 import { BoltPiece, buildBolts } from "./bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "./esc-guide.ts";
@@ -97,6 +99,17 @@ const FRAME: AtlasPart<FramePiece> = {
   pieces: Object.values(FramePiece),
   guide: FRAME_GUIDE,
   pieceGuides: FRAME_PIECE_GUIDES,
+  powers: false,
+  comesApart: true,
+};
+
+const BATTERY: AtlasPart<BatteryPiece> = {
+  label: "3D model of a LiPo battery. Every piece is also in the list of pieces.",
+  intro: "Shown here: a typical 6S 1300 mAh LiPo for a 5 inch quad.",
+  build: buildBattery,
+  pieces: Object.values(BatteryPiece),
+  guide: BATTERY_GUIDE,
+  pieceGuides: BATTERY_PIECE_GUIDES,
   powers: false,
   comesApart: true,
 };
@@ -234,6 +247,7 @@ const PARTS = [
   { name: "Analog video", show: () => <PartAtlas part={ANALOG} /> },
   { name: "Digital video", show: () => <PartAtlas part={DIGITAL} /> },
   { name: "Frame", show: () => <PartAtlas part={FRAME} /> },
+  { name: "Battery", show: () => <PartAtlas part={BATTERY} /> },
   {
     name: "Bolts",
     show: () => (
