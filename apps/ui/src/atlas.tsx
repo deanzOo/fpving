@@ -3,6 +3,8 @@ import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "./bolts-guide.ts";
 import { BoltPiece, buildBolts } from "./bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "./esc-guide.ts";
 import { buildEsc, EscPiece } from "./esc-model.ts";
+import { FC_GUIDE, FC_PIECE_GUIDES } from "./fc-guide.ts";
+import { buildFc, FcPiece } from "./fc-model.ts";
 import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "./frame-guide.ts";
 import { buildFrame, FramePiece } from "./frame-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "./motor-guide.ts";
@@ -49,6 +51,17 @@ const ESC: AtlasPart<EscPiece> = {
   pieces: Object.values(EscPiece),
   guide: ESC_GUIDE,
   pieceGuides: ESC_PIECE_GUIDES,
+  powers: false,
+  comesApart: true,
+};
+
+const FC: AtlasPart<FcPiece> = {
+  label: "3D model of a flight controller. Every piece is also in the list of pieces.",
+  intro: "Shown here: a typical 30×30 flight controller for a 5 inch quad.",
+  build: buildFc,
+  pieces: Object.values(FcPiece),
+  guide: FC_GUIDE,
+  pieceGuides: FC_PIECE_GUIDES,
   powers: false,
   comesApart: true,
 };
@@ -193,6 +206,7 @@ const PartAtlas = <Id extends string>({ part }: { readonly part: AtlasPart<Id> }
 const PARTS = [
   { name: "Motor", show: () => <PartAtlas part={MOTOR} /> },
   { name: "ESC", show: () => <PartAtlas part={ESC} /> },
+  { name: "Flight controller", show: () => <PartAtlas part={FC} /> },
   { name: "Frame", show: () => <PartAtlas part={FRAME} /> },
   {
     name: "Bolts",

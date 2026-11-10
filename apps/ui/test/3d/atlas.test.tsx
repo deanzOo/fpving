@@ -5,6 +5,8 @@ import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "../../src/bolts-guid
 import { BoltPiece } from "../../src/bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "../../src/esc-guide.ts";
 import { EscPiece } from "../../src/esc-model.ts";
+import { FC_GUIDE, FC_PIECE_GUIDES } from "../../src/fc-guide.ts";
+import { FcPiece } from "../../src/fc-model.ts";
 import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "../../src/frame-guide.ts";
 import { FramePiece } from "../../src/frame-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "../../src/motor-guide.ts";
@@ -160,6 +162,12 @@ describe("Atlas", () => {
 
   it.each([
     { part: "ESC", model: /ESC/u, guide: ESC_GUIDE, piece: ESC_PIECE_GUIDES[EscPiece.Capacitor] },
+    {
+      part: "Flight controller",
+      model: /flight controller/u,
+      guide: FC_GUIDE,
+      piece: FC_PIECE_GUIDES[FcPiece.BootButton],
+    },
     { part: "Frame", model: /frame/u, guide: FRAME_GUIDE, piece: FRAME_PIECE_GUIDES[FramePiece.Arms] },
     { part: "Bolts", model: /fasteners/u, guide: BOLTS_GUIDE, piece: BOLT_PIECE_GUIDES[BoltPiece.PropNut] },
   ])("switches to the $part, with its own pieces and no power switch, and back to the motor", async (shown) => {
