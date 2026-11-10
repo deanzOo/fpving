@@ -85,7 +85,7 @@ export const ModelView = <Id extends string>({
   }
   return (
     <div className="relative h-full min-h-96 overflow-hidden">
-      <div ref={startIn} className="size-full" />
+      <div ref={startIn} className="absolute inset-0" />
       <p aria-hidden="true" className="pointer-events-none absolute left-2 top-2 text-signal type-label">
         {hovered === null ? "" : nameOf(hovered)}
       </p>

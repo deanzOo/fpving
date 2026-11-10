@@ -23,6 +23,7 @@ const UNREAD = "?unread=true";
 const PAIR = 2;
 const POLL = { timeout: 20_000 };
 const PHONE = { width: 375, height: 812 } as const;
+const TALL_CANVAS = "2000";
 
 const scripted = () => {
   const api = fakeApi();
@@ -217,6 +218,14 @@ describe("Atlas", () => {
       await expect.element(row).toBeVisible();
       expect(row.element().textContent).toContain(thread);
     }
+  });
+
+  it("sizes the 3D view from its frame, never from the canvas, so a window resize cannot loop", async () => {
+    const screen = await open();
+    const canvas = screen.getByRole("img", { name: /brushless motor/u }).element();
+    const before = canvas.parentElement?.getBoundingClientRect().height;
+    canvas.setAttribute("height", TALL_CANVAS);
+    expect(canvas.parentElement?.getBoundingClientRect().height).toBe(before);
   });
 
   it("fits every part's button on a phone, so the page never scrolls sideways", async () => {
