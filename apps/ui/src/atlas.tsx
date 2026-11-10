@@ -12,6 +12,8 @@ import { buildFrame, FramePiece } from "./frame-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "./motor-guide.ts";
 import type { PartGuide } from "./motor-guide.ts";
 import { buildMotor, MotorPiece } from "./motor-model.ts";
+import { TPU_GUIDE, TPU_PIECE_GUIDES } from "./tpu-guide.ts";
+import { buildTpuParts, TpuPiece } from "./tpu-model.ts";
 import { Button, ButtonSize, ButtonVariant } from "./ui/button.tsx";
 import { DataTable } from "./ui/data-table.tsx";
 import type { Model } from "./ui/model-stage.ts";
@@ -121,6 +123,17 @@ const BOLTS: AtlasPart<BoltPiece> = {
   pieces: Object.values(BoltPiece),
   guide: BOLTS_GUIDE,
   pieceGuides: BOLT_PIECE_GUIDES,
+  powers: false,
+  comesApart: false,
+};
+
+const TPU: AtlasPart<TpuPiece> = {
+  label: "3D model of a row of printed TPU parts. Every one is also in the list of pieces.",
+  intro: "Shown here: TPU parts commonly printed for a 5 inch quad.",
+  build: buildTpuParts,
+  pieces: Object.values(TpuPiece),
+  guide: TPU_GUIDE,
+  pieceGuides: TPU_PIECE_GUIDES,
   powers: false,
   comesApart: false,
 };
@@ -248,6 +261,7 @@ const PARTS = [
   { name: "Digital video", show: () => <PartAtlas part={DIGITAL} /> },
   { name: "Frame", show: () => <PartAtlas part={FRAME} /> },
   { name: "Battery", show: () => <PartAtlas part={BATTERY} /> },
+  { name: "TPU parts", show: () => <PartAtlas part={TPU} /> },
   {
     name: "Bolts",
     show: () => (

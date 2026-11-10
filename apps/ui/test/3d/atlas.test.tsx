@@ -10,6 +10,8 @@ import { EscPiece } from "../../src/esc-model.ts";
 import { FC_GUIDE, FC_PIECE_GUIDES } from "../../src/fc-guide.ts";
 import { FcPiece } from "../../src/fc-model.ts";
 import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "../../src/frame-guide.ts";
+import { TPU_GUIDE, TPU_PIECE_GUIDES } from "../../src/tpu-guide.ts";
+import { TpuPiece } from "../../src/tpu-model.ts";
 import { ANALOG_GUIDE, ANALOG_PIECE_GUIDES, DIGITAL_GUIDE, DIGITAL_PIECE_GUIDES } from "../../src/video-guide.ts";
 import { AnalogPiece, DigitalPiece } from "../../src/video-model.ts";
 import { FramePiece } from "../../src/frame-model.ts";
@@ -188,6 +190,7 @@ describe("Atlas", () => {
     },
     { part: "Frame", model: /frame/u, guide: FRAME_GUIDE, piece: FRAME_PIECE_GUIDES[FramePiece.Arms] },
     { part: "Battery", model: /battery/u, guide: BATTERY_GUIDE, piece: BATTERY_PIECE_GUIDES[BatteryPiece.BalanceLead] },
+    { part: "TPU parts", model: /TPU parts/u, guide: TPU_GUIDE, piece: TPU_PIECE_GUIDES[TpuPiece.ArmGuard] },
     { part: "Bolts", model: /fasteners/u, guide: BOLTS_GUIDE, piece: BOLT_PIECE_GUIDES[BoltPiece.PropNut] },
   ])("switches to the $part, with its own pieces and no power switch, and back to the motor", async (shown) => {
     const screen = await open();
@@ -203,10 +206,13 @@ describe("Atlas", () => {
     await expect.element(screen.getByRole("button", { name: "Power on" })).toBeVisible();
   });
 
-  it("shows the bolts without taking them apart, since a single fastener does not come apart", async () => {
+  it.each([
+    { part: "Bolts", model: /fasteners/u },
+    { part: "TPU parts", model: /TPU parts/u },
+  ])("shows the $part without taking them apart, since a single part does not come apart", async (shown) => {
     const screen = await open();
-    await screen.getByRole("button", { name: "Bolts", exact: true }).click(POLL);
-    await expect.element(screen.getByRole("img", { name: /fasteners/u })).toBeVisible();
+    await screen.getByRole("button", { name: shown.part, exact: true }).click(POLL);
+    await expect.element(screen.getByRole("img", { name: shown.model })).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Take apart" })).not.toBeInTheDocument();
     await expect.element(screen.getByRole("slider", { name: "Explode" })).not.toBeInTheDocument();
   });
