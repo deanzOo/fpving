@@ -71,11 +71,11 @@ export const positions = ({ first, step, count }: Steps): number[] =>
   Array.from({ length: count }, (_none, index) => first + index * step);
 
 /**
- * Builds a square board with rounded corners and 30.5×30.5 mm mounting holes.
+ * Builds a square board with rounded corners and a mounting hole in each corner, 30.5×30.5 mm apart by default.
  *
  * @returns The board's mesh.
  */
-export const board = (side: number): ModelMesh[] => {
+export const board = (side: number, holeAt: number = PCB.holeAt): ModelMesh[] => {
   const half = side * HALF;
   const inner = half - PCB.corner;
   const shape = new Shape();
@@ -89,7 +89,7 @@ export const board = (side: number): ModelMesh[] => {
   shape.lineTo(-half, -inner);
   shape.absarc(-inner, -inner, PCB.corner, Math.PI, Math.PI + QUARTER_TURN, false);
   for (const { x, z } of QUADRANTS) {
-    shape.holes.push(new Path().absarc(x * PCB.holeAt, z * PCB.holeAt, PCB.hole, 0, WHOLE_TURN, true));
+    shape.holes.push(new Path().absarc(x * holeAt, z * holeAt, PCB.hole, 0, WHOLE_TURN, true));
   }
   const geometry = new ExtrudeGeometry(shape, { depth: PCB.thickness, curveSegments: PCB.curve, bevelEnabled: false });
   geometry.rotateX(QUARTER_TURN);

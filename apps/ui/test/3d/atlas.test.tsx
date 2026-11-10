@@ -1,6 +1,6 @@
 import { apiRoutes } from "@fpving/app/api-routes";
-import { describe, expect, it, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { page, userEvent } from "vitest/browser";
 import { BOLT_PIECE_GUIDES, BOLT_SIZES, BOLTS_GUIDE } from "../../src/bolts-guide.ts";
 import { BoltPiece } from "../../src/bolts-model.ts";
 import { ESC_GUIDE, ESC_PIECE_GUIDES } from "../../src/esc-guide.ts";
@@ -8,6 +8,8 @@ import { EscPiece } from "../../src/esc-model.ts";
 import { FC_GUIDE, FC_PIECE_GUIDES } from "../../src/fc-guide.ts";
 import { FcPiece } from "../../src/fc-model.ts";
 import { FRAME_GUIDE, FRAME_PIECE_GUIDES } from "../../src/frame-guide.ts";
+import { ANALOG_GUIDE, ANALOG_PIECE_GUIDES, DIGITAL_GUIDE, DIGITAL_PIECE_GUIDES } from "../../src/video-guide.ts";
+import { AnalogPiece, DigitalPiece } from "../../src/video-model.ts";
 import { FramePiece } from "../../src/frame-model.ts";
 import { MOTOR_GUIDE, MOTOR_PIECE_GUIDES } from "../../src/motor-guide.ts";
 import { buildMotor, MAGNET_POLES, MotorPiece, PHASES, STATOR_SLOTS } from "../../src/motor-model.ts";
@@ -20,6 +22,8 @@ const ATLAS = "/atlas";
 const UNREAD = "?unread=true";
 const PAIR = 2;
 const POLL = { timeout: 20_000 };
+const PHONE = { width: 375, height: 812 } as const;
+const TALL_CANVAS = "2000";
 
 const scripted = () => {
   const api = fakeApi();
@@ -168,6 +172,18 @@ describe("Atlas", () => {
       guide: FC_GUIDE,
       piece: FC_PIECE_GUIDES[FcPiece.BootButton],
     },
+    {
+      part: "Analog video",
+      model: /analog video/u,
+      guide: ANALOG_GUIDE,
+      piece: ANALOG_PIECE_GUIDES[AnalogPiece.Antenna],
+    },
+    {
+      part: "Digital video",
+      model: /digital video/u,
+      guide: DIGITAL_GUIDE,
+      piece: DIGITAL_PIECE_GUIDES[DigitalPiece.Heatsink],
+    },
     { part: "Frame", model: /frame/u, guide: FRAME_GUIDE, piece: FRAME_PIECE_GUIDES[FramePiece.Arms] },
     { part: "Bolts", model: /fasteners/u, guide: BOLTS_GUIDE, piece: BOLT_PIECE_GUIDES[BoltPiece.PropNut] },
   ])("switches to the $part, with its own pieces and no power switch, and back to the motor", async (shown) => {
@@ -202,6 +218,24 @@ describe("Atlas", () => {
       await expect.element(row).toBeVisible();
       expect(row.element().textContent).toContain(thread);
     }
+  });
+
+  it("sizes the 3D view from its frame, never from the canvas, so a window resize cannot loop", async () => {
+    const screen = await open();
+    const canvas = screen.getByRole("img", { name: /brushless motor/u }).element();
+    const before = canvas.parentElement?.getBoundingClientRect().height;
+    canvas.setAttribute("height", TALL_CANVAS);
+    expect(canvas.parentElement?.getBoundingClientRect().height).toBe(before);
+  });
+
+  it("fits every part's button on a phone, so the page never scrolls sideways", async () => {
+    const { width, height } = { width: innerWidth, height: innerHeight };
+    onTestFinished(async () => page.viewport(width, height));
+    await page.viewport(PHONE.width, PHONE.height);
+    const screen = await open();
+    const parts = screen.getByRole("navigation", { name: "Parts" }).element();
+    expect(parts.scrollWidth).toBeLessThanOrEqual(parts.clientWidth);
+    expect(document.documentElement.scrollWidth).toBe(PHONE.width);
   });
 
   it("marks the part shown as current", async () => {

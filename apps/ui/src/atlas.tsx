@@ -16,6 +16,8 @@ import type { Model } from "./ui/model-stage.ts";
 import { ModelView } from "./ui/model-view.tsx";
 import { Panel } from "./ui/panel.tsx";
 import { Slider } from "./ui/slider.tsx";
+import { ANALOG_GUIDE, ANALOG_PIECE_GUIDES, DIGITAL_GUIDE, DIGITAL_PIECE_GUIDES } from "./video-guide.ts";
+import { AnalogPiece, buildAnalogVideo, buildDigitalVideo, DigitalPiece } from "./video-model.ts";
 
 const APART = 100;
 const LIST_ITEM = "w-full justify-start";
@@ -62,6 +64,28 @@ const FC: AtlasPart<FcPiece> = {
   pieces: Object.values(FcPiece),
   guide: FC_GUIDE,
   pieceGuides: FC_PIECE_GUIDES,
+  powers: false,
+  comesApart: true,
+};
+
+const ANALOG: AtlasPart<AnalogPiece> = {
+  label: "3D model of an analog video system. Every piece is also in the list of pieces.",
+  intro: "Shown here: a typical analog camera, VTX and antenna for a 5 inch quad.",
+  build: buildAnalogVideo,
+  pieces: Object.values(AnalogPiece),
+  guide: ANALOG_GUIDE,
+  pieceGuides: ANALOG_PIECE_GUIDES,
+  powers: false,
+  comesApart: true,
+};
+
+const DIGITAL: AtlasPart<DigitalPiece> = {
+  label: "3D model of a digital video system. Every piece is also in the list of pieces.",
+  intro: "Shown here: a typical digital camera and air unit for a 5 inch quad.",
+  build: buildDigitalVideo,
+  pieces: Object.values(DigitalPiece),
+  guide: DIGITAL_GUIDE,
+  pieceGuides: DIGITAL_PIECE_GUIDES,
   powers: false,
   comesApart: true,
 };
@@ -207,6 +231,8 @@ const PARTS = [
   { name: "Motor", show: () => <PartAtlas part={MOTOR} /> },
   { name: "ESC", show: () => <PartAtlas part={ESC} /> },
   { name: "Flight controller", show: () => <PartAtlas part={FC} /> },
+  { name: "Analog video", show: () => <PartAtlas part={ANALOG} /> },
+  { name: "Digital video", show: () => <PartAtlas part={DIGITAL} /> },
   { name: "Frame", show: () => <PartAtlas part={FRAME} /> },
   {
     name: "Bolts",
@@ -230,7 +256,7 @@ export const Atlas = () => {
   return (
     <section>
       <h1 className="type-title">Atlas</h1>
-      <nav aria-label="Parts" className="mt-3 flex gap-1">
+      <nav aria-label="Parts" className="mt-3 flex flex-wrap gap-1">
         {PARTS.map((part) => (
           <Button
             key={part.name}

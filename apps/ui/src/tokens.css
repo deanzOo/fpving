@@ -55,6 +55,9 @@
   --color-model-capacitor: #2d3f6b;
   --color-model-carbon: #34383d;
   --color-model-strap: #7a2e36;
+  --color-model-lens: #1f3a52;
+  --color-model-antenna: #3d6f8f;
+  --color-model-wire: #26292e;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --spacing: 4px;
@@ -128,6 +131,9 @@
     --color-model-capacitor: #2d3f6b;
     --color-model-carbon: #34383d;
     --color-model-strap: #7a2e36;
+    --color-model-lens: #1f3a52;
+    --color-model-antenna: #3d6f8f;
+    --color-model-wire: #26292e;
     --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
   }
 }
@@ -183,6 +189,9 @@
   --color-model-capacitor: #2d3f6b;
   --color-model-carbon: #34383d;
   --color-model-strap: #7a2e36;
+  --color-model-lens: #1f3a52;
+  --color-model-antenna: #3d6f8f;
+  --color-model-wire: #26292e;
   --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
