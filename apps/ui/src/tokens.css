@@ -58,6 +58,8 @@
   --color-model-lens: #1f3a52;
   --color-model-antenna: #3d6f8f;
   --color-model-wire: #26292e;
+  --color-model-wrap: #3b4a3f;
+  --color-model-plug: #d9b026;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --spacing: 4px;
@@ -134,6 +136,8 @@
     --color-model-lens: #1f3a52;
     --color-model-antenna: #3d6f8f;
     --color-model-wire: #26292e;
+    --color-model-wrap: #3b4a3f;
+    --color-model-plug: #d9b026;
     --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
   }
 }
@@ -192,6 +196,8 @@
   --color-model-lens: #1f3a52;
   --color-model-antenna: #3d6f8f;
   --color-model-wire: #26292e;
+  --color-model-wrap: #3b4a3f;
+  --color-model-plug: #d9b026;
   --shadow-dialog: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
