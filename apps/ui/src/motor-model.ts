@@ -12,7 +12,7 @@ import {
   Vector3,
 } from "three";
 import type { BufferGeometry } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { merged } from "./geometry.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
 /** The pieces of the motor, in order from the top of the motor down. */
@@ -99,14 +99,6 @@ const extrudeUp = (shape: Shape, { depth, y, bevel = 0, curve }: {
 
 const around = <T>(count: number, make: (angle: number, index: number) => T): T[] =>
   Array.from({ length: count }, (_none, index) => make((index / count) * WHOLE_TURN, index));
-
-const merged = (geometries: readonly BufferGeometry[]): BufferGeometry => {
-  const geometry = mergeGeometries([...geometries]);
-  for (const part of geometries) {
-    part.dispose();
-  }
-  return geometry;
-};
 
 const PLATE = {
   outer: 13.4,

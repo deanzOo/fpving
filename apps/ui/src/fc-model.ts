@@ -1,11 +1,11 @@
 import { CylinderGeometry } from "three";
+import { merged } from "./geometry.ts";
 import {
   block,
   board,
   FROM_ABOVE,
   grommets,
   HALF,
-  merged,
   PCB_FINISH,
   positions,
   stackConnector,

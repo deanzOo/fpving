@@ -1,7 +1,8 @@
 import { CylinderGeometry } from "three";
 import type { BufferGeometry, Vector3 } from "three";
 import { at, tube } from "./cable-model.ts";
-import { block, board, HALF, merged, PCB_FINISH, positions, QUARTER_TURN, SIDES, TOP } from "./pcb-model.ts";
+import { merged } from "./geometry.ts";
+import { block, board, HALF, PCB_FINISH, positions, QUARTER_TURN, SIDES, TOP } from "./pcb-model.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
 /** The pieces of the analog video system, in the order the atlas lists them. */

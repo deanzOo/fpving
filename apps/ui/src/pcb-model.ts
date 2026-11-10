@@ -1,6 +1,6 @@
 import { BoxGeometry, ExtrudeGeometry, Path, Shape, TorusGeometry } from "three";
 import type { BufferGeometry } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { merged } from "./geometry.ts";
 import type { ModelFinish, ModelMesh } from "./ui/model-stage.ts";
 
 const WHOLE_TURN = Math.PI + Math.PI;
@@ -45,19 +45,6 @@ export interface Block {
  */
 export const block = ({ x, z, width, depth, height }: Block, base: number = TOP): BufferGeometry =>
   new BoxGeometry(width, height, depth).translate(x, base + height * HALF, z);
-
-/**
- * Merges geometries into one and frees the parts.
- *
- * @returns The merged geometry.
- */
-export const merged = (geometries: readonly BufferGeometry[]): BufferGeometry => {
-  const geometry = mergeGeometries([...geometries]);
-  for (const part of geometries) {
-    part.dispose();
-  }
-  return geometry;
-};
 
 /** Evenly spaced positions along one axis. */
 export interface Steps { readonly first: number; readonly step: number; readonly count: number }

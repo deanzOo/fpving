@@ -1,6 +1,6 @@
 import { CylinderGeometry, ExtrudeGeometry, LatheGeometry, Path, Shape, Vector2 } from "three";
 import type { BufferGeometry } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { merged } from "./geometry.ts";
 import type { Model, ModelFinish, ModelMesh, ModelPiece } from "./ui/model-stage.ts";
 
 /** The fasteners in the bolts set, in the order the atlas lists them, left to right. */
@@ -37,14 +37,6 @@ const NUT = { acrossCorners: 3.2, height: 2.4, hole: 1.5 } as const;
 const GROMMET = { flange: 3.4, waist: 2.3, bore: 1.5, height: 4.5, lip: 1.2 } as const;
 const PROP_NUT = { flange: 5, flangeHeight: 1, acrossCorners: 4.6, height: 4, insert: 3.3, insertHeight: 1.5 } as const;
 const M5_BORE = 2.5;
-
-const merged = (geometries: readonly BufferGeometry[]): BufferGeometry => {
-  const geometry = mergeGeometries(geometries.map((part) => (part.index === null ? part : part.toNonIndexed())));
-  for (const part of geometries) {
-    part.dispose();
-  }
-  return geometry;
-};
 
 const hexagon = (radius: number): Shape => {
   const corners = Array.from({ length: HEX }, (_none, index) => (index / HEX) * WHOLE_TURN)
