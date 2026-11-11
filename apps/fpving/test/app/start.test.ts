@@ -159,6 +159,21 @@ describe("App startup", () => {
     });
   });
 
+  it("serves the gear and catalog routes over the app's own wiring, with no catalog installed", async () => {
+    const running = await started(env(), fakes().ports);
+    const call = async (method: "GET" | "POST", url: string, payload?: object) =>
+      running.server.inject({ method, url, headers: host(), ...(payload === undefined ? {} : { payload }) });
+    expect((await call("GET", apiRoutes.listGear.url)).json()).toEqual([]);
+    expect((await call("GET", `${apiRoutes.searchCatalog.url}?q=radio`)).json()).toEqual({
+      matches: [],
+      failedPlugins: [],
+      catalogs: 0,
+    });
+    const read = await call("POST", apiRoutes.readSpecs.url, { kind: "radio", text: "a radio" });
+    expect(read.statusCode).toBe(UNAVAILABLE);
+    expect(read.json()).toMatchObject({ error: { kind: ApiErrorKind.Unavailable } });
+  });
+
   it("wires the Anthropic judge when an API key is set, without logging the key", async () => {
     await started({ ...env(), ANTHROPIC_API_KEY: FAKE_KEY }, fakes().ports);
     expect(logText()).not.toContain("no ANTHROPIC_API_KEY set");

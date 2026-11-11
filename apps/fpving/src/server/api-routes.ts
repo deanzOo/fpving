@@ -1,5 +1,7 @@
 import {
   alertIdSchema,
+  gearItemIdSchema,
+  gearItemSchema,
   listingIdSchema,
   alertSchema,
   listingSchema,
@@ -13,7 +15,14 @@ import {
   settingsSchema,
   TREND_DAYS,
 } from "@fpving/core";
-import { catalogManifestSchema, manifestSchema, moneySchema, storeErrorSchema } from "@fpving/plugin-sdk";
+import {
+  catalogManifestSchema,
+  GearKind,
+  gearSpecsSchema,
+  manifestSchema,
+  moneySchema,
+  storeErrorSchema,
+} from "@fpving/plugin-sdk";
 import { z } from "zod";
 import { PluginIssueKind, PluginStatusKind } from "../plugins/status.js";
 import { apiErrorSchema } from "./errors.js";
@@ -26,6 +35,27 @@ const listingParams = z.object({ productId: productIdSchema, listingId: listingI
 const candidateParams = z.object({ candidateId: matchCandidateIdSchema });
 const alertParams = z.object({ alertId: alertIdSchema });
 const addedListingSchema = z.object({ listing: listingSchema, snapshot: priceSnapshotSchema });
+
+const gearParams = z.object({ gearId: gearItemIdSchema });
+const { kind: gearKind, catalogRef, specs: gearSpecs } = gearItemSchema.shape;
+const gearDraftSchema = z.object({
+  kind: gearKind,
+  name: z.string(),
+  quantity: z.int(),
+  catalogRef,
+  specs: gearSpecs,
+});
+const catalogRefSchema = z.object({ pluginId: pluginIdSchema, key: z.string().min(1) });
+const catalogMatchSchema = z.object({
+  name: z.string(),
+  kind: gearKind,
+  specs: z.record(z.string(), z.array(z.object({ value: z.json(), pluginId: pluginIdSchema })).readonly()),
+  refs: z.array(catalogRefSchema).readonly(),
+});
+const gearWithChangesSchema = z.object({
+  item: gearItemSchema,
+  changes: z.array(z.object({ field: z.string(), saved: z.json(), catalog: z.json() })),
+});
 
 const productDetailSchema = z.object({
   product: productSchema,
@@ -228,6 +258,71 @@ export const apiRoutes = {
     summary: "Starts a scan of every listing in the background; 409 while any scan runs, 503 once shutdown started.",
     schema: {
       response: { [Accepted]: scanStatusSchema, [Conflict]: apiErrorSchema, [ServiceUnavailable]: apiErrorSchema },
+    },
+  },
+  listGear: {
+    method: "GET",
+    url: "/api/gear",
+    summary: "The gear the user owns, by kind then name, each item with the catalog-sourced fields its catalog now "
+      + "says differently.",
+    schema: { response: { [Ok]: z.array(gearWithChangesSchema) } },
+  },
+  addGear: {
+    method: "POST",
+    url: "/api/gear",
+    summary: "Stores a gear item. A spec is kept as catalog-sourced only when the item's catalog entry confirms "
+      + "its value; every other spec is stored as confirmed by the user.",
+    schema: {
+      body: gearDraftSchema,
+      response: { [Created]: gearItemSchema, [UnprocessableContent]: apiErrorSchema },
+    },
+  },
+  updateGear: {
+    method: "PATCH",
+    url: "/api/gear/:gearId",
+    summary: "Replaces a gear item with the draft, keeping its id and creation time; specs are sourced as when adding.",
+    schema: {
+      params: gearParams,
+      body: gearDraftSchema,
+      response: { [Ok]: gearItemSchema, [NotFound]: apiErrorSchema, [UnprocessableContent]: apiErrorSchema },
+    },
+  },
+  removeGear: {
+    method: "DELETE",
+    url: "/api/gear/:gearId",
+    summary: "Deletes a gear item.",
+    schema: { params: gearParams, response: { [NoContent]: z.null(), [NotFound]: apiErrorSchema } },
+  },
+  searchCatalog: {
+    method: "GET",
+    url: "/api/catalog/search",
+    summary: "Searches every loaded catalog plugin for gear by name and merges the same item across catalogs. "
+      + "A field two catalogs give differently keeps both values. `failedPlugins` lists the catalogs that could not "
+      + "answer, `catalogs` how many are loaded.",
+    schema: {
+      querystring: z.object({ q: z.string().min(1) }),
+      response: {
+        [Ok]: z.object({
+          matches: z.array(catalogMatchSchema),
+          failedPlugins: z.array(pluginIdSchema),
+          catalogs: countSchema,
+        }),
+      },
+    },
+  },
+  readSpecs: {
+    method: "POST",
+    url: "/api/gear/read",
+    summary: "Reads the name and specs of a piece of gear from pasted text with the AI. Nothing is stored. 503 "
+      + "`unavailable` without an API key or when the AI cannot be reached, 502 `malformed_output` when its answer "
+      + "fails validation.",
+    schema: {
+      body: z.object({ kind: z.enum(GearKind), text: z.string().min(1) }),
+      response: {
+        [Ok]: z.object({ name: z.string().nullable(), specs: gearSpecsSchema }),
+        [BadGateway]: apiErrorSchema,
+        [ServiceUnavailable]: apiErrorSchema,
+      },
     },
   },
   getScan: {

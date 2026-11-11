@@ -38,6 +38,7 @@ import { readPluginsConfig, readTextFile } from "../plugins/config.js";
 import type { SpawnWorker } from "../plugins/runtime/connection.js";
 import { spawnWorker, startPluginHost, WORKER_ENTRY } from "../plugins/runtime/host.js";
 import type { PluginHost, PluginState } from "../plugins/runtime/host.js";
+import { createPluginCatalogGateway } from "../plugins/catalog-gateway.js";
 import { createPluginStoreGateway } from "../plugins/store-gateway.js";
 import { registerApiRoutes } from "../server/api.js";
 import { HEALTH_PATH, registerHealthRoute } from "../server/health.js";
@@ -318,8 +319,16 @@ export const startApp = async (
       },
     });
     currentHost = () => parts.host;
+    const catalogs = createPluginCatalogGateway(currentHost);
     api.attach({
       deps: () => parts.deps,
+      gear: () => ({
+        gear: parts.deps.repository.gear,
+        catalogs,
+        ids: parts.deps.ids,
+        clock: parts.deps.clock,
+      }),
+      specReader: () => specReader,
       scans: () => parts.scans,
       plugins: (activity) => pluginRows(parts.host.plugins(), plugins.rejected, plugins.issue, activity),
       applySettings: async (next) => settingsApplier.apply(next),

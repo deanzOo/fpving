@@ -2,9 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ok, pluginIdSchema, startScheduler } from "@fpving/core";
-import type { PluginId, SchedulerHandle, StoreGateway } from "@fpving/core";
+import type { LlmError, PluginId, ReadSpecs, SchedulerHandle, SpecReader, StoreGateway } from "@fpving/core";
+import { FakeCatalogGateway } from "@fpving/core/testing";
 import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
-import type { FetchedListing, SearchCandidate, StoreResult } from "@fpving/plugin-sdk";
+import type { CatalogEntry, FetchedListing, Result, SearchCandidate, StoreResult } from "@fpving/plugin-sdk";
 import { vi } from "vitest";
 import { keylessLlmJudge } from "../../src/adapters/anthropic/llm-judge.ts";
 import { migrate } from "../../src/adapters/sqlite/migrate.ts";
@@ -35,6 +36,9 @@ export const SHOP_DOMAIN = "shop.example";
 
 /** A domain {@link OTHER} declares. */
 export const OTHER_DOMAIN = "other.example";
+
+/** The catalog plugin the harness has loaded. */
+export const CATALOG = pluginIdSchema.parse("gear-catalog");
 
 /** What the fake stores answer for a page that was not scripted. */
 export const LISTING: FetchedListing = {
@@ -98,6 +102,10 @@ export const startApiHarness = async () => {
     rates: { fetchLatest: async () => Promise.resolve(ok(FX)) },
     scheduler: { every: () => () => undefined },
   };
+  const catalogEntries = new Map<PluginId, CatalogEntry[]>([[CATALOG, []]]);
+  const catalogs = new FakeCatalogGateway(catalogEntries);
+  const reading: { answer: Result<ReadSpecs, LlmError> } = { answer: ok({ name: null, specs: { kind: "tool" } }) };
+  const specReader: SpecReader = { read: async () => Promise.resolve(reading.answer) };
   const scans: { current: SchedulerHandle } = { current: await startScheduler(deps) };
   const rows: { current: readonly PluginRow[] } = { current: [] };
   const restarting = { current: false };
@@ -108,6 +116,8 @@ export const startApiHarness = async () => {
   });
   const runtime = {
     deps: () => deps,
+    gear: () => ({ gear: repository.gear, catalogs, ids: deps.ids, clock: deps.clock }),
+    specReader: () => specReader,
     scans: () => scans.current,
     plugins: vi.fn<ApiRuntime["plugins"]>(() => rows.current),
     applySettings,
@@ -124,6 +134,8 @@ export const startApiHarness = async () => {
     request,
     repository,
     stores,
+    catalogEntries,
+    reading,
     logger,
     scans,
     rows,

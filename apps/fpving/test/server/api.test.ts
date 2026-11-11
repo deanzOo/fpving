@@ -6,6 +6,7 @@ import {
   ListingOrigin,
   listingSchema,
   ListingStatus,
+  LlmErrorKind,
   ok,
   priceSnapshotSchema,
   productIdSchema,
@@ -13,7 +14,8 @@ import {
   TREND_DAYS,
 } from "@fpving/core";
 import type { Alert } from "@fpving/core";
-import { StoreErrorKind } from "@fpving/plugin-sdk";
+import { GearKind, StoreErrorKind } from "@fpving/plugin-sdk";
+import type { CatalogEntry } from "@fpving/plugin-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { GatewayRefusal } from "../../src/plugins/store-gateway.ts";
@@ -25,6 +27,7 @@ import { createServer } from "../../src/server/server.ts";
 import {
   API_HOST,
   API_PORT,
+  CATALOG,
   LISTING,
   networkError,
   OTHER,
@@ -693,6 +696,165 @@ describe("Scan API", () => {
       expect((await status()).running).toBe(false);
     });
     expect(api.logger.events.map(({ message }) => message)).toContain("scan failed");
+  });
+});
+
+const POCKET: CatalogEntry = {
+  key: "pocket",
+  name: "Pocket radio",
+  specs: { kind: GearKind.Radio, rcLink: "elrs-2g4", firmware: "edgetx" },
+};
+const radio = (specs: object = {}) => ({
+  kind: GearKind.Radio,
+  name: "My radio",
+  quantity: 1,
+  catalogRef: null,
+  specs,
+});
+const catalogSpec = (value: string) => ({ source: "catalog", pluginId: CATALOG, value });
+const userSpec = (value: string) => ({ source: "user", value });
+const gearWire = z.object({ id: z.string(), specs: z.record(z.string(), z.unknown()) });
+const gearUrl = (id: string) => apiRoutes.updateGear.url.replace(":gearId", id);
+const POCKET_REF = { pluginId: CATALOG, key: POCKET.key };
+const SECRET = "sk-ant-secret";
+
+describe("Gear API", () => {
+  const addRadio = async (draft: object = radio()) => {
+    const response = await api.request("POST", apiRoutes.addGear.url, draft);
+    return gearWire.parse(response.json());
+  };
+
+  it("adds gear, answering 201 with the stored item", async () => {
+    const response = await api.request("POST", apiRoutes.addGear.url, radio({ rcLink: userSpec("crossfire") }));
+    expect(response.statusCode).toBe(HttpStatus.Created);
+    expect(response.json()).toMatchObject({ name: "My radio", quantity: 1, specs: { rcLink: userSpec("crossfire") } });
+  });
+
+  it("keeps a catalog source only for a value the catalog confirms", async () => {
+    api.catalogEntries.set(CATALOG, [POCKET]);
+    const specs = radio({ rcLink: catalogSpec("elrs-2g4"), firmware: catalogSpec("opentx") });
+    const added = await addRadio({ ...specs, catalogRef: POCKET_REF });
+    expect(added.specs).toEqual({ rcLink: catalogSpec("elrs-2g4"), firmware: userSpec("opentx") });
+  });
+
+  it.each([
+    ["a spec outside the vocabulary", radio({ rcLink: userSpec("carrier-pigeon") })],
+    ["a spec of another kind", radio({ cells: userSpec("4") })],
+    ["no quantity", { ...radio(), quantity: 0 }],
+    ["a blank name", { ...radio(), name: " " }],
+  ])("answers 422 invalid_specs to adding gear with %s", async (_label, draft) => {
+    const response = await api.request("POST", apiRoutes.addGear.url, draft);
+    expect(response.statusCode).toBe(HttpStatus.UnprocessableContent);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.InvalidSpecs);
+    expect(await api.repository.gear.list()).toEqual([]);
+  });
+
+  it("lists the gear with the catalog changes of each item", async () => {
+    api.catalogEntries.set(CATALOG, [POCKET]);
+    await addRadio({ ...radio({ rcLink: catalogSpec("elrs-2g4") }), catalogRef: POCKET_REF });
+    await addRadio();
+    api.catalogEntries.set(CATALOG, [{ ...POCKET, specs: { kind: GearKind.Radio, rcLink: "crossfire" } }]);
+    const response = await api.request("GET", apiRoutes.listGear.url);
+    expect(response.statusCode).toBe(HttpStatus.Ok);
+    expect(response.json()).toMatchObject([
+      { item: { name: "My radio" }, changes: [{ field: "rcLink", saved: "elrs-2g4", catalog: "crossfire" }] },
+      { item: { name: "My radio" }, changes: [] },
+    ]);
+  });
+
+  it("updates gear, keeping its id", async () => {
+    const { id } = await addRadio();
+    const response = await api.request("PATCH", gearUrl(id), { ...radio(), name: "Renamed", quantity: 2 });
+    expect(response.statusCode).toBe(HttpStatus.Ok);
+    expect(response.json()).toMatchObject({ id, name: "Renamed", quantity: 2 });
+    expect(await api.repository.gear.list()).toMatchObject([{ id, name: "Renamed" }]);
+  });
+
+  it("answers 404 gear_not_found to updating unknown gear", async () => {
+    const response = await api.request("PATCH", gearUrl("missing"), radio());
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.GearNotFound);
+  });
+
+  it("answers 422 invalid_specs to updating gear with invalid specs and changes nothing", async () => {
+    const { id } = await addRadio();
+    const response = await api.request("PATCH", gearUrl(id), { ...radio(), quantity: 0 });
+    expect(response.statusCode).toBe(HttpStatus.UnprocessableContent);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.InvalidSpecs);
+    expect(await api.repository.gear.list()).toMatchObject([{ id, quantity: 1 }]);
+  });
+
+  it("removes gear, answering 204", async () => {
+    const { id } = await addRadio();
+    const response = await api.request("DELETE", gearUrl(id));
+    expect(response.statusCode).toBe(HttpStatus.NoContent);
+    expect(await api.repository.gear.list()).toEqual([]);
+  });
+
+  it("answers 404 gear_not_found to removing unknown gear", async () => {
+    const response = await api.request("DELETE", gearUrl("missing"));
+    expect(response.statusCode).toBe(HttpStatus.NotFound);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.GearNotFound);
+  });
+
+  it("searches the catalogs, counting the loaded ones", async () => {
+    api.catalogEntries.set(CATALOG, [POCKET]);
+    const response = await api.request("GET", `${apiRoutes.searchCatalog.url}?q=pock`);
+    expect(response.statusCode).toBe(HttpStatus.Ok);
+    expect(response.json()).toEqual({
+      matches: [{
+        name: POCKET.name,
+        kind: GearKind.Radio,
+        specs: {
+          rcLink: [{ value: "elrs-2g4", pluginId: CATALOG }],
+          firmware: [{ value: "edgetx", pluginId: CATALOG }],
+        },
+        refs: [POCKET_REF],
+      }],
+      failedPlugins: [],
+      catalogs: 1,
+    });
+  });
+
+  it("answers no matches and no catalogs when none is installed", async () => {
+    api.catalogEntries.clear();
+    const response = await api.request("GET", `${apiRoutes.searchCatalog.url}?q=pock`);
+    expect(response.json()).toEqual({ matches: [], failedPlugins: [], catalogs: 0 });
+  });
+
+  it("refuses a catalog search without text", async () => {
+    const response = await api.request("GET", apiRoutes.searchCatalog.url);
+    expect(response.statusCode).toBe(HttpStatus.BadRequest);
+  });
+
+  it("reads specs from pasted text, answering the name and the specs", async () => {
+    const reading = { name: "Pocket", specs: { kind: GearKind.Radio, rcLink: "elrs-2g4" } } as const;
+    api.reading.answer = ok(reading);
+    const response = await api.request("POST", apiRoutes.readSpecs.url, { kind: GearKind.Radio, text: "Pocket ELRS" });
+    expect(response.statusCode).toBe(HttpStatus.Ok);
+    expect(response.json()).toEqual(reading);
+  });
+
+  it("answers 503 unavailable without leaking the reason when the reader cannot be reached", async () => {
+    api.reading.answer = err({ kind: LlmErrorKind.Unavailable, detail: `401 for ${SECRET}` });
+    const response = await api.request("POST", apiRoutes.readSpecs.url, { kind: GearKind.Radio, text: "Pocket" });
+    expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
+    expect(errorOf(response.json()).kind).toBe(LlmErrorKind.Unavailable);
+    expect(response.body).not.toContain(SECRET);
+  });
+
+  it("never returns a reading it could not validate", async () => {
+    api.reading.answer = err({ kind: LlmErrorKind.MalformedOutput, detail: `raw model text ${SECRET}` });
+    const response = await api.request("POST", apiRoutes.readSpecs.url, { kind: GearKind.Radio, text: "Pocket" });
+    expect(response.statusCode).toBe(HttpStatus.BadGateway);
+    expect(errorOf(response.json()).kind).toBe(LlmErrorKind.MalformedOutput);
+    expect(response.json()).not.toHaveProperty("specs");
+    expect(response.body).not.toContain(SECRET);
+  });
+
+  it("refuses to read an empty text", async () => {
+    const response = await api.request("POST", apiRoutes.readSpecs.url, { kind: GearKind.Radio, text: "" });
+    expect(response.statusCode).toBe(HttpStatus.BadRequest);
   });
 });
 
