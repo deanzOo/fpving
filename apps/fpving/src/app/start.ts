@@ -14,8 +14,10 @@ import type {
   Scheduler,
   SchedulerHandle,
   Settings,
+  SpecReader,
 } from "@fpving/core";
 import { anthropicMessages, createAnthropicLlmJudge, keylessLlmJudge } from "../adapters/anthropic/llm-judge.js";
+import { createSpecReader, keylessSpecReader } from "../adapters/anthropic/spec-reader.js";
 import { createFileDebugSink } from "../adapters/debug/file-debug-sink.js";
 import { createHttpFxRates } from "../adapters/fx/http-fx-rates.js";
 import { createPinoLogger } from "../adapters/logger/pino-logger.js";
@@ -91,6 +93,7 @@ export interface AppPorts {
   readonly http: HttpClient;
   readonly browser: ClosableBrowserDriver;
   readonly llm: LlmJudge;
+  readonly specReader: SpecReader;
   readonly spawn: SpawnWorker;
   readonly platform: NodeJS.Platform;
 }
@@ -102,6 +105,8 @@ export interface App {
   /** Every port core's use cases take, as they are now; a settings change can replace the store gateway. */
   readonly deps: AppDeps;
   readonly scans: SchedulerHandle;
+  /** Reads gear specs from pasted text; always unavailable without an API key. */
+  readonly specReader: SpecReader;
   /** The plugin host now; a settings change can replace it. */
   readonly plugins: PluginHost;
   readonly logger: ClosableLogger;
@@ -174,6 +179,11 @@ const judgeFor = (env: Env, logger: ClosableLogger): LlmJudge => {
   }
   return createAnthropicLlmJudge(anthropicMessages({ apiKey: env.ANTHROPIC_API_KEY }), logger);
 };
+
+const specReaderFor = (env: Env, logger: ClosableLogger): SpecReader =>
+  env.ANTHROPIC_API_KEY === undefined
+    ? keylessSpecReader(logger)
+    : createSpecReader({ createMessage: anthropicMessages({ apiKey: env.ANTHROPIC_API_KEY }), logger });
 
 /**
  * Starts the app: parses the environment, creates `DATA_DIR` owner-only (an existing one keeps its mode, with a
@@ -281,6 +291,7 @@ export const startApp = async (
     opened({ name: ShutdownStepName.Plugins, run: async () => currentHost().shutdown() });
     pluginStates = () => currentHost().plugins();
     checkpoint();
+    const specReader = overrides.specReader ?? specReaderFor(env, logger);
     const clock = overrides.clock ?? systemClock;
     const debugSink = createFileDebugSink({ dataDir, clock });
     const gatewayFor = (current: PluginHost) => createPluginStoreGateway({ host: current, debugSink, logger });
@@ -326,6 +337,7 @@ export const startApp = async (
       get scans() {
         return parts.scans;
       },
+      specReader,
       get plugins() {
         return parts.host;
       },

@@ -33,3 +33,19 @@ export const extractMessage = (title: string): string => `<title>${title}</title
  */
 export const compareMessage = (source: string, candidate: string): string =>
   `<source>${source}</source>\n<candidate>${candidate}</candidate>`;
+
+/** System prompt for reading the specs of a piece of gear from pasted text. */
+export const SPECS_SYSTEM = [
+  "You read pasted product text for FPV drone gear and fill in its specs.",
+  "Use only what the text states. Answer null for every field the text does not state or that fits none of the",
+  "allowed values; never guess or infer from the brand. Give the name only when the text states one.",
+].join(" ");
+
+/**
+ * The user turn for one pasted text.
+ *
+ * @param kind - The kind of gear the text describes.
+ * @param text - The pasted text.
+ * @returns The message text.
+ */
+export const specsMessage = (kind: string, text: string): string => `<kind>${kind}</kind>\n<text>${text}</text>`;

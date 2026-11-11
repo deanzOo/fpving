@@ -2,7 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { MessageCreateParamsNonStreaming, StopReason } from "@anthropic-ai/sdk/resources/messages";
 import { LlmErrorKind, LlmVerdict, MATCHING_RULES } from "@fpving/core";
 import type { LlmError, Result } from "@fpving/core";
-import type { LogFields, Logger } from "@fpving/plugin-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ANTHROPIC_BASE_URL,
@@ -14,6 +13,7 @@ import {
   NO_API_KEY,
 } from "../../../src/adapters/anthropic/llm-judge.ts";
 import type { CreateMessage, MessageReply } from "../../../src/adapters/anthropic/llm-judge.ts";
+import { recordingLogger, textReply } from "./helpers.ts";
 
 const FAKE_KEY = "test-key-not-a-real-secret";
 const SOURCE = "T-Motor F60 Pro V 2207 1950KV";
@@ -27,21 +27,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const textReply = (text: string, stopReason: StopReason = "end_turn"): MessageReply => ({
-  content: [{ type: "text", text, citations: null }],
-  stop_reason: stopReason,
-  stop_details: null,
-});
-
 const reply = (output: unknown, stopReason?: StopReason): MessageReply => textReply(JSON.stringify(output), stopReason);
-
-const recordingLogger = (): { logger: Logger; logged: (LogFields | undefined)[] } => {
-  const logged: (LogFields | undefined)[] = [];
-  const record = (_message: string, fields?: LogFields): void => {
-    logged.push(fields);
-  };
-  return { logger: { debug: record, info: record, warn: record, error: record }, logged };
-};
 
 const judgeReplying = (answer: () => Promise<MessageReply> | MessageReply) => {
   const requests: MessageCreateParamsNonStreaming[] = [];

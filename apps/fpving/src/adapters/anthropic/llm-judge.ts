@@ -55,23 +55,26 @@ const verdictFormat = zodOutputFormat(verdictSchema);
 
 type Format<T> = ReturnType<typeof zodOutputFormat<z.ZodType<T>>>;
 
+/** Asks one question and parses the reply under `format`; a failure is logged and answered as an error. */
+export type Ask = <T>(method: string, format: Format<T>, system: string, text: string) => Promise<Result<T, LlmError>>;
+
 /**
- * Creates the core {@link LlmJudge} on the Anthropic Messages API. It keeps at most {@link MAX_IN_FLIGHT} calls in
- * flight and logs every failure as a warning with its kind and detail.
+ * Creates the {@link Ask} both Anthropic adapters share. It keeps at most {@link MAX_IN_FLIGHT} calls in flight and
+ * logs every failure as a warning with its method, kind and detail.
  *
  * @param createMessage - Sends a request, see {@link anthropicMessages}.
  * @param logger - Where failures are logged.
- * @returns The judge.
+ * @returns The function that asks.
  */
-export const createAnthropicLlmJudge = (createMessage: CreateMessage, logger: Logger): LlmJudge => {
+export const createAsk = (createMessage: CreateMessage, logger: Logger): Ask => {
   const limit = limitConcurrency(MAX_IN_FLIGHT);
 
-  const failed = (method: keyof LlmJudge, kind: LlmErrorKind, detail: string): Result<never, LlmError> => {
+  const failed = (method: string, kind: LlmErrorKind, detail: string): Result<never, LlmError> => {
     logger.warn("LLM judge call failed", { method, kind, detail });
     return err({ kind, detail });
   };
 
-  const ask = async <T>(method: keyof LlmJudge, format: Format<T>, system: string, text: string) => {
+  return async (method, format, system, text) => {
     let reply: MessageReply;
     try {
       reply = await limit(async () => createMessage({
@@ -97,7 +100,18 @@ export const createAnthropicLlmJudge = (createMessage: CreateMessage, logger: Lo
       return failed(method, LlmErrorKind.MalformedOutput, `invalid output: ${String(error)}`);
     }
   };
+};
 
+/**
+ * Creates the core {@link LlmJudge} on the Anthropic Messages API. It keeps at most {@link MAX_IN_FLIGHT} calls in
+ * flight and logs every failure as a warning with its kind and detail.
+ *
+ * @param createMessage - Sends a request, see {@link anthropicMessages}.
+ * @param logger - Where failures are logged.
+ * @returns The judge.
+ */
+export const createAnthropicLlmJudge = (createMessage: CreateMessage, logger: Logger): LlmJudge => {
+  const ask = createAsk(createMessage, logger);
   return {
     extractIdentity: async (title) => ask("extractIdentity", identityFormat, EXTRACT_SYSTEM, extractMessage(title)),
     compare: async (source, candidate) =>

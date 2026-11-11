@@ -150,6 +150,14 @@ describe("App startup", () => {
     expect(logText()).toContain("no ANTHROPIC_API_KEY set");
   });
 
+  it("reads specs as unavailable when no API key is set", async () => {
+    const running = await started(env(), fakes().ports);
+    expect(await running.specReader.read("radio", "text")).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable" },
+    });
+  });
+
   it("wires the Anthropic judge when an API key is set, without logging the key", async () => {
     await started({ ...env(), ANTHROPIC_API_KEY: FAKE_KEY }, fakes().ports);
     expect(logText()).not.toContain("no ANTHROPIC_API_KEY set");
