@@ -1,5 +1,5 @@
 import { err, ok } from "@fpving/plugin-sdk";
-import type { Clock, GearKind, Result } from "@fpving/plugin-sdk";
+import type { CatalogEntry, Clock, GearKind, Result } from "@fpving/plugin-sdk";
 import type { GearItemId, PluginId } from "../ids.js";
 import type { CatalogGateway } from "../ports/catalog-gateway.js";
 import type { GearRepository } from "../ports/gear-repository.js";
@@ -105,7 +105,10 @@ interface Merging {
   readonly refs: CatalogRef[];
 }
 
-const same = (a: SpecRawValue, b: SpecRawValue): boolean => JSON.stringify(a) === JSON.stringify(b);
+const canonical = (value: SpecRawValue): string =>
+  Array.isArray(value) ? JSON.stringify(value.map((item) => JSON.stringify(item)).toSorted()) : JSON.stringify(value);
+
+const same = (a: SpecRawValue, b: SpecRawValue): boolean => canonical(a) === canonical(b);
 
 const fold = (name: string): string => name.trim().replaceAll(/\s+/gu, " ").toLowerCase();
 
@@ -148,6 +151,34 @@ export const searchCatalog = async ({ catalogs }: GearDeps, text: string): Promi
   return { matches: [...merged.values()], failedPlugins };
 };
 
+const currentEntry = async ({ catalogs }: GearDeps, ref: GearItem["catalogRef"]): Promise<CatalogEntry | null> => {
+  if (ref === null || !catalogs.plugins().includes(ref.pluginId)) {
+    return null;
+  }
+  const found = await catalogs.get(ref.pluginId, ref.key);
+  return found.ok ? found.value : null;
+};
+
+const verified = async (deps: GearDeps, draft: GearDraft): Promise<Record<string, SpecValue>> => {
+  const entry = await currentEntry(deps, draft.catalogRef);
+  const now = new Map(Object.entries<SpecRawValue>({ ...entry?.specs }));
+  const confirmed = (field: string, spec: SpecValue): boolean => {
+    const current = now.get(field);
+    return (
+      spec.source === SpecSource.Catalog
+      && spec.pluginId === draft.catalogRef?.pluginId
+      && current !== undefined
+      && same(spec.value, current)
+    );
+  };
+  return Object.fromEntries(
+    Object.entries(draft.specs).map(([field, spec]) => [
+      field,
+      confirmed(field, spec) ? spec : { source: SpecSource.User, value: spec.value },
+    ]),
+  );
+};
+
 const build = (
   id: string,
   createdAt: Date,
@@ -159,32 +190,34 @@ const build = (
 };
 
 /**
- * Stores a new gear item, keeping the draft's specs with their sources as given.
+ * Stores a new gear item.
+ *
+ * @remarks
+ * A field is saved as catalog-sourced only when its draft source is `catalog`, names the item's catalog plugin and its
+ * value equals the field's value in the catalog's current entry. Any other field, including every `user` field and
+ * every field when the catalog cannot be checked, is saved as confirmed by the user.
  *
  * @param deps - The ports to use.
  * @param draft - What the user entered.
  * @returns The stored item, or `invalid_specs` when the draft breaks the gear vocabulary of its kind.
  */
 export const addGear = async (deps: GearDeps, draft: GearDraft): Promise<Result<GearItem, InvalidSpecs>> => {
-  const built = build(deps.ids.next(), deps.clock.now(), draft, draft.specs);
+  const built = build(deps.ids.next(), deps.clock.now(), draft, await verified(deps, draft));
   if (built.ok) {
     await deps.gear.add(built.value);
   }
   return built;
 };
 
-const changesOf = async ({ catalogs }: GearDeps, item: GearItem): Promise<GearChange[]> => {
-  const ref = item.catalogRef;
-  if (ref === null || !catalogs.plugins().includes(ref.pluginId)) {
+const changesOf = async (deps: GearDeps, item: GearItem): Promise<GearChange[]> => {
+  const entry = await currentEntry(deps, item.catalogRef);
+  if (entry === null || item.catalogRef === null) {
     return [];
   }
-  const found = await catalogs.get(ref.pluginId, ref.key);
-  if (!found.ok || found.value === null) {
-    return [];
-  }
-  const now: Record<string, SpecRawValue> = { ...found.value.specs };
+  const { pluginId } = item.catalogRef;
+  const now: Record<string, SpecRawValue> = { ...entry.specs };
   return Object.entries(item.specs).flatMap(([field, spec]) =>
-    spec.source === SpecSource.Catalog && spec.pluginId === ref.pluginId && !same(spec.value, now[field] ?? null)
+    spec.source === SpecSource.Catalog && spec.pluginId === pluginId && !same(spec.value, now[field] ?? null)
       ? [{ field, saved: spec.value, catalog: now[field] ?? null }]
       : [],
   );
@@ -203,16 +236,8 @@ const changesOf = async ({ catalogs }: GearDeps, item: GearItem): Promise<GearCh
 export const listGear = async (deps: GearDeps): Promise<GearWithChanges[]> =>
   Promise.all((await deps.gear.list()).map(async (item) => ({ item, changes: await changesOf(deps, item) })));
 
-const settle = (before: SpecValue | undefined, next: SpecValue): SpecValue => {
-  if (before?.source !== SpecSource.Catalog) {
-    return next;
-  }
-  return same(before.value, next.value) ? before : { source: SpecSource.User, value: next.value };
-};
-
 /**
- * Replaces a stored item with the draft. A field whose value differs from its stored catalog value is saved as
- * confirmed by the user; one that does not keeps its catalog source.
+ * Replaces a stored item with the draft. See {@link addGear} for how each field's source is settled.
  *
  * @param deps - The ports to use.
  * @param id - The item to edit.
@@ -228,10 +253,7 @@ export const updateGear = async (
   if (stored === null) {
     return err({ kind: RepositoryErrorKind.NotFound });
   }
-  const specs = Object.fromEntries(
-    Object.entries(draft.specs).map(([field, next]) => [field, settle(stored.specs[field], next)]),
-  );
-  const built = build(id, stored.createdAt, draft, specs);
+  const built = build(id, stored.createdAt, draft, await verified(deps, draft));
   if (!built.ok) {
     return built;
   }

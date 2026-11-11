@@ -23,6 +23,7 @@ const TWO = pluginIdSchema.parse("catalog-two");
 const NOW = new Date("2026-02-03T04:05:06.000Z");
 const CELLS = 4;
 const OTHER_CELLS = 6;
+const MORE_CELLS = 3;
 
 const battery = (key: string, name: string, specs: Record<string, unknown>): CatalogEntry =>
   catalogEntrySchema.parse({ key, name, specs: { kind: GearKind.Battery, ...specs } });
@@ -71,6 +72,14 @@ const draft = (overrides: Partial<GearDraft> = {}): GearDraft => ({
   specs: { cells: { source: SpecSource.Catalog, pluginId: ONE, value: CELLS } },
   ...overrides,
 });
+
+const T1300 = battery("t1300", "Tattu 1300", { cells: CELLS });
+
+const seed = async (deps: GearDeps, overrides: Partial<GearDraft> = {}): Promise<GearItem> => {
+  const item = gearItemSchema.parse({ ...draft(overrides), id: "seed-1", createdAt: NOW });
+  await deps.gear.add(item);
+  return item;
+};
 
 const gateway = (entries: [PluginId, CatalogEntry[]][]): FakeCatalogGateway => new FakeCatalogGateway(new Map(entries));
 
@@ -138,7 +147,7 @@ describe("Catalog search", () => {
 
 describe("Adding gear", () => {
   it("copies catalog specs with their plugin as the source", async () => {
-    const deps = depsFor(gateway([]));
+    const deps = depsFor(gateway([[ONE, [T1300]]]));
     const added = await addGear(deps, draft());
     expect(added).toMatchObject({
       ok: true,
@@ -149,6 +158,37 @@ describe("Adding gear", () => {
       },
     });
     expect(await deps.gear.list()).toHaveLength(1);
+  });
+
+  it("saves a catalog source that does not match the catalog as confirmed by the user", async () => {
+    const deps = depsFor(gateway([[ONE, [T1300]]]));
+    const wrong = { cells: { source: SpecSource.Catalog, pluginId: ONE, value: OTHER_CELLS } };
+    const added = await addGear(deps, draft({ specs: wrong }));
+    expect(added).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User } } } });
+  });
+
+  it("saves a catalog source from another plugin than the item's catalog as confirmed by the user", async () => {
+    const deps = depsFor(gateway([[ONE, [T1300]]]));
+    const other = { cells: { source: SpecSource.Catalog, pluginId: TWO, value: CELLS } };
+    const added = await addGear(deps, draft({ specs: other }));
+    expect(added).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User } } } });
+  });
+
+  it("saves a catalog source as confirmed by the user when the catalog cannot be checked", async () => {
+    const entries = new Map([[ONE, [T1300]]]);
+    const down = { ...depsFor(gateway([])), catalogs: new FlakyCatalogGateway(entries, ONE) };
+    const gone = depsFor(gateway([]));
+    const noRef = draft({ catalogRef: null });
+    for (const [deps, item] of [[down, draft()], [gone, draft()], [gone, noRef]] as const) {
+      const added = await addGear(deps, item);
+      expect(added).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User } } } });
+    }
+  });
+
+  it("saves a catalog source as confirmed by the user when the catalog has no such entry", async () => {
+    const deps = depsFor(gateway([[ONE, []]]));
+    const added = await addGear(deps, draft());
+    expect(added).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User } } } });
   });
 
   it("saves an item with unknown specs", async () => {
@@ -179,13 +219,13 @@ describe("Listing gear", () => {
   });
 
   it("flags a field the catalog has changed since it was saved", async () => {
-    await addGear(deps, draft());
+    await seed(deps);
     const [row] = await listGear(deps);
     expect(row?.changes).toEqual([{ field: "cells", saved: CELLS, catalog: OTHER_CELLS }]);
   });
 
   it("keeps an item's specs and flags nothing when its catalog plugin is gone", async () => {
-    await addGear(deps, draft());
+    await seed(deps);
     const bare = { ...deps, catalogs: gateway([]) };
     const [row] = await listGear(bare);
     expect(row?.changes).toEqual([]);
@@ -193,7 +233,7 @@ describe("Listing gear", () => {
   });
 
   it("flags nothing when the catalog no longer has the entry or errors", async () => {
-    await addGear(deps, draft());
+    await seed(deps);
     const missing = { ...deps, catalogs: gateway([[ONE, []]]) };
     expect((await listGear(missing))[0]?.changes).toEqual([]);
     const failing = { ...deps, catalogs: new FlakyCatalogGateway(new Map(), ONE) };
@@ -201,11 +241,24 @@ describe("Listing gear", () => {
   });
 
   it("flags a field the catalog dropped and ignores items without a catalog", async () => {
-    await addGear(deps, draft());
+    await seed(deps);
     await addGear(deps, draft({ name: "Zed", catalogRef: null, specs: {} }));
     const dropped = { ...deps, catalogs: gateway([[ONE, [battery("t1300", "Tattu 1300", {})]]]) };
     const rows = await listGear(dropped);
     expect(rows.map((row) => row.changes)).toEqual([[{ field: "cells", saved: CELLS, catalog: null }], []]);
+  });
+
+  it("does not flag reordered list values as a change", async () => {
+    const charger = (cells: unknown): CatalogEntry =>
+      catalogEntrySchema.parse({ key: "c1", name: "Charger", specs: { kind: GearKind.Charger, cells } });
+    const listed = depsFor(gateway([[ONE, [charger([OTHER_CELLS, CELLS])]]]));
+    const kind = GearKind.Charger;
+    await seed(listed, { kind, name: "Charger", catalogRef: { pluginId: ONE, key: "c1" }, specs: {
+      cells: { source: SpecSource.Catalog, pluginId: ONE, value: [CELLS, OTHER_CELLS] },
+    } });
+    expect((await listGear(listed))[0]?.changes).toEqual([]);
+    const grown = { ...listed, catalogs: gateway([[ONE, [charger([OTHER_CELLS, CELLS, MORE_CELLS])]]]) };
+    expect((await listGear(grown))[0]?.changes).toHaveLength(1);
   });
 
   it("never flags a field the user confirmed", async () => {
@@ -220,8 +273,8 @@ describe("Editing gear", () => {
     return gearItemSchema.parse(added.ok ? added.value : null);
   };
 
-  it("marks an edited catalog value as confirmed by the user", async () => {
-    const deps = depsFor(gateway([]));
+  it("saves a catalog source that does not match the catalog as confirmed by the user", async () => {
+    const deps = depsFor(gateway([[ONE, [T1300]]]));
     const { id } = await stored(deps);
     const edited = await updateGear(deps, id, {
       ...draft(),
@@ -235,13 +288,23 @@ describe("Editing gear", () => {
     expect(await deps.gear.get(id)).toMatchObject({ quantity: 2, createdAt: NOW });
   });
 
-  it("keeps the catalog source of a value the edit left alone", async () => {
-    const deps = depsFor(gateway([]));
-    const { id } = await stored(deps);
-    const same = { cells: { source: SpecSource.User, value: CELLS } };
-    const kept = await updateGear(deps, id, draft({ specs: same }));
-    const cells = { source: SpecSource.Catalog, pluginId: ONE };
-    expect(kept).toMatchObject({ ok: true, value: { specs: { cells } } });
+  it("clears the change flag when the user keeps their own value", async () => {
+    const deps = depsFor(gateway([[ONE, [battery("t1300", "Tattu 1300", { cells: OTHER_CELLS })]]]));
+    const { id } = await seed(deps);
+    expect((await listGear(deps))[0]?.changes).toHaveLength(1);
+    const mine = { cells: { source: SpecSource.User, value: CELLS } };
+    const kept = await updateGear(deps, id, draft({ specs: mine }));
+    expect(kept).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User, value: CELLS } } } });
+    expect((await listGear(deps))[0]?.changes).toEqual([]);
+  });
+
+  it("keeps a value taken from the catalog sourced from the catalog", async () => {
+    const deps = depsFor(gateway([[ONE, [battery("t1300", "Tattu 1300", { cells: OTHER_CELLS })]]]));
+    const { id } = await seed(deps);
+    const theirs = { cells: { source: SpecSource.Catalog, pluginId: ONE, value: OTHER_CELLS } };
+    const used = await updateGear(deps, id, draft({ specs: theirs }));
+    expect(used).toMatchObject({ ok: true, value: { specs: { cells: theirs.cells } } });
+    expect((await listGear(deps))[0]?.changes).toEqual([]);
   });
 
   it("saves a field the item did not have as the user gave it", async () => {
