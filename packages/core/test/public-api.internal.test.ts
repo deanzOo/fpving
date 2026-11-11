@@ -33,6 +33,7 @@ describe("Core public API", () => {
       "alertSchema",
       "cachedVerdictSchema",
       "convert",
+      "compareGear",
       "err",
       "evaluate",
       "findMatches",

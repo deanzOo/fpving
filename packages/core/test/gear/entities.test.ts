@@ -1,6 +1,7 @@
 import { GearKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
-import { gearItemSchema, pluginIdSchema, SpecSource, specsOf } from "../../src/index.ts";
+import { z } from "zod";
+import { compareGear, gearItemSchema, pluginIdSchema, SpecSource, specsOf } from "../../src/index.ts";
 
 const CATALOG = pluginIdSchema.parse("example-catalog");
 const CELLS = 4;
@@ -47,5 +48,21 @@ describe("Gear item", () => {
 
   it("accepts an item with no specs known yet", () => {
     expect(specsOf(gearItemSchema.parse(battery({})))).toEqual({ kind: GearKind.Battery });
+  });
+});
+
+describe("Gear order", () => {
+  const base = z.object({}).loose().parse(battery({}));
+  const named = (kind: GearKind, name: string) => gearItemSchema.parse({ ...base, kind, name });
+
+  it("puts kinds in declaration order, not alphabetical", () => {
+    const tool = named(GearKind.Tool, "A");
+    const radio = named(GearKind.Radio, "Z");
+    expect([tool, radio].toSorted(compareGear)).toEqual([radio, tool]);
+  });
+
+  it("orders names within a kind with locale comparison", () => {
+    const names = ["b", "Ä", "a"].map((name) => named(GearKind.Tool, name));
+    expect(names.toSorted(compareGear).map((item) => item.name)).toEqual(["a", "Ä", "b"]);
   });
 });

@@ -50,3 +50,9 @@ export type GearItem = z.infer<typeof gearItemSchema>;
 
 /** The specs of `item` without their sources, as `gearSpecsSchema` accepts them. Throws when the item is invalid. */
 export const specsOf = (item: GearItem): GearSpecs => gearSpecsSchema.parse(stripSources(item));
+
+const KIND_ORDER: readonly string[] = Object.values(GearKind);
+
+/** Orders gear by kind in `GearKind` declaration order, then by name with `localeCompare`. */
+export const compareGear = (a: GearItem, b: GearItem): number =>
+  KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name);
