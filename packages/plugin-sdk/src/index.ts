@@ -5,6 +5,15 @@
  *
  * @module plugin-sdk
  */
+export { catalogEntrySchema, catalogManifestSchema, CatalogErrorKind, PluginKind } from "./catalog.js";
+export type {
+  Catalog,
+  CatalogContext,
+  CatalogEntry,
+  CatalogError,
+  CatalogManifest,
+  CatalogPlugin,
+} from "./catalog.js";
 export type {
   BrowserDriver,
   BrowserPage,
