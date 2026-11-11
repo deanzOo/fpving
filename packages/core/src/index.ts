@@ -111,6 +111,20 @@ export type {
 } from "./ids.js";
 export { gearItemSchema, SpecSource, specsOf, specValueSchema } from "./gear/entities.js";
 export type { GearItem, SpecValue } from "./gear/entities.js";
+export { GearErrorKind } from "./gear/errors.js";
+export { addGear, listGear, removeGear, searchCatalog, updateGear } from "./gear/use-cases.js";
+export type {
+  CatalogMatch,
+  CatalogRef,
+  CatalogSearch,
+  CatalogValue,
+  GearChange,
+  GearDeps,
+  GearDraft,
+  GearWithChanges,
+  InvalidSpecs,
+  SpecRawValue,
+} from "./gear/use-cases.js";
 export { PortErrorKind } from "./ports/errors.js";
 export type { RatesUnavailable, CurrencyRates } from "./ports/currency-rates.js";
 export type { DebugSink, DebugWriteFailed } from "./ports/debug-sink.js";
