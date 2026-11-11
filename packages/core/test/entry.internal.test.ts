@@ -15,6 +15,10 @@ describe("Core entry points", () => {
 
   it("exports the contract suites and the LLM judge, notifier and rates fakes from the testing entry", () => {
     expect(Object.keys(testing).toSorted()).toEqual([
+      "FakeCatalogGateway",
+      "FakeSpecReader",
+      "InMemoryGearRepository",
+      "describeGearRepositoryContract",
       "describeRepositoryContract",
       "describeStoreGatewayContract",
       "fakeCurrencyRates",

@@ -11,3 +11,7 @@ export type { StoreGatewayContractSubject } from "./store-gateway-contract.js";
 export { fakeLlmJudge } from "./fake-llm.js";
 export { fakeNotifier } from "./fake-notifier.js";
 export { fakeCurrencyRates } from "./fake-rates.js";
+export { describeGearRepositoryContract } from "./gear-repository-contract.js";
+export { InMemoryGearRepository } from "./in-memory-gear-repository.js";
+export { FakeCatalogGateway } from "./fake-catalog-gateway.js";
+export { FakeSpecReader } from "./fake-spec-reader.js";

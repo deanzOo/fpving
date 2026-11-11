@@ -91,6 +91,7 @@ export type {
 } from "./entities.js";
 export {
   alertIdSchema,
+  gearItemIdSchema,
   listingIdSchema,
   matchCandidateIdSchema,
   pluginIdSchema,
@@ -98,10 +99,24 @@ export {
   scanRunIdSchema,
   snapshotIdSchema,
 } from "./ids.js";
-export type { AlertId, ListingId, MatchCandidateId, PluginId, ProductId, ScanRunId, SnapshotId } from "./ids.js";
+export type {
+  AlertId,
+  GearItemId,
+  ListingId,
+  MatchCandidateId,
+  PluginId,
+  ProductId,
+  ScanRunId,
+  SnapshotId,
+} from "./ids.js";
+export { gearItemSchema, SpecSource, specsOf, specValueSchema } from "./gear/entities.js";
+export type { GearItem, SpecValue } from "./gear/entities.js";
 export { PortErrorKind } from "./ports/errors.js";
 export type { RatesUnavailable, CurrencyRates } from "./ports/currency-rates.js";
 export type { DebugSink, DebugWriteFailed } from "./ports/debug-sink.js";
+export type { CatalogGateway } from "./ports/catalog-gateway.js";
+export type { GearRepository } from "./ports/gear-repository.js";
+export type { ReadSpecs, SpecReader } from "./ports/spec-reader.js";
 export type { IdGenerator } from "./ports/id-generator.js";
 export { LlmErrorKind, productIdentitySchema } from "./ports/llm-judge.js";
 export type { LlmError, LlmJudge, ProductIdentity } from "./ports/llm-judge.js";

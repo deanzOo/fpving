@@ -42,3 +42,9 @@ export const pluginIdSchema = manifestSchema.shape.id.brand<"PluginId">();
 
 /** A plugin id as {@link pluginIdSchema} accepts it. */
 export type PluginId = z.infer<typeof pluginIdSchema>;
+
+/** Accepts a non-empty string as the id of a gear item. */
+export const gearItemIdSchema = z.string().min(1).brand<"GearItemId">();
+
+/** A gear item id as {@link gearItemIdSchema} accepts it. */
+export type GearItemId = z.infer<typeof gearItemIdSchema>;
