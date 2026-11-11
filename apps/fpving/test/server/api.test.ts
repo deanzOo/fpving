@@ -718,12 +718,12 @@ const gearUrl = (id: string) => apiRoutes.updateGear.url.replace(":gearId", id);
 const POCKET_REF = { pluginId: CATALOG, key: POCKET.key };
 const SECRET = "sk-ant-secret";
 
-describe("Gear API", () => {
-  const addRadio = async (draft: object = radio()) => {
-    const response = await api.request("POST", apiRoutes.addGear.url, draft);
-    return gearWire.parse(response.json());
-  };
+const addRadio = async (draft: object = radio()) => {
+  const response = await api.request("POST", apiRoutes.addGear.url, draft);
+  return gearWire.parse(response.json());
+};
 
+describe("Gear API", () => {
   it("adds gear, answering 201 with the stored item", async () => {
     const response = await api.request("POST", apiRoutes.addGear.url, radio({ rcLink: userSpec("crossfire") }));
     expect(response.statusCode).toBe(HttpStatus.Created);
@@ -870,6 +870,39 @@ describe("API during a settings restart", () => {
     const response = await api.request("POST", url, payload);
     expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
     expect(errorOf(response.json()).kind).toBe(ApiErrorKind.Restarting);
+  });
+
+  it("refuses to add gear while the plugins restart, and stores nothing", async () => {
+    api.restarting.current = true;
+    const response = await api.request("POST", apiRoutes.addGear.url, radio());
+    expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.Restarting);
+    expect(await api.repository.gear.list()).toEqual([]);
+  });
+
+  it("refuses to update gear while the plugins restart, and changes nothing", async () => {
+    const { id } = await addRadio();
+    api.restarting.current = true;
+    const response = await api.request("PATCH", gearUrl(id), { ...radio(), name: "Renamed" });
+    expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.Restarting);
+    expect(await api.repository.gear.list()).toMatchObject([{ id, name: "My radio" }]);
+  });
+
+  it("refuses to search the catalogs while the plugins restart", async () => {
+    api.restarting.current = true;
+    const response = await api.request("GET", `${apiRoutes.searchCatalog.url}?q=pock`);
+    expect(response.statusCode).toBe(HttpStatus.ServiceUnavailable);
+    expect(errorOf(response.json()).kind).toBe(ApiErrorKind.Restarting);
+  });
+
+  it("still lists, removes and reads gear while the plugins restart", async () => {
+    const { id } = await addRadio();
+    api.restarting.current = true;
+    expect((await api.request("GET", apiRoutes.listGear.url)).statusCode).toBe(HttpStatus.Ok);
+    expect((await api.request("POST", apiRoutes.readSpecs.url, { kind: GearKind.Radio, text: "x" })).statusCode)
+      .toBe(HttpStatus.Ok);
+    expect((await api.request("DELETE", gearUrl(id))).statusCode).toBe(HttpStatus.NoContent);
   });
 
   it("starts no scan while restarting", async () => {

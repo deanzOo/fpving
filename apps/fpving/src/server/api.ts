@@ -399,6 +399,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.addGear,
     handler: async ({ body }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       const added = await addGear(runtime().gear(), body);
       return added.ok
         ? reply.code(HttpStatus.Created).send(added.value)
@@ -409,6 +412,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.updateGear,
     handler: async ({ params: { gearId }, body }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       const updated = await updateGear(runtime().gear(), gearId, body);
       if (updated.ok) {
         return reply.code(HttpStatus.Ok).send(updated.value);
@@ -431,6 +437,9 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.searchCatalog,
     handler: async ({ query: { q } }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
       const gear = runtime().gear();
       const { matches, failedPlugins } = await searchCatalog(gear, q);
       return reply.code(HttpStatus.Ok).send({ matches, failedPlugins, catalogs: gear.catalogs.plugins().length });

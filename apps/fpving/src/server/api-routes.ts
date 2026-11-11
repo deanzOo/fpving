@@ -274,7 +274,11 @@ export const apiRoutes = {
       + "its value; every other spec is stored as confirmed by the user.",
     schema: {
       body: gearDraftSchema,
-      response: { [Created]: gearItemSchema, [UnprocessableContent]: apiErrorSchema },
+      response: {
+        [Created]: gearItemSchema,
+        [UnprocessableContent]: apiErrorSchema,
+        [ServiceUnavailable]: apiErrorSchema,
+      },
     },
   },
   updateGear: {
@@ -284,7 +288,12 @@ export const apiRoutes = {
     schema: {
       params: gearParams,
       body: gearDraftSchema,
-      response: { [Ok]: gearItemSchema, [NotFound]: apiErrorSchema, [UnprocessableContent]: apiErrorSchema },
+      response: {
+        [Ok]: gearItemSchema,
+        [NotFound]: apiErrorSchema,
+        [UnprocessableContent]: apiErrorSchema,
+        [ServiceUnavailable]: apiErrorSchema,
+      },
     },
   },
   removeGear: {
@@ -307,6 +316,7 @@ export const apiRoutes = {
           failedPlugins: z.array(pluginIdSchema),
           catalogs: countSchema,
         }),
+        [ServiceUnavailable]: apiErrorSchema,
       },
     },
   },
