@@ -272,7 +272,7 @@ export const startApp = async (
     checkpoint();
     const dbPath = join(dataDir, DB_FILE);
     migrate(dbPath);
-    const { repository, close: closeDatabase } = openSqliteRepository(dbPath);
+    const { repository, close: closeDatabase } = openSqliteRepository(dbPath, logger);
     opened({ name: ShutdownStepName.Database, run: closeDatabase });
     const settings = await repository.settings.get();
     plugins = await readPlugins(dataDir, logger);

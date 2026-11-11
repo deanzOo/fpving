@@ -6,6 +6,7 @@ import type { Scheduler, Settings } from "@fpving/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { migrate } from "../../src/adapters/sqlite/migrate.ts";
+import { recordingLogger } from "../support/recording-logger.ts";
 import { openSqliteRepository } from "../../src/adapters/sqlite/repository.ts";
 import type { ClosableBrowserDriver } from "../../src/adapters/transport/playwright-browser-driver.ts";
 import { readAppVersion } from "../../src/adapters/transport/user-agent.ts";
@@ -194,7 +195,7 @@ describe("App startup", () => {
     vi.stubGlobal("fetch", fetch);
     mkdirSync(dataDir, { recursive: true });
     migrate(join(dataDir, DB_FILE));
-    const seed = openSqliteRepository(join(dataDir, DB_FILE));
+    const seed = openSqliteRepository(join(dataDir, DB_FILE), recordingLogger());
     await seed.repository.fxRates.save({ ...FX, fetchedOn: today() });
     seed.close();
     const running = await started(env(), {});

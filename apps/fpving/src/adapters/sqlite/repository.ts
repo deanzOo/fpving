@@ -2,6 +2,7 @@ import {
   alertSchema,
   cachedVerdictSchema,
   CandidateStatus,
+  compareGear,
   DEFAULT_SETTINGS,
   err,
   listingSchema,
@@ -13,25 +14,51 @@ import {
   scanRunSchema,
   settingsSchema,
 } from "@fpving/core";
-import type { DuplicateUrl, Listing, NotFound, PriceSnapshot, Repository, Result } from "@fpving/core";
+import type {
+  DuplicateUrl,
+  GearItem,
+  Listing,
+  Logger,
+  NotFound,
+  PriceSnapshot,
+  Repository,
+  Result,
+} from "@fpving/core";
 import Database from "better-sqlite3";
-import { and, asc, desc, eq, getTableColumns, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { alias } from "drizzle-orm/sqlite-core";
 import {
   fromCandidateRow,
   fromFxRow,
+  fromGearRow,
   fromSettingsRow,
   fromSnapshotRow,
   toCandidateRow,
   toFxRow,
+  toGearRow,
   toSettingsRow,
   toSnapshotRow,
 } from "./mapping.js";
 import {
   alerts,
   fxTables,
+  gearItems,
   listings,
   matchCandidates,
   pluginHealth,
@@ -76,9 +103,10 @@ const bug = (message: string): never => {
  * mode, and waiting up to five seconds for a lock held by another connection.
  *
  * @param path - The database file.
+ * @param logger - Told about each stored gear row that no longer parses, which is then left out.
  * @returns The repository and a function that closes the database.
  */
-export const openSqliteRepository = (path: string): { repository: Repository; close: () => void } => {
+export const openSqliteRepository = (path: string, logger: Logger): { repository: Repository; close: () => void } => {
   const client = new Database(path, { timeout: BUSY_TIMEOUT_MS });
   client.pragma("journal_mode = WAL");
   client.pragma("foreign_keys = ON");
@@ -122,6 +150,18 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
       .orderBy(desc(matchCandidates.similarity), asc(matchCandidates.id))
       .all()
       .map(fromCandidateRow);
+
+  const readGear = (row: typeof gearItems.$inferSelect): GearItem | null => {
+    const parsed = fromGearRow(row);
+    if (parsed.success) {
+      return parsed.data;
+    }
+    logger.warn("skipped a stored gear item that no longer parses", {
+      id: row.id,
+      detail: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
+    });
+    return null;
+  };
 
   const urlRefusals = new Map<string, DuplicateUrl>([[Constraint.Unique, duplicateUrl]]);
 
@@ -424,6 +464,30 @@ export const openSqliteRepository = (path: string): { repository: Repository; cl
           const row = toSettingsRow(next);
           db.insert(settings).values(row).onConflictDoUpdate({ target: settings.id, set: row }).run();
         }),
+    },
+    gear: {
+      add: async (item) =>
+        settle(() => {
+          db.insert(gearItems).values(toGearRow(item)).run();
+        }),
+      get: async (id) =>
+        settle(() => {
+          const row = db.select().from(gearItems).where(eq(gearItems.id, id)).get();
+          return row === undefined ? null : readGear(row);
+        }),
+      list: async () =>
+        settle(() =>
+          db.select().from(gearItems).all()
+            .map(readGear)
+            .filter((item) => item !== null)
+            .toSorted(compareGear),
+        ),
+      update: async (item) =>
+        settle(() => {
+          const { id, ...change } = toGearRow(item);
+          return changedOne(db.update(gearItems).set(change).where(eq(gearItems.id, id)).run());
+        }),
+      remove: async (id) => settle(() => changedOne(db.delete(gearItems).where(eq(gearItems.id, id)).run())),
     },
   };
 

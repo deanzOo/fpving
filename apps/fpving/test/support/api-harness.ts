@@ -82,8 +82,8 @@ export const startApiHarness = async () => {
   const dir = mkdtempSync(join(tmpdir(), "fpving-api-"));
   const dbPath = join(dir, "api.db");
   migrate(dbPath);
-  const { repository, close } = openSqliteRepository(dbPath);
   const logger = recordingLogger();
+  const { repository, close } = openSqliteRepository(dbPath, logger);
   const stores = fakeGateway();
   let next = 0;
   let millis = Date.parse("2026-10-30T10:00:00.000Z");

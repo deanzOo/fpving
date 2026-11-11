@@ -13,6 +13,7 @@ import type {
 } from "../entities.js";
 import type { AlertId, ListingId, MatchCandidateId, PluginId, ProductId } from "../ids.js";
 import type { FxTable } from "../pricing/fx.js";
+import type { GearRepository } from "./gear-repository.js";
 
 /** Why a repository call was refused: the referenced row does not exist, or the url is already taken. */
 export const RepositoryErrorKind = { NotFound: "not_found", DuplicateUrl: "duplicate_url" } as const;
@@ -242,4 +243,6 @@ export interface Repository {
   readonly pluginHealth: PluginHealthRepository;
   /** Settings. */
   readonly settings: SettingsRepository;
+  /** Gear the user owns. */
+  readonly gear: GearRepository;
 }
