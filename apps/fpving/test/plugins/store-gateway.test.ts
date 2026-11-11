@@ -1,7 +1,7 @@
 import { err, ok, PortErrorKind, pluginIdSchema } from "@fpving/core";
 import type { DebugSink, PluginId } from "@fpving/core";
-import { StoreErrorKind } from "@fpving/plugin-sdk";
-import type { FetchedListing, PluginManifest, StoreResult } from "@fpving/plugin-sdk";
+import { PluginKind, StoreErrorKind } from "@fpving/plugin-sdk";
+import type { CatalogManifest, FetchedListing, PluginManifest, StoreResult } from "@fpving/plugin-sdk";
 import { describe, expect, it, vi } from "vitest";
 import type { PluginState } from "../../src/plugins/runtime/host.ts";
 import { PluginIssueKind, PluginStatusKind } from "../../src/plugins/status.ts";
@@ -21,6 +21,14 @@ const FETCHING: PluginManifest = {
   capabilities: ["fetchListing"],
 };
 const CRASHED: PluginManifest = { ...MANIFEST, id: "crashed-shop", domains: ["crashed.example"] };
+const CATALOGUE: CatalogManifest = {
+  kind: PluginKind.Catalog,
+  id: "gear-catalog",
+  displayName: "Gear Catalog",
+  version: "1.0.0",
+  sdkVersion: MANIFEST.sdkVersion,
+};
+const CATALOG = pluginIdSchema.parse(CATALOGUE.id);
 const SEARCHER = pluginIdSchema.parse(SEARCHING.id);
 const FETCHER = pluginIdSchema.parse(FETCHING.id);
 const CRASHER = pluginIdSchema.parse(CRASHED.id);
@@ -42,7 +50,7 @@ const CANDIDATES = ok([{ url: "https://searching.example/p/2", title: "Frame" }]
 const QUERY = { text: "frame" };
 const unavailable = err({ kind: StoreErrorKind.Network, detail: GatewayRefusal.Unavailable });
 
-const state = (manifest: PluginManifest | null, status: PluginStatus): PluginState => ({
+const state = (manifest: PluginManifest | CatalogManifest | null, status: PluginStatus): PluginState => ({
   entry: { path: `/plugins/${manifest?.id ?? "broken"}` },
   manifest,
   status,
@@ -53,6 +61,7 @@ const setup = (fetched: StoreResult<FetchedListing> = LISTING, sink?: DebugSink[
     state(SEARCHING, LOADED),
     state(FETCHING, LOADED),
     state(CRASHED, DISABLED),
+    state(CATALOGUE, LOADED),
     state(null, { kind: PluginStatusKind.Disabled, reason: { kind: PluginIssueKind.LoadFailed, detail: "x" } }),
   ];
   const owners = new Map<string, PluginId>([["searching.example", SEARCHER], ["crashed.example", CRASHER]]);
@@ -91,6 +100,7 @@ describe("Plugin store gateway", () => {
   it.each([
     ["a crashed plugin", CRASHER],
     ["a plugin id no loaded plugin has", NEVER_LOADED],
+    ["a loaded catalog plugin", CATALOG],
   ])("answers a fetch or search through %s as unavailable without reaching a worker", async (_, pluginId) => {
     const { gateway, host } = setup();
     expect(await gateway.fetchListing(pluginId, URL_1)).toEqual(unavailable);
@@ -105,6 +115,13 @@ describe("Plugin store gateway", () => {
       err({ kind: StoreErrorKind.Network, detail: GatewayRefusal.SearchNotDeclared }),
     );
     expect(host.search).not.toHaveBeenCalled();
+  });
+
+  it("never treats a loaded catalog plugin as a store to scan or search", () => {
+    const { gateway } = setup();
+    expect(gateway.isLoaded(CATALOG)).toBe(false);
+    expect(gateway.isLoaded(SEARCHER)).toBe(true);
+    expect(gateway.searchablePlugins()).not.toContain(CATALOG);
   });
 
   it("lists as searchable only the loaded plugins whose manifest declares search, as their status changes", () => {

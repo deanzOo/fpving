@@ -2,24 +2,31 @@ import { Worker } from "node:worker_threads";
 import { pluginIdSchema } from "@fpving/core";
 import type { PluginId } from "@fpving/core";
 import {
+  catalogEntrySchema,
+  CatalogErrorKind,
   err,
   fetchedListingSchema,
+  ok,
   PluginCapability,
   SDK_VERSION,
   searchCandidateSchema,
   StoreErrorKind,
 } from "@fpving/plugin-sdk";
 import type {
+  CatalogEntry,
+  CatalogError,
+  CatalogManifest,
   CountryCode,
   CurrencyCode,
   FetchedListing,
   PluginManifest,
+  Result,
   SearchCandidate,
   SearchQuery,
   StoreError,
   StoreResult,
 } from "@fpving/plugin-sdk";
-import type { z } from "zod";
+import { z } from "zod";
 import { checkSdkCompatibility } from "../compatibility.js";
 import type { PluginEntry } from "../config.js";
 import { buildDomainRegistry } from "../registry.js";
@@ -28,7 +35,7 @@ import { PluginIssueKind, PluginStatusKind } from "../status.js";
 import type { PluginIssue, PluginStatus } from "../status.js";
 import { connect } from "./connection.js";
 import type { Connection, HostServices, SpawnWorker } from "./connection.js";
-import { CallMethod, storeResultSchema } from "./protocol.js";
+import { CallMethod, catalogResultSchema, storeResultSchema } from "./protocol.js";
 import type { CallRequest } from "./protocol.js";
 
 // Room for per-host limiter waits plus several 15 s HTTP or 30 s browser steps in one call.
@@ -69,7 +76,7 @@ export interface PluginHostOptions {
 /** One `plugins.json` entry as the host sees it: its manifest once loaded, and its status. */
 export interface PluginState {
   readonly entry: PluginEntry;
-  readonly manifest: PluginManifest | null;
+  readonly manifest: PluginManifest | CatalogManifest | null;
   readonly status: PluginStatus;
 }
 
@@ -81,13 +88,19 @@ export interface PluginHost {
   subscribe(listener: (plugins: readonly PluginState[]) => void): () => void;
   fetchListing(pluginId: PluginId, url: string): Promise<StoreResult<FetchedListing>>;
   search(pluginId: PluginId, query: SearchQuery): Promise<StoreResult<SearchCandidate[]>>;
+  /** The loaded catalog plugins, in `plugins.json` order. */
+  catalogPlugins(): PluginId[];
+  /** A catalog's entries matching the text; entries that fail `catalogEntrySchema` are dropped with a warning. */
+  searchCatalog(pluginId: PluginId, text: string): Promise<Result<CatalogEntry[], CatalogError>>;
+  /** A catalog's entry with this key, or null when it has none or its entry fails `catalogEntrySchema`. */
+  getCatalogEntry(pluginId: PluginId, key: string): Promise<Result<CatalogEntry | null, CatalogError>>;
   /** Terminates every worker and fails every open call. Idempotent. */
   shutdown(): Promise<void>;
 }
 
 interface Slot {
   readonly entry: PluginEntry;
-  manifest: PluginManifest | null;
+  manifest: PluginManifest | CatalogManifest | null;
   status: PluginStatus;
   connection: Connection;
   current: Promise<Connection | null>;
@@ -95,8 +108,9 @@ interface Slot {
   startupFailure: string | null;
 }
 
-type RoutedSlot = Slot & {
-  readonly id: PluginId;
+type CatalogSlot = Slot & { readonly id: PluginId };
+
+type RoutedSlot = CatalogSlot & {
   readonly domains: PluginManifest["domains"];
   readonly searchable: boolean;
 };
@@ -111,10 +125,14 @@ const parseOutput = <T extends z.ZodType>(schema: T, raw: StoreResult<unknown>) 
   return parsed.success ? parsed.data : err<StoreError>({ kind: StoreErrorKind.ParseFailed, detail: INVALID_OUTPUT });
 };
 
+const failed = (detail: string): Result<never, CatalogError> => err({ kind: CatalogErrorKind.Failed, detail });
+
 /**
  * Starts one worker per entry, waits for each to report, then disables every plugin that failed to load, is
- * incompatible with the running SDK or loses all its domains, and stops their workers. A loaded worker that misses a
- * call deadline, errors or exits is restarted once; a second failure disables the plugin for the session.
+ * incompatible with the running SDK or, for a store, loses all its domains, and stops their workers. Catalog plugins
+ * own no domains and are routed apart from stores, so a store call never reaches a catalog nor the reverse. A loaded
+ * worker that misses a call deadline, errors or exits is restarted once; a second failure disables the plugin for the
+ * session.
  *
  * @param options - The entries, the real services, the context settings and, for tests, the spawner and deadlines.
  * @returns The host, once every worker has reported.
@@ -196,6 +214,7 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
   });
 
   const candidates: RoutedSlot[] = [];
+  const catalogCandidates: CatalogSlot[] = [];
   for (const slot of slots) {
     const loaded = await slot.connection.loaded;
     if (!loaded.ok) {
@@ -208,16 +227,22 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
       disable(slot, compatibility.error);
       continue;
     }
-    const { id, domains, capabilities } = loaded.value;
-    const searchable = capabilities.includes(PluginCapability.Search);
-    candidates.push(Object.assign(slot, { id: pluginIdSchema.parse(id), domains, searchable }));
+    const id = pluginIdSchema.parse(loaded.value.id);
+    if ("kind" in loaded.value) {
+      catalogCandidates.push(Object.assign(slot, { id }));
+      continue;
+    }
+    const { domains, capabilities } = loaded.value;
+    candidates.push(Object.assign(slot, { id, domains, searchable: capabilities.includes(PluginCapability.Search) }));
   }
-  const compatible = candidates.filter((slot) => {
+  const startedCleanly = (slot: Slot): boolean => {
     if (slot.startupFailure !== null) {
       disable(slot, { kind: PluginIssueKind.Crashed, detail: `${STARTUP_FAILURE}${slot.startupFailure}` });
     }
     return slot.startupFailure === null;
-  });
+  };
+  const compatible = candidates.filter(startedCleanly);
+  const catalogs = new Map(catalogCandidates.filter(startedCleanly).map((slot) => [slot.id, slot]));
   const { registry, statuses } = buildDomainRegistry(compatible);
   const routes = new Map<PluginId, RoutedSlot>();
   for (const { plugin, status } of statuses) {
@@ -230,8 +255,11 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
   }
   started = true;
 
-  const call = async (pluginId: PluginId, request: CallRequest): Promise<StoreResult<unknown>> => {
-    const slot = routes.get(pluginId);
+  const send = async (
+    slot: CatalogSlot | undefined,
+    pluginId: PluginId,
+    request: CallRequest,
+  ): Promise<StoreResult<unknown>> => {
     if (slot?.status.kind !== PluginStatusKind.Loaded) {
       return network(`the plugin ${pluginId} is not loaded`);
     }
@@ -241,6 +269,31 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
     }
     return connection === null ? network(`the plugin ${pluginId} is not loaded`) : connection.call(request);
   };
+
+  const call = (pluginId: PluginId, request: CallRequest) => send(routes.get(pluginId), pluginId, request);
+
+  const callCatalog = async <T extends z.ZodType>(
+    pluginId: PluginId,
+    request: CallRequest,
+    schema: T,
+  ) => {
+    const raw = await send(catalogs.get(pluginId), pluginId, request);
+    if (!raw.ok) {
+      return failed(raw.error.detail);
+    }
+    const parsed = catalogResultSchema(schema).safeParse(raw.value);
+    return parsed.success ? parsed.data : failed(INVALID_OUTPUT);
+  };
+
+  const keepValid = (pluginId: PluginId, items: readonly unknown[]): CatalogEntry[] => items.flatMap((item) => {
+    const entry = catalogEntrySchema.safeParse(item);
+    if (entry.success) {
+      return [entry.data];
+    }
+    const detail = z.prettifyError(entry.error);
+    options.services.logger.warn("dropped an invalid catalog entry", { pluginId, detail });
+    return [];
+  });
 
   return {
     registry,
@@ -256,6 +309,16 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
     search: async (pluginId, query) => routes.get(pluginId)?.searchable === false
       ? network(`the plugin ${pluginId} does not declare search`)
       : parseOutput(searchCandidateSchema.array(), await call(pluginId, { method: CallMethod.Search, query })),
+    catalogPlugins: () => [...catalogs.values()].filter(({ status }) => status.kind === PluginStatusKind.Loaded)
+      .map(({ id }) => id),
+    searchCatalog: async (pluginId, text) => {
+      const found = await callCatalog(pluginId, { method: CallMethod.CatalogSearch, text }, z.array(z.unknown()));
+      return found.ok ? ok(keepValid(pluginId, found.value)) : found;
+    },
+    getCatalogEntry: async (pluginId, key) => {
+      const found = await callCatalog(pluginId, { method: CallMethod.CatalogGet, key }, z.unknown());
+      return found.ok ? ok(found.value === null ? null : (keepValid(pluginId, [found.value])[0] ?? null)) : found;
+    },
     shutdown: async () => {
       closed = true;
       await Promise.all(slots.map(({ connection }) => connection.stop()));

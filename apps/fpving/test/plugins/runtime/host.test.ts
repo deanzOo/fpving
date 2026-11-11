@@ -1,6 +1,6 @@
 import { pluginIdSchema } from "@fpving/core";
-import { err, ok, StoreErrorKind } from "@fpving/plugin-sdk";
-import type { PluginManifest } from "@fpving/plugin-sdk";
+import { CatalogErrorKind, err, ok, PluginKind, StoreErrorKind } from "@fpving/plugin-sdk";
+import type { CatalogManifest, PluginManifest } from "@fpving/plugin-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startPluginHost } from "../../../src/plugins/runtime/host.ts";
 import type { PluginHost, PluginHostOptions, PluginState } from "../../../src/plugins/runtime/host.ts";
@@ -28,7 +28,7 @@ const LOADED = { kind: PluginStatusKind.Loaded, warnings: [] };
 
 type Script = (worker: FakeWorker) => void;
 
-const readyWith = (manifest: PluginManifest): Script => (worker) => {
+const readyWith = (manifest: PluginManifest | CatalogManifest): Script => (worker) => {
   queueMicrotask(() => {
     worker.ready(manifest);
   });
@@ -364,5 +364,114 @@ describe("Plugin host shutdown", () => {
     expect(workerFor(SHOP_ENTRY.path, 1)?.terminations()).toBe(1);
     expect(await waiting).toEqual(err({ kind: StoreErrorKind.Network, detail: "the plugin host is shut down" }));
     expect(host.plugins()[0]?.status).toEqual(LOADED);
+  });
+});
+
+const CATALOG_MANIFEST: CatalogManifest = {
+  kind: PluginKind.Catalog,
+  id: "example-catalog",
+  displayName: "Example Catalog",
+  version: "1.0.0",
+  sdkVersion: ">=0.0.0 <1.0.0",
+};
+const CATALOG = pluginIdSchema.parse(CATALOG_MANIFEST.id);
+const CATALOG_ENTRY = { package: "fpving-catalog-example" };
+const BOXER = { key: "boxer-crush", name: "Boxer Crush", specs: { kind: "radio", rcLink: "elrs-2g4" } } as const;
+const BROKEN = { key: "broken", name: "Broken", specs: { kind: "radio", rcLink: "smoke-signals" } };
+const withCatalog = {
+  [SHOP_ENTRY.path]: [readyWith(MANIFEST)],
+  [CATALOG_ENTRY.package]: [readyWith(CATALOG_MANIFEST), readyWith(CATALOG_MANIFEST)],
+};
+const catalogFailure = (detail: string) => err({ kind: CatalogErrorKind.Failed, detail });
+
+const startWithCatalog = async (scripts: Readonly<Record<string, Script[]>> = withCatalog) =>
+  start(scripts, { entries: [SHOP_ENTRY, CATALOG_ENTRY] });
+
+const answerCatalog = async (
+  asking: Promise<unknown>,
+  worker: FakeWorker | undefined,
+  output: unknown,
+): Promise<unknown> => {
+  await flush();
+  worker?.answer(lastCallId(worker), output);
+  return asking;
+};
+
+describe("Plugin host catalog plugins", () => {
+  it("loads a catalog plugin beside a store without giving it domains, and lists it as a catalog", async () => {
+    const { host } = await startWithCatalog();
+    expect(host.plugins()).toEqual([
+      { entry: SHOP_ENTRY, manifest: MANIFEST, status: LOADED },
+      { entry: CATALOG_ENTRY, manifest: CATALOG_MANIFEST, status: LOADED },
+    ]);
+    expect(host.registry.declaredDomains()).toEqual(["shop.example.com"]);
+    expect(host.catalogPlugins()).toEqual([CATALOG]);
+  });
+
+  it("searches a catalog in its worker, keeping entries that pass the schema and warning per drop", async () => {
+    const { host, workerFor, mocks } = await startWithCatalog();
+    const worker = workerFor(CATALOG_ENTRY.package);
+    const found = await answerCatalog(host.searchCatalog(CATALOG, "boxer"), worker, ok([BOXER, BROKEN, "junk"]));
+    expect(worker?.received).toEqual([
+      { type: MessageType.Call, id: 0, request: { method: "catalog.search", text: "boxer" } },
+    ]);
+    expect(found).toEqual(ok([BOXER]));
+    expect(mocks.warn).toHaveBeenCalledTimes([BROKEN, "junk"].length);
+    expect(mocks.warn).toHaveBeenCalledWith("dropped an invalid catalog entry", expect.objectContaining({
+      pluginId: CATALOG,
+    }));
+  });
+
+  it.each([
+    ["an entry", ok(BOXER), ok(BOXER)],
+    ["no entry", ok(null), ok(null)],
+    ["an entry that fails the schema as no entry", ok(BROKEN), ok(null)],
+    ["the catalog's own error", catalogFailure("offline"), catalogFailure("offline")],
+    ["output that is not a result as failed", "garbage", catalogFailure("invalid plugin output")],
+  ])("gets a catalog entry by key and returns %s", async (_, output, expected) => {
+    const { host, workerFor } = await startWithCatalog();
+    const worker = workerFor(CATALOG_ENTRY.package);
+    expect(await answerCatalog(host.getCatalogEntry(CATALOG, BOXER.key), worker, output)).toEqual(expected);
+    expect(worker?.received).toEqual([
+      { type: MessageType.Call, id: 0, request: { method: "catalog.get", key: BOXER.key } },
+    ]);
+  });
+
+  it("refuses a catalog call to a store and a store call to a catalog without reaching either worker", async () => {
+    const { host, workerFor } = await startWithCatalog();
+    expect(await host.searchCatalog(SHOP, "x")).toEqual(catalogFailure("the plugin example-shop is not loaded"));
+    expect(await host.getCatalogEntry(SHOP, "x")).toEqual(catalogFailure("the plugin example-shop is not loaded"));
+    const notLoaded = err({ kind: StoreErrorKind.Network, detail: "the plugin example-catalog is not loaded" });
+    expect(await host.fetchListing(CATALOG, URL_1)).toEqual(notLoaded);
+    expect(await host.search(CATALOG, { text: "x" })).toEqual(notLoaded);
+    expect([workerFor(SHOP_ENTRY.path)?.received, workerFor(CATALOG_ENTRY.package)?.received]).toEqual([[], []]);
+  });
+
+  it("disables a catalog plugin whose sdkVersion range excludes the running SDK and does not list it", async () => {
+    const future = { ...CATALOG_MANIFEST, sdkVersion: ">=9.0.0 <10.0.0" };
+    const { host } = await startWithCatalog({ ...withCatalog, [CATALOG_ENTRY.package]: [readyWith(future)] });
+    expect(host.plugins()[1]?.status).toMatchObject({
+      kind: PluginStatusKind.Disabled,
+      reason: { kind: PluginIssueKind.SdkIncompatible },
+    });
+    expect(host.catalogPlugins()).toEqual([]);
+  });
+
+  it("restarts a failed catalog worker like a store's and routes later catalog calls to the new one", async () => {
+    const { host, workerFor } = await startWithCatalog();
+    workerFor(CATALOG_ENTRY.package)?.emit("exit", 1);
+    const asking = host.searchCatalog(CATALOG, "boxer");
+    expect(await answerCatalog(asking, workerFor(CATALOG_ENTRY.package, 1), ok([BOXER]))).toEqual(ok([BOXER]));
+    workerFor(CATALOG_ENTRY.package, 1)?.emit("exit", 1);
+    expect(host.catalogPlugins()).toEqual([]);
+    expect(host.plugins()[1]?.status).toMatchObject({ reason: { kind: PluginIssueKind.Crashed } });
+  });
+
+  it("answers a catalog call its worker cannot answer with a failed catalog error", async () => {
+    const { host, workerFor } = await startWithCatalog();
+    const asking = host.getCatalogEntry(CATALOG, BOXER.key);
+    await flush();
+    workerFor(CATALOG_ENTRY.package)?.emit("exit", 1);
+    expect(await asking).toEqual(catalogFailure("the plugin worker exited with code 1"));
   });
 });

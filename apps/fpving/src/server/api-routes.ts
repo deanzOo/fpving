@@ -13,7 +13,7 @@ import {
   settingsSchema,
   TREND_DAYS,
 } from "@fpving/core";
-import { manifestSchema, moneySchema, storeErrorSchema } from "@fpving/plugin-sdk";
+import { catalogManifestSchema, manifestSchema, moneySchema, storeErrorSchema } from "@fpving/plugin-sdk";
 import { z } from "zod";
 import { PluginIssueKind, PluginStatusKind } from "../plugins/status.js";
 import { apiErrorSchema } from "./errors.js";
@@ -44,7 +44,7 @@ const watchlistSchema = z.array(z.object({
 
 const pluginRowSchema = z.object({
   source: z.string().min(1),
-  manifest: manifestSchema.nullable(),
+  manifest: z.union([manifestSchema, catalogManifestSchema]).nullable(),
   status: z.enum(PluginStatusKind),
   issues: z.array(z.object({ kind: z.enum(PluginIssueKind), detail: z.string() })),
   backoffUntil: z.date().nullable(),

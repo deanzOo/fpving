@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { err, ok, PluginCapability, StoreErrorKind } from "@fpving/plugin-sdk";
-import type { PluginContext, PluginManifest } from "@fpving/plugin-sdk";
+import { CatalogErrorKind, err, ok, PluginCapability, PluginKind, StoreErrorKind } from "@fpving/plugin-sdk";
+import type { CatalogContext, CatalogManifest, PluginContext, PluginManifest } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { CallMethod, Capability, LogMethod, MessageType } from "../../../src/plugins/runtime/protocol.ts";
 import type { HostMessage, WorkerMessage } from "../../../src/plugins/runtime/protocol.ts";
@@ -24,6 +24,13 @@ const MANIFEST: PluginManifest = {
   sdkVersion: ">=0.0.0 <1.0.0",
   domains: ["shop.example.com"],
   capabilities: [PluginCapability.FetchListing],
+};
+const CATALOG_MANIFEST: CatalogManifest = {
+  kind: PluginKind.Catalog,
+  id: "example-catalog",
+  displayName: "Example Catalog",
+  version: "1.0.0",
+  sdkVersion: ">=0.0.0 <1.0.0",
 };
 const DATA = { entry: { path: "/plugins/example-shop" }, shipTo: "IL", currencyPreference: "EUR" };
 
@@ -60,6 +67,9 @@ const exporting = (module: unknown): ImportModule => () => Promise.resolve(modul
 
 const withStore = (store: unknown, manifest: PluginManifest = MANIFEST): ImportModule =>
   exporting({ manifest, createStore: () => store });
+
+const withCatalog = (catalog: unknown, manifest: unknown = CATALOG_MANIFEST): ImportModule =>
+  exporting({ manifest, createCatalog: () => catalog });
 
 const started = async (load: ImportModule): Promise<FakePort> => {
   const port = fakePort();
@@ -319,5 +329,68 @@ describe("Plugin worker context", () => {
     const before = Date.now();
     expect(ctx.clock.now().getTime()).toBeGreaterThanOrEqual(before);
     expect([ctx.shipTo, ctx.currencyPreference]).toEqual([DATA.shipTo, DATA.currencyPreference]);
+  });
+});
+
+describe("Catalog plugin worker", () => {
+  const catalog = {
+    search: (text: unknown) => Promise.resolve(ok([text])),
+    get: (key: unknown) => Promise.resolve(ok(key)),
+  };
+
+  it("loads a catalog module and reports its catalog manifest", async () => {
+    const port = await started(withCatalog(catalog));
+    expect(port.posted).toEqual([{ type: MessageType.Ready, manifest: CATALOG_MANIFEST }]);
+  });
+
+  it("gives a catalog only a logger and a clock, so it has no http or browser", async () => {
+    const contexts: CatalogContext[] = [];
+    await started(exporting({
+      manifest: CATALOG_MANIFEST,
+      createCatalog: (ctx: CatalogContext) => {
+        contexts.push(ctx);
+        return catalog;
+      },
+    }));
+    expect(contexts.map((ctx) => Object.keys(ctx))).toEqual([["logger", "clock"]]);
+  });
+
+  it("answers catalog search with the text and catalog get with the key", async () => {
+    const port = await started(withCatalog(catalog));
+    expect(await call(port, { method: CallMethod.CatalogSearch, text: "boxer" })).toEqual(ok(["boxer"]));
+    expect(await call(port, { method: CallMethod.CatalogGet, key: "boxer-crush" })).toEqual(ok("boxer-crush"));
+  });
+
+  it("answers a catalog method that throws with a failed catalog error naming the error", async () => {
+    const port = await started(withCatalog({ ...catalog, get: () => Promise.reject(new Error("bad")) }));
+    expect(await call(port, { method: CallMethod.CatalogGet, key: "x" })).toEqual(
+      err({ kind: CatalogErrorKind.Failed, detail: "the plugin threw: Error: bad" }),
+    );
+  });
+
+  it("answers a catalog call to a store with a failed catalog error", async () => {
+    const port = await started(withStore({ fetchListing: () => undefined }));
+    expect(await call(port, { method: CallMethod.CatalogGet, key: "x" })).toEqual(
+      err({ kind: CatalogErrorKind.Failed, detail: "the catalog has no get" }),
+    );
+  });
+
+  it.each([
+    ["no createCatalog", exporting({ manifest: CATALOG_MANIFEST }), /^the module must export manifest and createCat/u],
+    ["an invalid catalog manifest", withCatalog(catalog, { ...CATALOG_MANIFEST, id: "Bad Id" }), /^manifest: .*id/u],
+    ["a catalog without get", withCatalog({ search: catalog.search }), /^createCatalog must return a catalog/u],
+    ["a catalog that is not an object", withCatalog("catalog"), /^createCatalog must return a catalog/u],
+  ])("reports a catalog module with %s as manifest_invalid", async (_, load, detail) => {
+    expectLoadFailure(await started(load), PluginIssueKind.ManifestInvalid, detail);
+  });
+
+  it("reports a createCatalog that throws as load_failed with the error", async () => {
+    const port = await started(exporting({
+      manifest: CATALOG_MANIFEST,
+      createCatalog: () => {
+        throw new Error("boom");
+      },
+    }));
+    expect(loadFailure(port)).toEqual({ kind: PluginIssueKind.LoadFailed, detail: "createCatalog threw: Error: boom" });
   });
 });

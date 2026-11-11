@@ -1,5 +1,5 @@
 import { err, ok, StoreErrorKind } from "@fpving/plugin-sdk";
-import type { BrowserDriver, HttpClient, Logger, PluginManifest, Result, StoreError } from "@fpving/plugin-sdk";
+import type { BrowserDriver, HttpClient, Logger, Result, StoreError } from "@fpving/plugin-sdk";
 import { PluginIssueKind } from "../status.js";
 import type { PluginIssue } from "../status.js";
 import { createPending } from "./pending.js";
@@ -9,6 +9,7 @@ import type {
   CapabilityCall,
   CapabilityResult,
   HostMessage,
+  LoadedManifest,
   WorkerData,
   WorkerMessage,
 } from "./protocol.js";
@@ -41,8 +42,8 @@ interface ConnectionOptions {
 /** One running plugin worker, seen from the host. */
 export interface Connection {
   /** The manifest the worker reported, or why it did not load. */
-  readonly loaded: Promise<Result<PluginManifest, PluginIssue>>;
-  /** Sends a store call; resolves to the worker's unvalidated result, or `timeout`/`network` when it cannot answer. */
+  readonly loaded: Promise<Result<LoadedManifest, PluginIssue>>;
+  /** Sends a store or catalog call; resolves to the worker's raw result, or `timeout`/`network` if it cannot answer. */
   call(request: CallRequest): Promise<Result<unknown, StoreError>>;
   /** Terminates the worker and fails every open call. Idempotent. */
   stop(): Promise<void>;
@@ -72,8 +73,8 @@ export const connect = (options: ConnectionOptions): Connection => {
   let pluginId = "path" in options.data.entry ? options.data.entry.path : options.data.entry.package;
   let stopReason: string | null = null;
   let isLoaded = false;
-  const load = Promise.withResolvers<Result<PluginManifest, PluginIssue>>();
-  const reportLoad = (outcome: Result<PluginManifest, PluginIssue>): boolean => {
+  const load = Promise.withResolvers<Result<LoadedManifest, PluginIssue>>();
+  const reportLoad = (outcome: Result<LoadedManifest, PluginIssue>): boolean => {
     if (isLoaded) {
       return false;
     }

@@ -18,10 +18,18 @@ const MANIFEST = {
   domains: ["shop.example.com"],
   capabilities: ["fetchListing"],
 };
+const CATALOG_MANIFEST = {
+  kind: "catalog",
+  id: "example-catalog",
+  displayName: "Example Catalog",
+  version: "1.0.0",
+  sdkVersion: ">=0.0.0 <1.0.0",
+};
 
 describe("Plugin worker protocol", () => {
   it.each([
     { type: MessageType.Ready, manifest: MANIFEST },
+    { type: MessageType.Ready, manifest: CATALOG_MANIFEST },
     { type: MessageType.LoadFailed, issue: { kind: PluginIssueKind.ManifestInvalid, detail: "no manifest" } },
     { type: MessageType.CallResult, id: 0, result: { anything: "goes" } },
     { type: MessageType.CapabilityCall, id: 1, call: { capability: Capability.HttpGet, url: "https://a.example/" } },
@@ -44,6 +52,7 @@ describe("Plugin worker protocol", () => {
   it.each([
     ["an unknown type", { type: "explode" }],
     ["a ready message with an invalid manifest", { type: MessageType.Ready, manifest: { id: "Bad Id" } }],
+    ["a catalog manifest with domains", { type: MessageType.Ready, manifest: { ...CATALOG_MANIFEST, domains: [] } }],
     ["a call result without an id", { type: MessageType.CallResult, result: 1 }],
     ["a negative id", { type: MessageType.CallResult, id: -1, result: 1 }],
     ["an unknown capability", { type: MessageType.CapabilityCall, id: 1, call: { capability: "fs.read", url: "/" } }],
@@ -62,6 +71,8 @@ describe("Plugin worker protocol", () => {
   it.each([
     { type: MessageType.Call, id: 0, request: { method: CallMethod.FetchListing, url: "https://a.example/p" } },
     { type: MessageType.Call, id: 1, request: { method: CallMethod.Search, query: { text: "frame", brand: "x" } } },
+    { type: MessageType.Call, id: 2, request: { method: CallMethod.CatalogSearch, text: "boxer" } },
+    { type: MessageType.Call, id: 3, request: { method: CallMethod.CatalogGet, key: "boxer-crush" } },
     {
       type: MessageType.CapabilityResult,
       id: 0,
