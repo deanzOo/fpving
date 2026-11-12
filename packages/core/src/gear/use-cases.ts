@@ -166,7 +166,8 @@ const verified = async (
 ): Promise<Record<string, SpecValue>> => {
   const entry = await currentEntry(deps, draft.catalogRef);
   const now = new Map(entry?.specs.kind === draft.kind ? Object.entries<SpecRawValue>({ ...entry.specs }) : []);
-  const before = stored?.kind === draft.kind ? stored.specs : {};
+  const sameEntry = stored?.kind === draft.kind && stored.catalogRef?.key === draft.catalogRef?.key;
+  const before = sameEntry ? stored.specs : {};
   const unchanged = (field: string, value: SpecRawValue): boolean => {
     const saved = before[field];
     return (
@@ -221,7 +222,7 @@ export const addGear = async (deps: GearDeps, draft: GearDraft): Promise<Result<
 
 const changesOf = async (deps: GearDeps, item: GearItem): Promise<GearChange[]> => {
   const entry = await currentEntry(deps, item.catalogRef);
-  if (entry === null || item.catalogRef === null) {
+  if (entry?.specs.kind !== item.kind || item.catalogRef === null) {
     return [];
   }
   const { pluginId } = item.catalogRef;
@@ -237,8 +238,8 @@ const changesOf = async (deps: GearDeps, item: GearItem): Promise<GearChange[]> 
  * Lists the stored gear, each item with the catalog-sourced fields its catalog now says differently.
  *
  * @remarks
- * Nothing is flagged for an item without a catalog entry, whose plugin is not loaded, whose entry is gone or whose
- * catalog errors. A field the user confirmed is never flagged.
+ * Nothing is flagged for an item without a catalog entry, whose plugin is not loaded, whose entry is gone or is now
+ * another kind of gear, or whose catalog errors. A field the user confirmed is never flagged.
  *
  * @param deps - The ports to use.
  * @returns Every item with its changes.
@@ -251,8 +252,8 @@ export const listGear = async (deps: GearDeps): Promise<GearWithChanges[]> =>
  *
  * @remarks
  * A catalog-sourced field whose plugin and value equal the stored item's catalog-sourced field also stays
- * catalog-sourced, so a field left as it was keeps its source and its change flag even when the catalog changed or is
- * gone.
+ * catalog-sourced while the item keeps its kind and catalog entry, so a field left as it was keeps its source and its
+ * change flag even when the catalog changed or is gone.
  *
  * @param deps - The ports to use.
  * @param id - The item to edit.

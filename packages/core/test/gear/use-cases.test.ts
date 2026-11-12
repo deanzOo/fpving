@@ -265,6 +265,12 @@ describe("Listing gear", () => {
     expect((await listGear(grown))[0]?.changes).toHaveLength(1);
   });
 
+  it("flags nothing when the catalog entry is now another kind of gear", async () => {
+    await seed(deps);
+    const quad = catalogEntrySchema.parse({ key: "t1300", name: "Tattu 1300", specs: { ...QUAD, cells: OTHER_CELLS } });
+    expect((await listGear({ ...deps, catalogs: gateway([[ONE, [quad]]]) }))[0]?.changes).toEqual([]);
+  });
+
   it("never flags a field the user confirmed", async () => {
     await addGear(deps, draft({ specs: { cells: { source: SpecSource.User, value: CELLS } } }));
     expect((await listGear(deps))[0]?.changes).toEqual([]);
@@ -327,6 +333,14 @@ describe("Editing gear", () => {
     const { id, specs } = await seed(deps);
     const edited = await updateGear(deps, id, draft({ quantity: 2, specs }));
     expect(edited).toMatchObject({ ok: true, value: { quantity: 2, specs: draft().specs } });
+  });
+
+  it("pointing an item at another catalog entry saves its old catalog values as confirmed by the user", async () => {
+    const deps = depsFor(gateway([]));
+    const { id, specs } = await seed(deps);
+    const moved = await updateGear(deps, id, draft({ catalogRef: { pluginId: ONE, key: "t1500" }, specs }));
+    const mine = { cells: { source: SpecSource.User, value: CELLS } };
+    expect(moved).toMatchObject({ ok: true, value: { specs: mine } });
   });
 
   it("an edited catalog value is still saved as confirmed by the user", async () => {
