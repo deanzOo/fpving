@@ -1,5 +1,5 @@
 import { ok } from "@fpving/plugin-sdk";
-import type { BrowserDriver, HttpClient, Logger, PluginManifest } from "@fpving/plugin-sdk";
+import type { BrowserDriver, CatalogManifest, HttpClient, Logger, PluginManifest } from "@fpving/plugin-sdk";
 import { vi } from "vitest";
 import type { Mock } from "vitest";
 import { MessageType } from "../../../src/plugins/runtime/protocol.ts";
@@ -27,7 +27,7 @@ export interface FakeWorker {
   terminations(): number;
   emit(event: WorkerEvent, value: unknown): void;
   send(message: unknown): void;
-  ready(manifest?: PluginManifest): void;
+  ready(manifest?: PluginManifest | CatalogManifest): void;
   answer(id: number, result: unknown): void;
 }
 
@@ -62,7 +62,7 @@ export const fakeWorker = (data: WorkerData = DATA): FakeWorker => {
     send: (message: unknown) => {
       emit("message", message);
     },
-    ready: (manifest: PluginManifest = MANIFEST) => {
+    ready: (manifest: PluginManifest | CatalogManifest = MANIFEST) => {
       emit("message", { type: MessageType.Ready, manifest });
     },
     answer: (id: number, result: unknown) => {

@@ -7,9 +7,14 @@ export interface Described {
   readonly error?: ReactNode;
 }
 
+const BOX = "w-full rounded-1 border border-line-strong bg-page px-3 text-ink focus:border-signal "
+  + "aria-invalid:border-critical";
+
 /** The classes a text input and a select share, but the face: on `page`, a strong border, critical when invalid. */
-export const CONTROL = "h-(--control-height) w-full rounded-1 border border-line-strong bg-page px-3 text-ink "
-  + "focus:border-signal aria-invalid:border-critical";
+export const CONTROL = `h-(--control-height) ${BOX}`;
+
+/** The classes of a multi-line text box: the control's look, a few lines tall and taller on demand. */
+export const AREA = `min-h-24 resize-y py-2 ${BOX}`;
 
 /**
  * Ties a control to its hint or error: the attributes the control takes and the line to show under it.

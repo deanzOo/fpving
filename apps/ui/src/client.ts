@@ -195,6 +195,19 @@ export const createClient = (fetcher: Fetch) => {
     listPlugins: async () => send(fetcher, routes.listPlugins, routes.listPlugins.schema.response[Ok]),
     startScan: async () => send(fetcher, routes.startScan, routes.startScan.schema.response[Accepted]),
     getScan: async () => send(fetcher, routes.getScan, routes.getScan.schema.response[Ok]),
+    listGear: async () => send(fetcher, routes.listGear, routes.listGear.schema.response[Ok]),
+    addGear: async (body: z.input<typeof routes.addGear.schema.body>) =>
+      send(fetcher, routes.addGear, routes.addGear.schema.response[Created], { body }),
+    updateGear: async (
+      params: z.input<typeof routes.updateGear.schema.params>,
+      body: z.input<typeof routes.updateGear.schema.body>,
+    ) => send(fetcher, routes.updateGear, routes.updateGear.schema.response[Ok], { params, body }),
+    removeGear: async (params: z.input<typeof routes.removeGear.schema.params>) =>
+      send(fetcher, routes.removeGear, routes.removeGear.schema.response[NoContent], { params }),
+    searchCatalog: async (query: z.input<typeof routes.searchCatalog.schema.querystring>) =>
+      send(fetcher, routes.searchCatalog, routes.searchCatalog.schema.response[Ok], { query }),
+    readSpecs: async (body: z.input<typeof routes.readSpecs.schema.body>) =>
+      send(fetcher, routes.readSpecs, routes.readSpecs.schema.response[Ok], { body }),
   };
 };
 

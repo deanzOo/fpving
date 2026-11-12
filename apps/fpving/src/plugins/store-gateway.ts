@@ -24,8 +24,9 @@ export interface PluginStoreGatewayOptions {
 const refuse = (detail: string): StoreResult<never> => err({ kind: StoreErrorKind.Network, detail });
 
 /**
- * Implements core's `StoreGateway` over the plugin host. Domains come from the registry, so a plugin disabled at run
- * time keeps them and a pasted URL still names it. A call to a plugin that is not loaded now, or a search through one
+ * Implements core's `StoreGateway` over the plugin host's store plugins; a catalog plugin is never loaded as a store,
+ * so it is never scanned or searched. Domains come from the registry, so a plugin disabled at run time keeps them and
+ * a pasted URL still names it. A call to a plugin that is not loaded now, or a search through one
  * whose manifest does not declare it, resolves to a `network` error with a {@link GatewayRefusal} detail and never
  * reaches a worker. The raw page of a `parse_failed` fetch goes to the debug sink; a failed save is logged and does
  * not change the result.
@@ -36,7 +37,7 @@ const refuse = (detail: string): StoreResult<never> => err({ kind: StoreErrorKin
 export const createPluginStoreGateway = (options: PluginStoreGatewayOptions): StoreGateway => {
   const { host, debugSink, logger } = options;
   const loadedManifests = (): PluginManifest[] => host.plugins().flatMap(({ manifest, status }) =>
-    manifest !== null && status.kind === PluginStatusKind.Loaded ? [manifest] : []);
+    manifest !== null && !("kind" in manifest) && status.kind === PluginStatusKind.Loaded ? [manifest] : []);
   const loaded = (pluginId: PluginId): PluginManifest | undefined =>
     loadedManifests().find((manifest) => manifest.id === pluginId);
   const declaresSearch = (manifest: PluginManifest): boolean =>

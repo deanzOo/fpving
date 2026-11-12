@@ -6,6 +6,7 @@ import type { Scheduler, Settings } from "@fpving/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { migrate } from "../../src/adapters/sqlite/migrate.ts";
+import { recordingLogger } from "../support/recording-logger.ts";
 import { openSqliteRepository } from "../../src/adapters/sqlite/repository.ts";
 import type { ClosableBrowserDriver } from "../../src/adapters/transport/playwright-browser-driver.ts";
 import { readAppVersion } from "../../src/adapters/transport/user-agent.ts";
@@ -150,6 +151,29 @@ describe("App startup", () => {
     expect(logText()).toContain("no ANTHROPIC_API_KEY set");
   });
 
+  it("reads specs as unavailable when no API key is set", async () => {
+    const running = await started(env(), fakes().ports);
+    expect(await running.specReader.read("radio", "text")).toMatchObject({
+      ok: false,
+      error: { kind: "unavailable" },
+    });
+  });
+
+  it("serves the gear and catalog routes over the app's own wiring, with no catalog installed", async () => {
+    const running = await started(env(), fakes().ports);
+    const call = async (method: "GET" | "POST", url: string, payload?: object) =>
+      running.server.inject({ method, url, headers: host(), ...(payload === undefined ? {} : { payload }) });
+    expect((await call("GET", apiRoutes.listGear.url)).json()).toEqual([]);
+    expect((await call("GET", `${apiRoutes.searchCatalog.url}?q=radio`)).json()).toEqual({
+      matches: [],
+      failedPlugins: [],
+      catalogs: 0,
+    });
+    const read = await call("POST", apiRoutes.readSpecs.url, { kind: "radio", text: "a radio" });
+    expect(read.statusCode).toBe(UNAVAILABLE);
+    expect(read.json()).toMatchObject({ error: { kind: ApiErrorKind.Unavailable } });
+  });
+
   it("wires the Anthropic judge when an API key is set, without logging the key", async () => {
     await started({ ...env(), ANTHROPIC_API_KEY: FAKE_KEY }, fakes().ports);
     expect(logText()).not.toContain("no ANTHROPIC_API_KEY set");
@@ -186,7 +210,7 @@ describe("App startup", () => {
     vi.stubGlobal("fetch", fetch);
     mkdirSync(dataDir, { recursive: true });
     migrate(join(dataDir, DB_FILE));
-    const seed = openSqliteRepository(join(dataDir, DB_FILE));
+    const seed = openSqliteRepository(join(dataDir, DB_FILE), recordingLogger());
     await seed.repository.fxRates.save({ ...FX, fetchedOn: today() });
     seed.close();
     const running = await started(env(), {});

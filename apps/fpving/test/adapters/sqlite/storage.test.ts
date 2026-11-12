@@ -30,6 +30,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { migrate } from "../../../src/adapters/sqlite/migrate.ts";
+import { recordingLogger } from "../../support/recording-logger.ts";
 import { openSqliteRepository } from "../../../src/adapters/sqlite/repository.ts";
 import { cleanUpTemp, tempDir } from "./temp-db.ts";
 
@@ -85,7 +86,7 @@ describe("SQLite repository storage", () => {
   beforeEach(async () => {
     path = join(tempDir(), "fpving.db");
     migrate(path);
-    ({ repository: repo, close } = openSqliteRepository(path));
+    ({ repository: repo, close } = openSqliteRepository(path, recordingLogger()));
     raw = new Database(path);
     expect(await repo.products.add(product, listing, snapshot)).toEqual({ ok: true, value: undefined });
   });

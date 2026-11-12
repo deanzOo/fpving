@@ -43,6 +43,7 @@ export type {
 } from "./products/add.js";
 export { AddErrorKind } from "./products/errors.js";
 export { productDetail, TREND_DAYS, watchlist } from "./products/read.js";
+export { textSchema } from "./text.js";
 export { removeListing } from "./products/remove.js";
 export type { CheapestPrice, ListingHistory, PricedSnapshot, ProductDetail, WatchlistEntry } from "./products/read.js";
 export { normalizeListingUrl } from "./products/normalize-url.js";
@@ -91,6 +92,7 @@ export type {
 } from "./entities.js";
 export {
   alertIdSchema,
+  gearItemIdSchema,
   listingIdSchema,
   matchCandidateIdSchema,
   pluginIdSchema,
@@ -98,10 +100,38 @@ export {
   scanRunIdSchema,
   snapshotIdSchema,
 } from "./ids.js";
-export type { AlertId, ListingId, MatchCandidateId, PluginId, ProductId, ScanRunId, SnapshotId } from "./ids.js";
+export type {
+  AlertId,
+  GearItemId,
+  ListingId,
+  MatchCandidateId,
+  PluginId,
+  ProductId,
+  ScanRunId,
+  SnapshotId,
+} from "./ids.js";
+export { compareGear, gearItemSchema, SpecSource, specValueSchema } from "./gear/entities.js";
+export type { GearItem, SpecValue } from "./gear/entities.js";
+export { GearErrorKind } from "./gear/errors.js";
+export { addGear, listGear, removeGear, searchCatalog, updateGear } from "./gear/use-cases.js";
+export type {
+  CatalogMatch,
+  CatalogRef,
+  CatalogSearch,
+  CatalogValue,
+  GearChange,
+  GearDeps,
+  GearDraft,
+  GearWithChanges,
+  InvalidSpecs,
+  SpecRawValue,
+} from "./gear/use-cases.js";
 export { PortErrorKind } from "./ports/errors.js";
 export type { RatesUnavailable, CurrencyRates } from "./ports/currency-rates.js";
 export type { DebugSink, DebugWriteFailed } from "./ports/debug-sink.js";
+export type { CatalogGateway } from "./ports/catalog-gateway.js";
+export type { GearRepository } from "./ports/gear-repository.js";
+export type { ReadSpecs, SpecReader } from "./ports/spec-reader.js";
 export type { IdGenerator } from "./ports/id-generator.js";
 export { LlmErrorKind, productIdentitySchema } from "./ports/llm-judge.js";
 export type { LlmError, LlmJudge, ProductIdentity } from "./ports/llm-judge.js";

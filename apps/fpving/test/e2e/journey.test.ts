@@ -29,6 +29,7 @@ const Store = {
   SourceUrl: "https://source.example/frame",
   SourcePlugin: "source-shop",
   NewShipTo: "US",
+  CatalogPlugin: "catalog",
 } as const;
 
 const Text = {
@@ -43,6 +44,10 @@ const Text = {
   NoUnread: "No unread alerts.",
   PriceDrop: "Price drop",
   Unread: "Unread",
+  Radio: "RadioMaster Boxer Crush",
+  RadioAdded: "Added RadioMaster Boxer Crush to your gear.",
+  RadioLink: "ELRS 2.4GHz",
+  RadiosHeading: "Radios",
 } as const;
 
 const Label = {
@@ -59,7 +64,13 @@ const Label = {
   ShipTo: "Ship to",
   SaveSettings: "Save settings",
   UnreadOnly: "Unread only",
+  MyGear: "My gear",
+  SearchCatalog: "Search the catalog",
+  Search: "Search",
+  UseRadio: "Use RadioMaster Boxer Crush",
+  Save: "Save",
 } as const;
+const SEARCH_TERM = "Boxer";
 
 const Path = { Alerts: "/alerts" } as const;
 
@@ -102,7 +113,7 @@ beforeAll(async () => {
   cleanups.push(async () => server.close());
   const dataDir = join(root, "data");
   await mkdir(dataDir);
-  const plugins = [fixturePlugin(Store.SourcePlugin), { path: FIXTURE_PLUGIN_DIR }];
+  const plugins = [fixturePlugin(Store.SourcePlugin), { path: FIXTURE_PLUGIN_DIR }, fixturePlugin(Store.CatalogPlugin)];
   await writeFile(join(dataDir, PLUGINS_FILE), JSON.stringify(plugins));
   const notifier = fakeNotifier();
   const started = await startApp(
@@ -240,5 +251,17 @@ describe("End-to-end journey", () => {
       .waitFor();
     expect(await alerts.count()).toBe(1);
     expect(notifier.sent).toEqual([expect.objectContaining({ title: Text.Source })]);
+  });
+
+  it("saves a catalog radio to My gear under Radios with its link tag", async () => {
+    const { page } = journey;
+    await nav(page).getByRole("link", { name: Label.MyGear }).click();
+    await page.getByLabel(Label.SearchCatalog).fill(SEARCH_TERM);
+    await page.getByRole("button", { name: Label.Search, exact: true }).click();
+    await page.getByRole("button", { name: Label.UseRadio }).click();
+    await page.getByRole("button", { name: Label.Save, exact: true }).click();
+    await status(page, Text.RadioAdded).waitFor();
+    const radios = page.getByRole("region", { name: Text.RadiosHeading });
+    await radios.getByRole("listitem").filter({ hasText: Text.Radio }).filter({ hasText: Text.RadioLink }).waitFor();
   });
 });

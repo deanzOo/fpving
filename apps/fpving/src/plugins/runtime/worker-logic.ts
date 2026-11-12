@@ -1,8 +1,17 @@
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { err, manifestSchema, ok, PluginCapability, StoreErrorKind } from "@fpving/plugin-sdk";
-import type { LogFields, PluginContext, PluginManifest, Result } from "@fpving/plugin-sdk";
+import {
+  catalogManifestSchema,
+  CatalogErrorKind,
+  err,
+  manifestSchema,
+  ok,
+  PluginCapability,
+  PluginKind,
+  StoreErrorKind,
+} from "@fpving/plugin-sdk";
+import type { CatalogContext, LogFields, PluginContext, PluginManifest, Result } from "@fpving/plugin-sdk";
 import { z } from "zod";
 import { PluginIssueKind } from "../status.js";
 import { createPending } from "./pending.js";
@@ -11,6 +20,7 @@ import type {
   CallRequest,
   CapabilityCall,
   CapabilityResult,
+  LoadedManifest,
   LoadFailure,
   WorkerData,
   WorkerMessage,
@@ -25,9 +35,16 @@ export interface WorkerPort {
 /** Resolves and imports a plugin entry and resolves to its module namespace. */
 export type ImportModule = (entry: WorkerData["entry"]) => Promise<unknown>;
 
-interface LoadedStore {
-  readonly manifest: PluginManifest;
-  readonly store: Readonly<Record<string, unknown>>;
+interface LoadedPlugin {
+  readonly manifest: LoadedManifest;
+  readonly target: Readonly<Record<string, unknown>>;
+}
+
+interface PluginShape<M extends LoadedManifest> {
+  readonly factory: "createStore" | "createCatalog";
+  readonly schema: z.ZodType<M>;
+  readonly ctx: PluginContext | CatalogContext;
+  readonly check: (made: unknown, manifest: M) => Result<Readonly<Record<string, unknown>>, string>;
 }
 
 const PACKAGE_JSON = "package.json";
@@ -43,11 +60,49 @@ const importFromAppDir: ImportModule = (entry) =>
 
 const issue = (kind: LoadFailure["kind"], detail: string): Result<never, LoadFailure> => err({ kind, detail });
 
-const loadStore = async (
+const checkStore = (made: unknown, manifest: PluginManifest): Result<Readonly<Record<string, unknown>>, string> => {
+  if (!isRecord(made) || typeof made["fetchListing"] !== "function") {
+    return err("createStore must return a store with a fetchListing method");
+  }
+  return manifest.capabilities.includes(PluginCapability.Search) && typeof made["search"] !== "function"
+    ? err("createStore must return a store with search, which the manifest declares")
+    : ok(made);
+};
+
+const checkCatalog = (made: unknown): Result<Readonly<Record<string, unknown>>, string> =>
+  isRecord(made) && typeof made["search"] === "function" && typeof made["get"] === "function"
+    ? ok(made)
+    : err("createCatalog must return a catalog with search and get methods");
+
+const loadShape = <M extends LoadedManifest>(
+  plugin: unknown,
+  shape: PluginShape<M>,
+): Result<LoadedPlugin, LoadFailure> => {
+  const factory = isRecord(plugin) ? plugin[shape.factory] : undefined;
+  if (!isRecord(plugin) || typeof factory !== "function") {
+    return issue(PluginIssueKind.ManifestInvalid, `the module must export manifest and ${shape.factory}`);
+  }
+  const manifest = shape.schema.safeParse(plugin["manifest"]);
+  if (!manifest.success) {
+    return issue(PluginIssueKind.ManifestInvalid, `manifest: ${z.prettifyError(manifest.error)}`);
+  }
+  let made: unknown;
+  try {
+    made = Reflect.apply(factory, plugin, [shape.ctx]);
+  } catch (error) {
+    return issue(PluginIssueKind.LoadFailed, `${shape.factory} threw: ${String(error)}`);
+  }
+  const checked = shape.check(made, manifest.data);
+  return checked.ok
+    ? ok({ manifest: manifest.data, target: checked.value })
+    : issue(PluginIssueKind.ManifestInvalid, checked.error);
+};
+
+const loadPlugin = async (
   data: WorkerData,
   ctx: PluginContext,
   load: ImportModule,
-): Promise<Result<LoadedStore, LoadFailure>> => {
+): Promise<Result<LoadedPlugin, LoadFailure>> => {
   let namespace: unknown;
   try {
     namespace = await load(data.entry);
@@ -55,27 +110,15 @@ const loadStore = async (
     return issue(PluginIssueKind.LoadFailed, `cannot import the plugin: ${String(error)}`);
   }
   const plugin = isRecord(namespace) && isRecord(namespace["default"]) ? namespace["default"] : namespace;
-  if (!isRecord(plugin) || typeof plugin["createStore"] !== "function") {
-    return issue(PluginIssueKind.ManifestInvalid, "the module must export manifest and createStore");
-  }
-  const manifest = manifestSchema.safeParse(plugin["manifest"]);
-  if (!manifest.success) {
-    return issue(PluginIssueKind.ManifestInvalid, `manifest: ${z.prettifyError(manifest.error)}`);
-  }
-  let store: unknown;
-  try {
-    store = Reflect.apply(plugin["createStore"], plugin, [ctx]);
-  } catch (error) {
-    return issue(PluginIssueKind.LoadFailed, `createStore threw: ${String(error)}`);
-  }
-  if (!isRecord(store) || typeof store["fetchListing"] !== "function") {
-    return issue(PluginIssueKind.ManifestInvalid, "createStore must return a store with a fetchListing method");
-  }
-  if (manifest.data.capabilities.includes(PluginCapability.Search) && typeof store["search"] !== "function") {
-    const detail = "createStore must return a store with search, which the manifest declares";
-    return issue(PluginIssueKind.ManifestInvalid, detail);
-  }
-  return ok({ manifest: manifest.data, store });
+  const declared = isRecord(plugin) && isRecord(plugin["manifest"]) ? plugin["manifest"]["kind"] : undefined;
+  return declared === PluginKind.Catalog
+    ? loadShape(plugin, {
+        factory: "createCatalog",
+        schema: catalogManifestSchema,
+        ctx: { logger: ctx.logger, clock: ctx.clock },
+        check: checkCatalog,
+      })
+    : loadShape(plugin, { factory: "createStore", schema: manifestSchema, ctx, check: checkStore });
 };
 
 const createContext = (port: WorkerPort, data: WorkerData) => {
@@ -115,35 +158,56 @@ const createContext = (port: WorkerPort, data: WorkerData) => {
   return { ctx, capabilities };
 };
 
-const invoke = async (store: LoadedStore["store"], request: CallRequest): Promise<unknown> => {
-  const [method, argument] = request.method === CallMethod.Search
-    ? [store["search"], request.query]
-    : [store["fetchListing"], request.url];
-  if (typeof method !== "function") {
-    return err({ kind: StoreErrorKind.ParseFailed, detail: "the store has no search" });
-  }
-  try {
-    const result: unknown = await Reflect.apply(method, store, [argument]);
-    return result;
-  } catch (error) {
-    return err({ kind: StoreErrorKind.ParseFailed, detail: `the plugin threw: ${String(error)}` });
+interface Invocation {
+  readonly noun: "store" | "catalog";
+  readonly name: string;
+  readonly argument: unknown;
+  readonly failure: typeof StoreErrorKind.ParseFailed | typeof CatalogErrorKind.Failed;
+}
+
+const invocationOf = (request: CallRequest): Invocation => {
+  const store = { noun: "store", failure: StoreErrorKind.ParseFailed } as const;
+  const catalog = { noun: "catalog", failure: CatalogErrorKind.Failed } as const;
+  switch (request.method) {
+    case CallMethod.FetchListing:
+      return { ...store, name: "fetchListing", argument: request.url };
+    case CallMethod.Search:
+      return { ...store, name: "search", argument: request.query };
+    case CallMethod.CatalogSearch:
+      return { ...catalog, name: "search", argument: request.text };
+    case CallMethod.CatalogGet:
+      return { ...catalog, name: "get", argument: request.key };
   }
 };
 
-const answer = async (port: WorkerPort, store: LoadedStore["store"], id: number, request: CallRequest) => {
-  const result = await invoke(store, request);
+const invoke = async (target: LoadedPlugin["target"], invocation: Invocation): Promise<unknown> => {
+  const method = target[invocation.name];
+  if (typeof method !== "function") {
+    return err({ kind: invocation.failure, detail: `the ${invocation.noun} has no ${invocation.name}` });
+  }
+  try {
+    const result: unknown = await Reflect.apply(method, target, [invocation.argument]);
+    return result;
+  } catch (error) {
+    return err({ kind: invocation.failure, detail: `the plugin threw: ${String(error)}` });
+  }
+};
+
+const answer = async (port: WorkerPort, target: LoadedPlugin["target"], id: number, request: CallRequest) => {
+  const invocation = invocationOf(request);
+  const result = await invoke(target, invocation);
   try {
     port.postMessage({ type: MessageType.CallResult, id, result });
   } catch (error) {
     const detail = `the plugin output cannot be sent: ${String(error)}`;
-    port.postMessage({ type: MessageType.CallResult, id, result: err({ kind: StoreErrorKind.ParseFailed, detail }) });
+    port.postMessage({ type: MessageType.CallResult, id, result: err({ kind: invocation.failure, detail }) });
   }
 };
 
 /**
  * Runs inside a plugin worker: imports the plugin, validates its exports and manifest, creates its store over a
- * context that forwards http and browser calls to the host, then posts `ready` and answers calls. Every failure is
- * posted as a message; nothing here throws.
+ * context that forwards http and browser calls to the host, or a catalog plugin's catalog over only the logger and the
+ * clock, then posts `ready` and answers calls. Every failure is posted as a message; nothing here throws.
  *
  * @param port - The worker's `parentPort`.
  * @param data - The worker's `workerData`, validated here.
@@ -158,18 +222,18 @@ export const startWorker = async (port: WorkerPort, data: unknown, load = import
     return;
   }
   const { ctx, capabilities } = createContext(port, parsed.value);
-  const loaded = await loadStore(parsed.value, ctx, load);
+  const loaded = await loadPlugin(parsed.value, ctx, load);
   if (!loaded.ok) {
     port.postMessage({ type: MessageType.LoadFailed, issue: loaded.error });
     return;
   }
-  const { store } = loaded.value;
+  const { target } = loaded.value;
   port.on("message", (raw) => {
     const message = parseHostMessage(raw);
     if (!message.ok) {
       ctx.logger.error("the plugin worker ignored a message", { detail: message.error });
     } else if (message.value.type === MessageType.Call) {
-      void answer(port, store, message.value.id, message.value.request);
+      void answer(port, target, message.value.id, message.value.request);
     } else {
       capabilities.settle(message.value.id, message.value.result);
     }

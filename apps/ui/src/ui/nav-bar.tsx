@@ -4,6 +4,7 @@ import { ThemeSwitch } from "./theme-switch.tsx";
 
 const NAV = [
   { to: "/", label: "Watchlist" },
+  { to: "/gear", label: "My gear" },
   { to: "/matches", label: "Matches" },
   { to: "/alerts", label: "Alerts" },
   { to: "/settings", label: "Settings" },
@@ -18,7 +19,7 @@ const SKIP = "sr-only rounded-1 bg-surface-raised px-3 py-2 type-control focus:n
 const LINK = "inline-flex h-(--control-height) items-center gap-2 px-3 type-control hover:text-ink";
 
 /**
- * The app's top bar: a skip link to `main`, the wordmark, the six screens in their fixed order with the current one
+ * The app's top bar: a skip link to `main`, the wordmark, the seven screens in their fixed order with the current one
  * in muted brackets and the unread count on Alerts, and the theme switch.
  *
  * @param props - The unread alert count and the id of the main element.

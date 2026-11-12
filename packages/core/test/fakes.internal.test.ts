@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ShippingUnknown, StoreErrorKind } from "@fpving/plugin-sdk";
+import { GearKind } from "@fpving/plugin-sdk";
 import { alertIdSchema, err, LlmErrorKind, LlmVerdict, ok, pluginIdSchema } from "../src/index.ts";
 import { fakeClock } from "./fakes/fake-clock.ts";
 import { fakeDebugSink } from "./fakes/fake-debug-sink.ts";
 import { fakeIdGenerator } from "./fakes/fake-id-generator.ts";
 import { fakeLlmJudge } from "../src/testing/fake-llm.ts";
+import { FakeCatalogGateway } from "../src/testing/fake-catalog-gateway.ts";
+import { FakeSpecReader } from "../src/testing/fake-spec-reader.ts";
 import { fakeNotifier } from "../src/testing/fake-notifier.ts";
 import { fakeCurrencyRates } from "../src/testing/fake-rates.ts";
 import { fakeStoreGateway } from "./fakes/fake-store-gateway.ts";
@@ -75,5 +78,26 @@ describe("Test fakes", () => {
     expect(stores.searchablePlugins()).toEqual([shop]);
     expect(await stores.search(shop, { text: "Motor" })).toEqual(found);
     expect(stores.searched).toEqual([{ pluginId: shop, query: { text: "Motor" } }]);
+  });
+
+  it("fake catalog gateway searches names, finds keys and lists its plugins", async () => {
+    const catalog = pluginIdSchema.parse("example-catalog");
+    const other = pluginIdSchema.parse("other-catalog");
+    const zorro = { key: "zorro", name: "Zorro", specs: { kind: GearKind.Radio } };
+    const gateway = new FakeCatalogGateway(new Map([[catalog, [zorro]]]));
+    expect(gateway.plugins()).toEqual([catalog]);
+    expect(await gateway.search(catalog, "zor")).toEqual(ok([zorro]));
+    expect(await gateway.search(catalog, "pocket")).toEqual(ok([]));
+    expect(await gateway.search(other, "zor")).toEqual(ok([]));
+    expect(await gateway.get(catalog, "zorro")).toEqual(ok(zorro));
+    expect(await gateway.get(catalog, "none")).toEqual(ok(null));
+    expect(await gateway.get(other, "zorro")).toEqual(ok(null));
+  });
+
+  it("fake spec reader gives its scripted answer and records what it read", async () => {
+    const answer = ok({ name: null, specs: { kind: GearKind.Tool } });
+    const reader = new FakeSpecReader(answer);
+    expect(await reader.read(GearKind.Tool, "a multimeter")).toEqual(answer);
+    expect(reader.reads).toEqual([{ kind: GearKind.Tool, text: "a multimeter" }]);
   });
 });

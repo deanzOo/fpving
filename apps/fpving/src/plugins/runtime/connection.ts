@@ -1,5 +1,5 @@
 import { err, ok, StoreErrorKind } from "@fpving/plugin-sdk";
-import type { BrowserDriver, HttpClient, Logger, PluginManifest, Result, StoreError } from "@fpving/plugin-sdk";
+import type { BrowserDriver, HttpClient, Logger, Result, StoreError } from "@fpving/plugin-sdk";
 import { PluginIssueKind } from "../status.js";
 import type { PluginIssue } from "../status.js";
 import { createPending } from "./pending.js";
@@ -9,6 +9,7 @@ import type {
   CapabilityCall,
   CapabilityResult,
   HostMessage,
+  LoadedManifest,
   WorkerData,
   WorkerMessage,
 } from "./protocol.js";
@@ -41,8 +42,8 @@ interface ConnectionOptions {
 /** One running plugin worker, seen from the host. */
 export interface Connection {
   /** The manifest the worker reported, or why it did not load. */
-  readonly loaded: Promise<Result<PluginManifest, PluginIssue>>;
-  /** Sends a store call; resolves to the worker's unvalidated result, or `timeout`/`network` when it cannot answer. */
+  readonly loaded: Promise<Result<LoadedManifest, PluginIssue>>;
+  /** Sends a store or catalog call; resolves to the worker's raw result, or `timeout`/`network` if it cannot answer. */
   call(request: CallRequest): Promise<Result<unknown, StoreError>>;
   /** Terminates the worker and fails every open call. Idempotent. */
   stop(): Promise<void>;
@@ -60,7 +61,8 @@ const serve = (services: HostServices, call: CapabilityCall): Promise<Capability
 
 /**
  * Spawns a worker for one plugin entry and talks to it: validates every message it sends, serves its http and browser
- * calls with the real services, writes its logs with `pluginId` added, and enforces the load and call deadlines.
+ * calls with the real services, refuses them from a catalog, writes its logs with `pluginId` added, and enforces the
+ * load and call deadlines.
  *
  * @param options - The spawner, the worker data, the services, the deadlines and the failure callback.
  * @returns The connection.
@@ -72,8 +74,9 @@ export const connect = (options: ConnectionOptions): Connection => {
   let pluginId = "path" in options.data.entry ? options.data.entry.path : options.data.entry.package;
   let stopReason: string | null = null;
   let isLoaded = false;
-  const load = Promise.withResolvers<Result<PluginManifest, PluginIssue>>();
-  const reportLoad = (outcome: Result<PluginManifest, PluginIssue>): boolean => {
+  let isCatalog = false;
+  const load = Promise.withResolvers<Result<LoadedManifest, PluginIssue>>();
+  const reportLoad = (outcome: Result<LoadedManifest, PluginIssue>): boolean => {
     if (isLoaded) {
       return false;
     }
@@ -112,6 +115,7 @@ export const connect = (options: ConnectionOptions): Connection => {
       case MessageType.Ready:
         if (reportLoad(ok(message.manifest))) {
           pluginId = message.manifest.id;
+          isCatalog = "kind" in message.manifest;
         }
         return;
       case MessageType.LoadFailed:
@@ -124,6 +128,13 @@ export const connect = (options: ConnectionOptions): Connection => {
         return;
       case MessageType.CapabilityCall:
         if (stopReason !== null) {
+          return;
+        }
+        if (isCatalog) {
+          const detail = `a catalog plugin is given no ${message.call.capability}`;
+          services.logger.warn("a plugin capability call was refused", { pluginId, detail });
+          const result = { capability: message.call.capability, value: err({ kind: StoreErrorKind.Network, detail }) };
+          worker.postMessage({ type: MessageType.CapabilityResult, id: message.id, result });
           return;
         }
         void serve(services, message.call).then((result) => result, (error: unknown): CapabilityResult => {

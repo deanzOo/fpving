@@ -1,8 +1,10 @@
-import { fxTableSchema, matchCandidateSchema, priceSnapshotSchema, settingsSchema } from "@fpving/core";
-import type { FxTable, MatchCandidate, PriceSnapshot, Settings } from "@fpving/core";
+import { fxTableSchema, gearItemSchema, matchCandidateSchema, priceSnapshotSchema, settingsSchema } from "@fpving/core";
+import type { FxTable, GearItem, MatchCandidate, PriceSnapshot, Settings } from "@fpving/core";
 import { ShippingKind } from "@fpving/plugin-sdk";
 import { SETTINGS_ROW_ID } from "./schema.js";
-import type { fxTables, matchCandidates, priceSnapshots, settings } from "./schema.js";
+import type { fxTables, gearItems, matchCandidates, priceSnapshots, settings } from "./schema.js";
+
+type GearRow = typeof gearItems.$inferSelect;
 
 type SnapshotRow = typeof priceSnapshots.$inferSelect;
 type CandidateRow = typeof matchCandidates.$inferSelect;
@@ -61,3 +63,17 @@ export const toFxRow = ({ ratesPerBase, ...rest }: FxTable): Omit<FxRow, "id"> =
 
 export const fromFxRow = ({ ratesJson, ...rest }: FxRow): FxTable =>
   fxTableSchema.parse({ ...rest, ratesPerBase: ratesJson });
+
+export const toGearRow = ({ catalogRef, specs, ...rest }: GearItem): GearRow => ({
+  ...rest,
+  catalogPluginId: catalogRef?.pluginId ?? null,
+  catalogKey: catalogRef?.key ?? null,
+  specsJson: specs,
+});
+
+export const fromGearRow = ({ catalogPluginId, catalogKey, specsJson, ...rest }: GearRow) =>
+  gearItemSchema.safeParse({
+    ...rest,
+    catalogRef: catalogPluginId === null ? null : { pluginId: catalogPluginId, key: catalogKey },
+    specs: specsJson,
+  });

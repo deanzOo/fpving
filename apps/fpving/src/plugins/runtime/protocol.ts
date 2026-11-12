@@ -1,4 +1,6 @@
 import {
+  catalogManifestSchema,
+  CatalogErrorKind,
   countryCodeSchema,
   currencyCodeSchema,
   err,
@@ -22,8 +24,13 @@ export const MessageType = {
   Log: "log",
 } as const;
 
-/** The store methods the host calls in a worker. */
-export const CallMethod = { FetchListing: "fetchListing", Search: "search" } as const;
+/** The store and catalog methods the host calls in a worker. */
+export const CallMethod = {
+  FetchListing: "fetchListing",
+  Search: "search",
+  CatalogSearch: "catalog.search",
+  CatalogGet: "catalog.get",
+} as const;
 
 /** The host capabilities a worker calls. */
 export const Capability = { HttpGet: "http.get", BrowserFetchPage: "browser.fetchPage" } as const;
@@ -51,7 +58,11 @@ const callRequestSchema = z.discriminatedUnion("method", [
     method: z.literal(CallMethod.Search),
     query: z.object({ text: z.string(), brand: z.string().exactOptional(), model: z.string().exactOptional() }),
   }),
+  z.object({ method: z.literal(CallMethod.CatalogSearch), text: z.string() }),
+  z.object({ method: z.literal(CallMethod.CatalogGet), key: z.string() }),
 ]);
+
+const loadedManifestSchema = z.union([manifestSchema, catalogManifestSchema]);
 
 const capabilityCallSchema = z.discriminatedUnion("capability", [
   z.object({
@@ -76,7 +87,7 @@ const hostMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 const workerMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal(MessageType.Ready), manifest: manifestSchema }),
+  z.object({ type: z.literal(MessageType.Ready), manifest: loadedManifestSchema }),
   z.object({
     type: z.literal(MessageType.LoadFailed),
     issue: z.object({
@@ -100,7 +111,9 @@ const workerDataSchema = z.object({
   currencyPreference: currencyCodeSchema,
 });
 
-/** A store call the host sends to a worker. */
+/** The manifest a worker reports: a store or a catalog plugin's. */
+export type LoadedManifest = z.infer<typeof loadedManifestSchema>;
+/** A store or catalog call the host sends to a worker. */
 export type CallRequest = z.infer<typeof callRequestSchema>;
 /** A capability call a worker sends to the host. */
 export type CapabilityCall = z.infer<typeof capabilityCallSchema>;
@@ -131,3 +144,7 @@ export const parseWorkerData = parseWith(workerDataSchema, "worker data");
 
 /** Validates what a store method resolved to, given the schema of its success value. */
 export const storeResultSchema = <T extends z.ZodType>(value: T) => resultOf(value, storeErrorSchema);
+
+/** Validates what a catalog method resolved to, given the schema of its success value. */
+export const catalogResultSchema = <T extends z.ZodType>(value: T) =>
+  resultOf(value, z.object({ kind: z.enum(CatalogErrorKind), detail: z.string() }));

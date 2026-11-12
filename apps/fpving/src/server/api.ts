@@ -1,26 +1,35 @@
 import { inspect } from "node:util";
 import {
   acceptCandidate,
+  addGear,
   addListing,
   addProduct,
   AddErrorKind,
   findMatches,
+  GearErrorKind,
+  listGear,
   markAllAlertsRead,
   MatchErrorKind,
   pendingCandidates,
   productDetail,
   rejectCandidate,
+  removeGear,
   removeListing,
+  searchCatalog,
+  updateGear,
   watchlist,
+  LlmErrorKind,
 } from "@fpving/core";
 import type {
   AddProductError,
   FindMatchesError,
+  GearDeps,
   MatchDeps,
   Result,
   SchedulerDeps,
   SchedulerHandle,
   Settings,
+  SpecReader,
 } from "@fpving/core";
 import { StoreErrorKind } from "@fpving/plugin-sdk";
 import { GatewayRefusal } from "../plugins/store-gateway.js";
@@ -41,6 +50,10 @@ export interface SettingsChangeError {
 export interface ApiRuntime {
   /** The ports core's use cases take, as they are now. */
   deps(): MatchDeps & SchedulerDeps;
+  /** The ports core's gear use cases take, as they are now. */
+  gear(): GearDeps;
+  /** Reads gear specs from pasted text. */
+  specReader(): SpecReader;
   /** The running scan schedule. */
   scans(): SchedulerHandle;
   /** The plugins screen rows, given what the repository holds about the plugins now. */
@@ -68,6 +81,10 @@ const Message = {
   ScanRunning: "a scan is already running",
   Restarting: "the plugins and the scan schedule are restarting for a settings change; try again shortly",
   ShuttingDown: "fpving is shutting down",
+  InvalidSpecs: "the name, quantity or specs do not fit the kind of gear",
+  GearNotFound: "no gear has this id",
+  ReaderUnavailable: "the AI that reads specs is not available; set ANTHROPIC_API_KEY or enter the specs by hand",
+  ReaderMalformed: "the AI answered something that is not valid gear specs; try again or enter them by hand",
   SettingsNotApplied: "the settings were not applied and the old ones still hold; see the log, then try again",
 } as const;
 
@@ -111,6 +128,8 @@ const matchFailure = (error: FindMatchesError) => {
 };
 
 const productNotFound = failure(HttpStatus.NotFound, AddErrorKind.ProductNotFound, Message.ProductNotFound);
+const gearNotFound = failure(HttpStatus.NotFound, ApiErrorKind.GearNotFound, Message.GearNotFound);
+const invalidSpecs = failure(HttpStatus.UnprocessableContent, ApiErrorKind.InvalidSpecs, Message.InvalidSpecs);
 const listingNotFound = failure(HttpStatus.NotFound, ApiErrorKind.ListingNotFound, Message.ListingNotFound);
 const notPending = failure(HttpStatus.NotFound, MatchErrorKind.NotPending, Message.NotPending);
 const restarting = failure(HttpStatus.ServiceUnavailable, ApiErrorKind.Restarting, Message.Restarting);
@@ -370,6 +389,75 @@ export const registerApiRoutes = (server: AppServer): { attach(runtime: ApiRunti
   server.route({
     ...apiRoutes.getScan,
     handler: async (_request, reply) => reply.code(HttpStatus.Ok).send(await scanStatus()),
+  });
+
+  server.route({
+    ...apiRoutes.listGear,
+    handler: async (_request, reply) => reply.code(HttpStatus.Ok).send(await listGear(runtime().gear())),
+  });
+
+  server.route({
+    ...apiRoutes.addGear,
+    handler: async ({ body }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
+      const added = await addGear(runtime().gear(), body);
+      return added.ok
+        ? reply.code(HttpStatus.Created).send(added.value)
+        : reply.code(invalidSpecs.status).send(invalidSpecs.body);
+    },
+  });
+
+  server.route({
+    ...apiRoutes.updateGear,
+    handler: async ({ params: { gearId }, body }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
+      const updated = await updateGear(runtime().gear(), gearId, body);
+      if (updated.ok) {
+        return reply.code(HttpStatus.Ok).send(updated.value);
+      }
+      const { status, body: refusal } = updated.error.kind === GearErrorKind.InvalidSpecs ? invalidSpecs : gearNotFound;
+      return reply.code(status).send(refusal);
+    },
+  });
+
+  server.route({
+    ...apiRoutes.removeGear,
+    handler: async ({ params: { gearId } }, reply) => {
+      const removed = await removeGear(runtime().gear(), gearId);
+      return removed.ok
+        ? reply.code(HttpStatus.NoContent).send(null)
+        : reply.code(gearNotFound.status).send(gearNotFound.body);
+    },
+  });
+
+  server.route({
+    ...apiRoutes.searchCatalog,
+    handler: async ({ query: { q } }, reply) => {
+      if (runtime().restarting()) {
+        return reply.code(restarting.status).send(restarting.body);
+      }
+      const gear = runtime().gear();
+      const { matches, failedPlugins } = await searchCatalog(gear, q);
+      return reply.code(HttpStatus.Ok).send({ matches, failedPlugins, catalogs: gear.catalogs.plugins().length });
+    },
+  });
+
+  server.route({
+    ...apiRoutes.readSpecs,
+    handler: async ({ body: { kind, text } }, reply) => {
+      const read = await runtime().specReader().read(kind, text);
+      if (read.ok) {
+        return reply.code(HttpStatus.Ok).send(read.value);
+      }
+      const { status, body } = read.error.kind === LlmErrorKind.Unavailable
+        ? failure(HttpStatus.ServiceUnavailable, read.error.kind, Message.ReaderUnavailable)
+        : failure(HttpStatus.BadGateway, read.error.kind, Message.ReaderMalformed);
+      return reply.code(status).send(body);
+    },
   });
 
   return {

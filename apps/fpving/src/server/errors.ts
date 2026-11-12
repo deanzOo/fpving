@@ -1,4 +1,4 @@
-import { AddErrorKind, MatchErrorKind, productSchema } from "@fpving/core";
+import { AddErrorKind, GearErrorKind, LlmErrorKind, MatchErrorKind, productSchema } from "@fpving/core";
 import { z } from "zod";
 
 /**
@@ -15,6 +15,9 @@ export const ApiErrorKind = {
   NotFound: "not_found",
   ...AddErrorKind,
   ...MatchErrorKind,
+  ...GearErrorKind,
+  ...LlmErrorKind,
+  GearNotFound: "gear_not_found",
   AlertNotFound: "alert_not_found",
   ListingNotFound: "listing_not_found",
   PluginUnavailable: "plugin_unavailable",

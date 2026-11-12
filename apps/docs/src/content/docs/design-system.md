@@ -25,7 +25,7 @@ The primitives live in `apps/ui/src/ui/`. If one nearly fits, extend it instead 
 | --- | --- |
 | `Button` | One action, labelled with its verb. Primary, secondary or ghost, regular or small, with `pending` and `pendingLabel`. |
 | `Confirm` | A button that asks first in a modal dialog, for a destructive step. The only place the danger fill appears. |
-| `TextField` | A labelled single-line input with a hint or an error. `numeric` types in the readout face. |
+| `TextField` | A labelled input with a hint or an error. `numeric` types in the readout face; `multiline` makes it a text box of several lines, for pasted text. |
 | `Select` | A closed set of values, with the same label, hint and error wiring as `TextField`. |
 | `Checkbox` | A toggle with its label to the right. |
 | `Badge` | A short uppercase status: a word, a glyph where it has one, and a tone. |
@@ -78,14 +78,15 @@ The guards match strings, so a sentence that only looks like a colour or a class
 ### Agreed exceptions to the design
 
 - Back in stock, gone and removed badges have no glyph: word and colour only, so each glyph keeps one meaning.
-- Refusal notices are tagged REFUSED or FAILED. A restart is a warning tagged RESTARTING. The startup 503 is a warning tagged STARTING. A partial Find matches result is a warning tagged PARTIAL.
+- Refusal notices are tagged REFUSED or FAILED. A restart is a warning tagged RESTARTING. The startup 503 is a warning tagged STARTING. A partial Find matches or catalog search result is a warning tagged PARTIAL.
 - The watchlist's unread count is a `Badge`, not a `Count`.
 - Scan now keeps its label while running. Its status line changes instead.
 - The settings form is half of `--content-max` wide (512px), which is not a design token.
-- A plugin warning uses ▲, which the glyph list keeps for a rise or a stale listing.
+- A plugin warning uses ▲, which the glyph list keeps for a rise or a stale listing. A catalog value that changed on My gear is a kind of plugin warning, so its Changed tag uses ▲ too.
 - A chart with one series can ask for a legend with `Legend single`, where the design only has one from two series up.
-- A Find matches search that saved nothing is tagged FAILED, though it is not a refusal.
-- `main`, `h1` and `h2` have no focus outline when focus moves to them by script (`tabindex="-1"`).
+- A Find matches search that saved nothing, or a catalog search where every catalog failed, is tagged FAILED, though neither is a refusal.
+- `main`, `h1`, `h2` and `h3` have no focus outline when focus moves to them by script (`tabindex="-1"`). A list item that script focuses, such as a gear item after a removal, keeps its outline, as a match row does.
+- The notice that the AI is not available on My gear is the quiet Status form, with no tag.
 
 ## Add a screen
 

@@ -1,5 +1,6 @@
 import { err, ok } from "@fpving/plugin-sdk";
 import { CandidateStatus, DEFAULT_SETTINGS, ListingStatus, RepositoryErrorKind } from "../../src/index.ts";
+import { InMemoryGearRepository } from "../../src/testing/index.ts";
 import type {
   Alert,
   CachedVerdict,
@@ -386,5 +387,6 @@ export const inMemoryRepository = (): Repository => {
         return Promise.resolve();
       },
     },
+    gear: new InMemoryGearRepository(),
   };
 };

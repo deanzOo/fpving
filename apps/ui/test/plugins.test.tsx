@@ -60,6 +60,16 @@ describe("Plugins", () => {
     await expect.element(row.getByRole("cell", { name: "3", exact: true })).toBeVisible();
   });
 
+  it("shows a catalog plugin as a catalog", async () => {
+    const catalog = {
+      kind: "catalog", id: "gear", displayName: "Gear Catalog", version: "1.0.0", sdkVersion: ">=0.0.0 <1.0.0",
+    } as const;
+    const api = scripted([plugin({ source: "./plugins/gear", manifest: catalog })]);
+    const screen = await renderApp(api.client, "/plugins");
+    const row = screen.getByRole("row", { name: /^Gear Catalog gear/u });
+    await expect.element(row.getByRole("cell", { name: "Catalog", exact: true })).toBeVisible();
+  });
+
   it("shows a plugin backing off and when it retries", async () => {
     const screen = await renderApp(scripted(rows()).client, "/plugins");
     const mall = screen.getByRole("row", { name: /^Mall mall/u });

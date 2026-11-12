@@ -8,7 +8,7 @@ import {
   ThresholdBasis,
   verdictSchema,
 } from "@fpving/core";
-import { ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
+import { GearKind, ShippingKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { check, index, integer, primaryKey, real, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
@@ -152,6 +152,22 @@ export const fxTables = sqliteTable("fx_tables", {
   ratesJson: text("rates_json", { mode: "json" }).notNull(),
   fetchedOn: text("fetched_on").notNull(),
 });
+
+export const gearItems = sqliteTable("gear_items", {
+  id: text().primaryKey(),
+  kind: text().notNull(),
+  name: text().notNull(),
+  quantity: integer().notNull(),
+  createdAt: instant("created_at").notNull(),
+  catalogPluginId: text("catalog_plugin_id"),
+  catalogKey: text("catalog_key"),
+  specsJson: text("specs_json", { mode: "json" }).notNull(),
+}, (table) => [
+  index("gear_items_kind_name_idx").on(table.kind, table.name),
+  check("gear_items_kind_check", oneOf(table.kind, GearKind)),
+  check("gear_items_quantity_check", sql`${table.quantity} >= 1`),
+  check("gear_items_catalog_ref_check", nullExactlyWhen(table.catalogKey, sql`${table.catalogPluginId} is null`)),
+]);
 
 export const settings = sqliteTable("settings", {
   id: integer().primaryKey(),

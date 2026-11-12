@@ -7,6 +7,7 @@ import { Alerts } from "./alerts.tsx";
 import { ClientContext } from "./client.ts";
 import type { Client } from "./client.ts";
 import { ErrorView } from "./error-view.tsx";
+import { Gear } from "./gear.tsx";
 import { Layout } from "./layout.tsx";
 import { Matches } from "./matches.tsx";
 import { Plugins } from "./plugins.tsx";
@@ -22,6 +23,7 @@ const ProductPage = () => <ProductDetail id={productRoute.useParams().id} />;
 const productRoute = createRoute({ getParentRoute: () => rootRoute, path: "/products/$id", component: ProductPage });
 
 const watchlistRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Watchlist });
+const gearRoute = createRoute({ getParentRoute: () => rootRoute, path: "/gear", component: Gear });
 const matchesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/matches", component: Matches });
 const alertsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/alerts", component: Alerts });
 const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsScreen });
@@ -35,6 +37,7 @@ const atlasRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   watchlistRoute,
   productRoute,
+  gearRoute,
   matchesRoute,
   alertsRoute,
   settingsRoute,

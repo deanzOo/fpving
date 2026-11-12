@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../src/adapters/sqlite/migrate.ts";
+import { recordingLogger } from "../support/recording-logger.ts";
 import { openSqliteRepository } from "../../src/adapters/sqlite/repository.ts";
 import { ExitCode, SHUTDOWN_DEADLINE_MS, SHUTDOWN_MESSAGE } from "../../src/app/lifecycle.ts";
 import { DB_FILE } from "../../src/app/start.ts";
@@ -41,7 +42,7 @@ const withoutAnthropic = (): NodeJS.ProcessEnv =>
 
 const seedFreshRates = async (): Promise<void> => {
   migrate(join(dataDir, DB_FILE));
-  const { repository, close } = openSqliteRepository(join(dataDir, DB_FILE));
+  const { repository, close } = openSqliteRepository(join(dataDir, DB_FILE), recordingLogger());
   const fetchedOn = new Date().toISOString().slice(0, "yyyy-mm-dd".length);
   await repository.fxRates.save({ base: "EUR", fetchedOn, ratesPerBase: { USD: 1 } });
   close();

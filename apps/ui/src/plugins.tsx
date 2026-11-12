@@ -109,7 +109,9 @@ export const Plugins = () => {
               { header: "State", cell: (row) => <State row={row} /> },
               {
                 header: "Domains",
-                cell: ({ manifest }) => <span className="type-code">{manifest?.domains.join(", ") ?? ""}</span>,
+                cell: ({ manifest }) => (manifest !== null && "kind" in manifest
+                  ? <span className="type-body">Catalog</span>
+                  : <span className="type-code">{manifest?.domains.join(", ") ?? ""}</span>),
               },
               {
                 header: "Stale listings",

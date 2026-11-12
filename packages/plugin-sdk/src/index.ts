@@ -1,10 +1,19 @@
 /**
- * The store plugin contract: plugin types, the schemas the host validates plugin output with, the store error
- * taxonomy, ISO currency and country codes, `Result`, and the SDK version with the semver check the host applies to
- * a manifest's `sdkVersion`.
+ * The store and catalog plugin contracts: plugin types, the schemas the host validates plugin output with, the store
+ * and catalog error taxonomies, the gear spec vocabulary, ISO currency and country codes, `Result`, and the SDK version
+ * with the semver check the host applies to a manifest's `sdkVersion`.
  *
  * @module plugin-sdk
  */
+export { catalogEntrySchema, catalogManifestSchema, CatalogErrorKind, PluginKind } from "./catalog.js";
+export type {
+  Catalog,
+  CatalogContext,
+  CatalogEntry,
+  CatalogError,
+  CatalogManifest,
+  CatalogPlugin,
+} from "./catalog.js";
 export type {
   BrowserDriver,
   BrowserPage,
@@ -19,6 +28,18 @@ export type {
 } from "./context.js";
 export { StoreErrorKind, storeErrorSchema } from "./errors.js";
 export type { StoreError, StoreResult } from "./errors.js";
+export {
+  Chemistry,
+  Connector,
+  GearKind,
+  gearSpecsSchema,
+  RadioFirmware,
+  RcLink,
+  SizeClass,
+  ToolType,
+  VideoSystem,
+} from "./gear.js";
+export type { GearSpecField, GearSpecs } from "./gear.js";
 export { COUNTRY_CODES, CURRENCY_CODES, CURRENCY_MINOR_UNITS, countryCodeSchema, currencyCodeSchema } from "./iso.js";
 export type { CountryCode, CurrencyCode } from "./iso.js";
 export {

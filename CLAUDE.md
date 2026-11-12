@@ -39,14 +39,15 @@ Write the missing failing test, scan the codebase for the same bug class, fix ev
   8. Contrast in both themes: 4.5:1 for text, 3:1 for borders, focus and marks. Check new pairs before shipping.
 - Agreed exceptions:
   - Back in stock, gone and removed badges have no glyph: word and colour only, so each glyph keeps one meaning.
-  - Refusal notices are tagged REFUSED or FAILED. A restart is a warning tagged RESTARTING, the startup 503 a warning tagged STARTING, a partial Find matches result a warning tagged PARTIAL.
+  - Refusal notices are tagged REFUSED or FAILED. A restart is a warning tagged RESTARTING, the startup 503 a warning tagged STARTING, a partial Find matches or catalog search result a warning tagged PARTIAL.
   - The watchlist's unread count is a Badge, not Count.
   - Scan now keeps its label while running; its status line changes instead.
   - The settings form is half of `--content-max` wide (512px), which is not a design token.
-  - ▲ also marks a plugin warning, not only a rise or a stale listing.
+  - ▲ also marks a plugin warning, not only a rise or a stale listing, and a changed catalog value on My gear.
   - `Legend single` gives a one-series chart a legend, which the design starts at two series.
-  - FAILED also tags a Find matches search that saved nothing, which is not a refusal.
-  - No focus outline on `main`, `h1` or `h2` when script moves focus there (`tabindex="-1"`).
+  - FAILED also tags a Find matches search that saved nothing and a catalog search where every catalog failed, which are not refusals.
+  - No focus outline on `main`, `h1`, `h2` or `h3` when script moves focus there (`tabindex="-1"`). A focused `li` keeps its outline.
+  - The notice that the AI is not available on My gear is the quiet Status form, with no tag.
 - Guide: `apps/docs/src/content/docs/design-system.md`.
 
 ## Worktree and env isolation

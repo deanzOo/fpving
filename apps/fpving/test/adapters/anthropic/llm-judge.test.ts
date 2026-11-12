@@ -2,7 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { MessageCreateParamsNonStreaming, StopReason } from "@anthropic-ai/sdk/resources/messages";
 import { LlmErrorKind, LlmVerdict, MATCHING_RULES } from "@fpving/core";
 import type { LlmError, Result } from "@fpving/core";
-import type { LogFields, Logger } from "@fpving/plugin-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ANTHROPIC_BASE_URL,
@@ -14,6 +13,7 @@ import {
   NO_API_KEY,
 } from "../../../src/adapters/anthropic/llm-judge.ts";
 import type { CreateMessage, MessageReply } from "../../../src/adapters/anthropic/llm-judge.ts";
+import { keyedMessages, recordingLogger, textReply } from "./helpers.ts";
 
 const FAKE_KEY = "test-key-not-a-real-secret";
 const SOURCE = "T-Motor F60 Pro V 2207 1950KV";
@@ -27,21 +27,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const textReply = (text: string, stopReason: StopReason = "end_turn"): MessageReply => ({
-  content: [{ type: "text", text, citations: null }],
-  stop_reason: stopReason,
-  stop_details: null,
-});
-
 const reply = (output: unknown, stopReason?: StopReason): MessageReply => textReply(JSON.stringify(output), stopReason);
-
-const recordingLogger = (): { logger: Logger; logged: (LogFields | undefined)[] } => {
-  const logged: (LogFields | undefined)[] = [];
-  const record = (_message: string, fields?: LogFields): void => {
-    logged.push(fields);
-  };
-  return { logger: { debug: record, info: record, warn: record, error: record }, logged };
-};
 
 const judgeReplying = (answer: () => Promise<MessageReply> | MessageReply) => {
   const requests: MessageCreateParamsNonStreaming[] = [];
@@ -176,17 +162,8 @@ describe("Anthropic LLM judge", () => {
   });
 
   it("calls the real client without ever logging the api key", async () => {
-    const sentHeaders: string[] = [];
     const body = { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } };
-    const createMessage = anthropicMessages({
-      apiKey: FAKE_KEY,
-      maxRetries: 0,
-      fetch: (_url, init) => {
-        sentHeaders.push(JSON.stringify([...new Headers(init?.headers)]));
-        const headers = { "content-type": "application/json" };
-        return Promise.resolve(new Response(JSON.stringify(body), { status: Status.Unauthorized, headers }));
-      },
-    });
+    const { createMessage, sentHeaders } = keyedMessages(FAKE_KEY, Status.Unauthorized, body);
     const { logger, logged } = recordingLogger();
     const judge = createAnthropicLlmJudge(createMessage, logger);
     expect(failure(await judge.compare(SOURCE, CANDIDATE))?.detail).toContain("authentication failed");
