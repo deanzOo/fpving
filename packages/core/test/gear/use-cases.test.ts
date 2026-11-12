@@ -307,6 +307,33 @@ describe("Editing gear", () => {
     expect((await listGear(deps))[0]?.changes).toEqual([]);
   });
 
+  it("resolving one change keeps the other change flagged", async () => {
+    const changed = battery("t1300", "Tattu 1300", { cells: OTHER_CELLS, chemistry: "lihv" });
+    const deps = depsFor(gateway([[ONE, [changed]]]));
+    const chemistry = { source: SpecSource.Catalog, pluginId: ONE, value: "lipo" };
+    const { id } = await seed(deps, { specs: { ...draft().specs, chemistry } });
+    const mine = { cells: { source: SpecSource.User, value: CELLS }, chemistry };
+    const kept = await updateGear(deps, id, draft({ specs: mine }));
+    expect(kept).toMatchObject({ ok: true, value: { specs: { chemistry } } });
+    expect((await listGear(deps))[0]?.changes).toEqual([{ field: "chemistry", saved: "lipo", catalog: "lihv" }]);
+  });
+
+  it("editing only the quantity while the catalog is disabled keeps catalog sources", async () => {
+    const deps = depsFor(gateway([]));
+    const { id, specs } = await seed(deps);
+    const edited = await updateGear(deps, id, draft({ quantity: 2, specs }));
+    expect(edited).toMatchObject({ ok: true, value: { quantity: 2, specs: draft().specs } });
+  });
+
+  it("an edited catalog value is still saved as confirmed by the user", async () => {
+    const deps = depsFor(gateway([[ONE, [battery("t1300", "Tattu 1300", { cells: OTHER_CELLS })]]]));
+    const { id } = await seed(deps);
+    const edited = { cells: { source: SpecSource.Catalog, pluginId: ONE, value: MORE_CELLS } };
+    const saved = await updateGear(deps, id, draft({ specs: edited }));
+    const mine = { cells: { source: SpecSource.User, value: MORE_CELLS } };
+    expect(saved).toMatchObject({ ok: true, value: { specs: mine } });
+  });
+
   it("saves a field the item did not have as the user gave it", async () => {
     const deps = depsFor(gateway([]));
     const { id } = await stored(deps);

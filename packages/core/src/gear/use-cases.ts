@@ -159,16 +159,26 @@ const currentEntry = async ({ catalogs }: GearDeps, ref: GearItem["catalogRef"])
   return found.ok ? found.value : null;
 };
 
-const verified = async (deps: GearDeps, draft: GearDraft): Promise<Record<string, SpecValue>> => {
+const verified = async (
+  deps: GearDeps,
+  draft: GearDraft,
+  stored: GearItem | null,
+): Promise<Record<string, SpecValue>> => {
   const entry = await currentEntry(deps, draft.catalogRef);
   const now = new Map(Object.entries<SpecRawValue>({ ...entry?.specs }));
+  const before = stored?.kind === draft.kind ? stored.specs : {};
+  const unchanged = (field: string, value: SpecRawValue): boolean => {
+    const saved = before[field];
+    return (
+      saved?.source === SpecSource.Catalog && saved.pluginId === draft.catalogRef?.pluginId && same(saved.value, value)
+    );
+  };
   const confirmed = (field: string, spec: SpecValue): boolean => {
     const current = now.get(field);
     return (
       spec.source === SpecSource.Catalog
       && spec.pluginId === draft.catalogRef?.pluginId
-      && current !== undefined
-      && same(spec.value, current)
+      && ((current !== undefined && same(spec.value, current)) || unchanged(field, spec.value))
     );
   };
   return Object.fromEntries(
@@ -202,7 +212,7 @@ const build = (
  * @returns The stored item, or `invalid_specs` when the draft breaks the gear vocabulary of its kind.
  */
 export const addGear = async (deps: GearDeps, draft: GearDraft): Promise<Result<GearItem, InvalidSpecs>> => {
-  const built = build(deps.ids.next(), deps.clock.now(), draft, await verified(deps, draft));
+  const built = build(deps.ids.next(), deps.clock.now(), draft, await verified(deps, draft, null));
   if (built.ok) {
     await deps.gear.add(built.value);
   }
@@ -239,6 +249,11 @@ export const listGear = async (deps: GearDeps): Promise<GearWithChanges[]> =>
 /**
  * Replaces a stored item with the draft. See {@link addGear} for how each field's source is settled.
  *
+ * @remarks
+ * A catalog-sourced field whose plugin and value equal the stored item's catalog-sourced field also stays
+ * catalog-sourced, so a field left as it was keeps its source and its change flag even when the catalog changed or is
+ * gone.
+ *
  * @param deps - The ports to use.
  * @param id - The item to edit.
  * @param draft - What the user entered.
@@ -253,7 +268,7 @@ export const updateGear = async (
   if (stored === null) {
     return err({ kind: RepositoryErrorKind.NotFound });
   }
-  const built = build(id, stored.createdAt, draft, await verified(deps, draft));
+  const built = build(id, stored.createdAt, draft, await verified(deps, draft, stored));
   if (!built.ok) {
     return built;
   }
