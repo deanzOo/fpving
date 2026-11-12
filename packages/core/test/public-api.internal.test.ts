@@ -73,7 +73,6 @@ describe("Core public API", () => {
       "settingsSchema",
       "snapshotIdSchema",
       "specValueSchema",
-      "specsOf",
       "startScheduler",
       "updateGear",
       "verdictSchema",

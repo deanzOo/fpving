@@ -109,7 +109,7 @@ export type {
   ScanRunId,
   SnapshotId,
 } from "./ids.js";
-export { compareGear, gearItemSchema, SpecSource, specsOf, specValueSchema } from "./gear/entities.js";
+export { compareGear, gearItemSchema, SpecSource, specValueSchema } from "./gear/entities.js";
 export type { GearItem, SpecValue } from "./gear/entities.js";
 export { GearErrorKind } from "./gear/errors.js";
 export { addGear, listGear, removeGear, searchCatalog, updateGear } from "./gear/use-cases.js";

@@ -1,5 +1,4 @@
 import { GearKind, gearSpecsSchema } from "@fpving/plugin-sdk";
-import type { GearSpecs } from "@fpving/plugin-sdk";
 import { z } from "zod";
 import { gearItemIdSchema, pluginIdSchema } from "../ids.js";
 import { textSchema } from "../text.js";
@@ -47,9 +46,6 @@ export const gearItemSchema = z
 
 /** A gear item as {@link gearItemSchema} accepts it. */
 export type GearItem = z.infer<typeof gearItemSchema>;
-
-/** The specs of `item` without their sources, as `gearSpecsSchema` accepts them. Throws when the item is invalid. */
-export const specsOf = (item: GearItem): GearSpecs => gearSpecsSchema.parse(stripSources(item));
 
 const KIND_ORDER: readonly string[] = Object.values(GearKind);
 

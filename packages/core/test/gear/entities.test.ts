@@ -1,7 +1,7 @@
 import { GearKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { compareGear, gearItemSchema, pluginIdSchema, SpecSource, specsOf } from "../../src/index.ts";
+import { compareGear, gearItemSchema, pluginIdSchema, SpecSource } from "../../src/index.ts";
 
 const CATALOG = pluginIdSchema.parse("example-catalog");
 const CELLS = 4;
@@ -26,7 +26,6 @@ describe("Gear item", () => {
     );
     expect(item.specs["cells"]).toEqual({ source: SpecSource.Catalog, pluginId: CATALOG, value: CELLS });
     expect(item.specs["chemistry"]).toEqual({ source: SpecSource.User, value: "lipo" });
-    expect(specsOf(item)).toEqual({ kind: GearKind.Battery, cells: CELLS, chemistry: "lipo" });
   });
 
   it("rejects a stored spec that breaks the vocabulary", () => {
@@ -47,7 +46,7 @@ describe("Gear item", () => {
   });
 
   it("accepts an item with no specs known yet", () => {
-    expect(specsOf(gearItemSchema.parse(battery({})))).toEqual({ kind: GearKind.Battery });
+    expect(gearItemSchema.parse(battery({})).specs).toEqual({});
   });
 });
 
