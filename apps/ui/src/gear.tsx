@@ -4,10 +4,14 @@ import { SpecSource } from "@fpving/core";
 import type { GearItem, SpecValue } from "@fpving/core";
 import { GearKind } from "@fpving/plugin-sdk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { RefObject } from "react";
 import type { z } from "zod";
 import { AddGear, fromItem, GearForm } from "./add-gear.tsx";
+import { CatalogState, useCatalogs } from "./catalogs.ts";
+import type { NameOf } from "./catalogs.ts";
 import { useClient } from "./client.ts";
+import { useFocusAfterRemoval } from "./focus.ts";
 import { GEAR_FIELDS, KIND_HEADING, specWords } from "./gear-labels.ts";
 import type { GearField } from "./gear-labels.ts";
 import { QueryKey } from "./queries.ts";
@@ -22,7 +26,10 @@ type Row = z.output<(typeof apiRoutes.listGear.schema.response)[typeof HttpStatu
 type Change = Row["changes"][number];
 type CatalogRef = NonNullable<GearItem["catalogRef"]>;
 
-const EMPTY = "Nothing in your gear yet. Search for something you own to add it.";
+const EMPTY = {
+  search: "Nothing in your gear yet. Search for something you own above to add it.",
+  paste: "Nothing in your gear yet. Paste the specs or type them in above to add it.",
+} as const;
 
 const useGearChanged = () => {
   const queryClient = useQueryClient();
@@ -37,22 +44,23 @@ const withSpec = (item: GearItem, field: string, spec: SpecValue) => ({
   specs: { ...item.specs, [field]: spec },
 });
 
-const ChangeDetail = ({ item, catalogRef, field, change, close }: {
+const ChangeDetail = ({ item, catalogRef, field, change, resolved }: {
   readonly item: GearItem;
   readonly catalogRef: CatalogRef;
   readonly field: GearField;
   readonly change: Change;
-  readonly close: () => void;
+  readonly resolved: () => void;
 }) => {
   const client = useClient();
   const changed = useGearChanged();
   const resolving = useMutation({
     mutationFn: async (spec: SpecValue) => client.updateGear({ gearId: item.id }, withSpec(item, field.name, spec)),
     onSuccess: async () => {
-      close();
+      resolved();
       await changed();
     },
   });
+  const sending = resolving.isPending ? resolving.variables.source : null;
   const words = (value: Change["saved"]) => specWords(field.name, value).join(" / ");
   return (
     <div className="mt-3 border-t border-line pt-3">
@@ -62,7 +70,8 @@ const ChangeDetail = ({ item, catalogRef, field, change, close }: {
       <div className="mt-2 flex flex-wrap gap-2">
         <Button
           size={ButtonSize.Small}
-          pending={resolving.isPending}
+          pending={sending === SpecSource.User}
+          pendingLabel="Keeping…"
           onClick={() => {
             resolving.mutate({ source: SpecSource.User, value: change.saved });
           }}
@@ -71,7 +80,8 @@ const ChangeDetail = ({ item, catalogRef, field, change, close }: {
         </Button>
         <Button
           size={ButtonSize.Small}
-          pending={resolving.isPending}
+          pending={sending === SpecSource.Catalog}
+          pendingLabel="Updating…"
           onClick={() => {
             resolving.mutate({ source: SpecSource.Catalog, pluginId: catalogRef.pluginId, value: change.catalog });
           }}
@@ -86,11 +96,27 @@ const ChangeDetail = ({ item, catalogRef, field, change, close }: {
   );
 };
 
-const GearCard = ({ row: { item, changes }, edit }: { readonly row: Row; readonly edit: () => void }) => {
+interface Removal {
+  readonly start: () => void;
+  readonly fail: () => void;
+}
+
+const GearCard = ({ row: { item, changes }, edit, editButton, removal }: {
+  readonly row: Row;
+  readonly edit: () => void;
+  readonly editButton: RefObject<HTMLButtonElement | null>;
+  readonly removal: Removal;
+}) => {
   const client = useClient();
   const changed = useGearChanged();
+  const heading = useRef<HTMLHeadingElement>(null);
   const [opened, setOpened] = useState<string | null>(null);
-  const removing = useMutation({ mutationFn: client.removeGear, onSuccess: changed });
+  const removing = useMutation({
+    mutationFn: client.removeGear,
+    onMutate: removal.start,
+    onError: removal.fail,
+    onSuccess: changed,
+  });
   const { catalogRef } = item;
   const resolvable = catalogRef === null ? [] : changes.map((change) => ({ change, catalogRef }));
   const changeOf = (field: GearField) => resolvable.find(({ change }) => change.field === field.name);
@@ -102,12 +128,12 @@ const GearCard = ({ row: { item, changes }, edit }: { readonly row: Row; readonl
   return (
     <Panel>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h3 className="type-control">
+        <h3 ref={heading} tabIndex={-1} className="type-control">
           {item.name}{" "}
           {item.quantity > 1 && <span className="text-ink-muted type-readout">{`×${String(item.quantity)}`}</span>}
         </h3>
         <div className="flex gap-2">
-          <Button size={ButtonSize.Small} aria-label={`Edit ${item.name}`} onClick={edit}>Edit</Button>
+          <Button ref={editButton} size={ButtonSize.Small} aria-label={`Edit ${item.name}`} onClick={edit}>Edit</Button>
           <Confirm
             action="Remove"
             actionLabel={`Remove ${item.name}`}
@@ -153,8 +179,9 @@ const GearCard = ({ row: { item, changes }, edit }: { readonly row: Row; readonl
               catalogRef={open.change.catalogRef}
               field={open.field}
               change={open.change.change}
-              close={() => {
+              resolved={() => {
                 setOpened(null);
+                heading.current?.focus();
               }}
             />
           )}
@@ -165,29 +192,45 @@ const GearCard = ({ row: { item, changes }, edit }: { readonly row: Row; readonl
   );
 };
 
-const GearEntry = ({ row }: { readonly row: Row }) => {
+const GearEntry = ({ row, nameOf, removal }: {
+  readonly row: Row;
+  readonly nameOf: NameOf;
+  readonly removal: Removal;
+}) => {
   const client = useClient();
   const changed = useGearChanged();
+  const editButton = useRef<HTMLButtonElement>(null);
   const [editing, setEditing] = useState(false);
+  const [returning, setReturning] = useState(false);
+  useEffect(() => {
+    if (returning) {
+      editButton.current?.focus();
+      setReturning(false);
+    }
+  }, [returning]);
+  const stopEditing = () => {
+    setEditing(false);
+    setReturning(true);
+  };
   return (
-    <li>
+    <li tabIndex={-1}>
       {editing
         ? (
             <GearForm
-              prefill={fromItem(row.item)}
+              prefill={fromItem(row.item, nameOf)}
               send={async (draft) => client.updateGear({ gearId: row.item.id }, draft)}
               onSaved={async () => {
-                setEditing(false);
+                stopEditing();
                 await changed();
               }}
-              onCancel={() => {
-                setEditing(false);
-              }}
+              onCancel={stopEditing}
             />
           )
         : (
             <GearCard
               row={row}
+              editButton={editButton}
+              removal={removal}
               edit={() => {
                 setEditing(true);
               }}
@@ -197,13 +240,21 @@ const GearEntry = ({ row }: { readonly row: Row }) => {
   );
 };
 
-const KindSection = ({ kind, rows }: { readonly kind: GearKind; readonly rows: readonly Row[] }) => {
+const KindSection = ({ kind, rows, list, nameOf, removal }: {
+  readonly kind: GearKind;
+  readonly rows: readonly Row[];
+  readonly list: RefObject<HTMLUListElement | null> | undefined;
+  readonly nameOf: NameOf;
+  readonly removal: (id: string, index: number) => Removal;
+}) => {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId}>
       <h2 id={headingId} className="type-heading">{KIND_HEADING[kind]}</h2>
-      <ul className="mt-3 grid gap-3">
-        {rows.map((row) => <GearEntry key={row.item.id} row={row} />)}
+      <ul ref={list} className="mt-3 grid gap-3">
+        {rows.map((row, index) => (
+          <GearEntry key={row.item.id} row={row} nameOf={nameOf} removal={removal(row.item.id, index)} />
+        ))}
       </ul>
     </section>
   );
@@ -211,23 +262,52 @@ const KindSection = ({ kind, rows }: { readonly kind: GearKind; readonly rows: r
 
 /**
  * The my gear screen: adding gear, then everything the user owns grouped by kind, each item with its spec tags, a
- * warning on a value its catalog now gives differently, and Edit and Remove.
+ * warning on a value its catalog now gives differently, and Edit and Remove. Focus follows each change: into an
+ * opened form, back to Edit when it closes, to the card once a change is resolved, and to the next item after a
+ * removal.
  *
  * @returns The screen.
  */
 export const Gear = () => {
   const client = useClient();
+  const { state, nameOf } = useCatalogs();
   const rows = useQuery({ queryKey: QueryKey.Gear, queryFn: async () => client.listGear(), throwOnError: true }).data;
+  const [removingKind, setRemovingKind] = useState<GearKind | null>(null);
+  const { list, heading, track } = useFocusAfterRemoval(
+    (gearId) => rows?.some(({ item }) => item.id === gearId) === true,
+  );
+  const removal = (kind: GearKind) => (id: string, index: number): Removal => ({
+    start: () => {
+      setRemovingKind(kind);
+      track({ id, index });
+    },
+    fail: () => {
+      track(null);
+    },
+  });
   return (
     <section>
-      <h1 className="type-title">My gear</h1>
+      <h1 ref={heading} tabIndex={-1} className="type-title">My gear</h1>
       <AddGear />
       <div className="mt-8 grid gap-8">
         {rows === undefined && <p className="text-ink-muted type-body">Loading…</p>}
-        {rows?.length === 0 && <EmptyState tag={EmptyTag.NoSignal}>{EMPTY}</EmptyState>}
+        {rows?.length === 0 && (
+          <EmptyState tag={EmptyTag.NoSignal}>{state === CatalogState.Ready ? EMPTY.search : EMPTY.paste}</EmptyState>
+        )}
         {Object.values(GearKind).map((kind) => {
           const owned = rows?.filter(({ item }) => item.kind === kind) ?? [];
-          return owned.length === 0 ? null : <KindSection key={kind} kind={kind} rows={owned} />;
+          return owned.length === 0
+            ? null
+            : (
+                <KindSection
+                  key={kind}
+                  kind={kind}
+                  rows={owned}
+                  list={kind === removingKind ? list : undefined}
+                  nameOf={nameOf}
+                  removal={removal(kind)}
+                />
+              );
         })}
       </div>
     </section>

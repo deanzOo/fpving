@@ -67,20 +67,26 @@ export const deansGear = (): GearItem[] => [
   owned("g-tweezers", GearKind.Tool, "Tweezers", { toolType: "tweezers" }),
 ];
 
-const catalogPlugin = (): z.output<typeof wire.plugins>[number] => ({
-  source: "./plugins/betafpv",
-  manifest: { kind: "catalog", id: CATALOG, displayName: "BetaFPV", version: "1.0.0", sdkVersion: ">=0.0.0 <1.0.0" },
+type PluginRow = z.output<typeof wire.plugins>[number];
+
+/** A catalog plugin's row on the plugins screen, loaded unless `overrides` say otherwise. */
+export const catalogRow = (id: string, displayName: string, overrides: Partial<PluginRow> = {}): PluginRow => ({
+  source: `./plugins/${id}`,
+  manifest: { kind: "catalog", id, displayName, version: "1.0.0", sdkVersion: ">=0.0.0 <1.0.0" },
   status: wire.plugins.element.shape.status.enum.Loaded,
   issues: [],
   backoffUntil: null,
   staleListings: 0,
   unscannedListings: 0,
+  ...overrides,
 });
+
+const CATALOGS = (): PluginRow[] => [catalogRow(CATALOG, "BetaFPV"), catalogRow(OTHER_CATALOG, "FPV Wiki")];
 
 /** The API with `items` owned, each with its `changes`, and the plugins `plugins` loaded. */
 export const gearApi = (
   items: readonly GearItem[],
-  plugins = [catalogPlugin()],
+  plugins = CATALOGS(),
   changes: Readonly<Record<string, Changes>> = {},
 ): ReturnType<typeof fakeApi> => {
   const api = fakeApi();

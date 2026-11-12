@@ -1,12 +1,12 @@
 import { apiRoutes } from "@fpving/app/api-routes";
 import { ApiErrorKind } from "@fpving/app/errors";
 import { HttpStatus } from "@fpving/app/http-status";
-import { SpecSource } from "@fpving/core";
+import { pluginIdSchema, SpecSource } from "@fpving/core";
 import { GearKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import { failWith, reply, wire } from "./support/fake-api.ts";
-import { air75, CATALOG, gearApi, OTHER_CATALOG } from "./support/gear.ts";
+import { failWith, gate, heldBy, reply, wire } from "./support/fake-api.ts";
+import { air75, CATALOG, catalogRow, gearApi, OTHER_CATALOG } from "./support/gear.ts";
 import { renderApp } from "./support/render-app.tsx";
 import "../src/styles.css";
 
@@ -17,6 +17,7 @@ const AIR75 = "BetaFPV Air75 II Freestyle";
 const GOGGLES = "Box goggles";
 const CHANNELS = 40;
 const TWO = 2;
+const HOUR_MS = 3_600_000;
 const AI_READ = "Read by AI, check it";
 const PASTED = "Analog 5.8G FPV goggles, 40 channels, DVR";
 const REF = { pluginId: CATALOG, key: "air75-ii" };
@@ -44,9 +45,9 @@ const disagreeing = () => air75Match(
   [REF, { pluginId: OTHER_CATALOG, key: "air75" }],
 );
 
-const searching = (query: string, matches: readonly Match[]) => {
+const searching = (query: string, matches: readonly Match[], failedPlugins: Found["pluginId"][] = []) => {
   const api = gearApi([]);
-  api.on(apiRoutes.searchCatalog, reply(wire.catalog, { matches: [...matches], failedPlugins: [], catalogs: 2 }),
+  api.on(apiRoutes.searchCatalog, reply(wire.catalog, { matches: [...matches], failedPlugins, catalogs: 2 }),
     `?q=${query}`);
   api.on(apiRoutes.addGear, reply(wire.gearItem, air75(), HttpStatus.Created));
   return api;
@@ -63,6 +64,7 @@ const pick = async (api: ReturnType<typeof searching>) => {
   const screen = await search(api, "air75");
   await screen.getByRole("button", { name: `Use ${AIR75}` }).click();
   await expect.element(screen.getByLabelText("Name")).toHaveValue(AIR75);
+  await expect.element(screen.getByLabelText("Name")).toHaveFocus();
   return screen;
 };
 
@@ -79,8 +81,8 @@ const reading = (answer: Parameters<ReturnType<typeof searching>["on"]>[1]) => {
   return api;
 };
 
-const read = async (api: ReturnType<typeof reading>) => {
-  const screen = await search(api, "goggles");
+const read = async (api: ReturnType<typeof reading>, opened?: Awaited<ReturnType<typeof search>>) => {
+  const screen = opened ?? await search(api, "goggles");
   await expect.element(screen.getByText("No match in the catalog.")).toBeVisible();
   await screen.getByLabelText("Kind").selectOptions("Goggles");
   await screen.getByLabelText("Specs text").fill(PASTED);
@@ -119,11 +121,15 @@ describe("Adding gear", () => {
     const result = screen.getByRole("listitem").filter({ hasText: AIR75 });
     await expect.element(result.getByText("Analog 5.8GHz", { exact: true })).toBeVisible();
     await expect.element(result.getByText("DJI O3", { exact: true })).toBeVisible();
+    await expect.element(result.getByText("BetaFPV", { exact: true })).toBeVisible();
+    await expect.element(result.getByText("FPV Wiki", { exact: true })).toBeVisible();
     await screen.getByRole("button", { name: `Use ${AIR75}` }).click();
     const video = screen.getByLabelText("Video system");
     await expect.element(video).toHaveValue("");
     await expect.element(video).toHaveAccessibleDescription(/The catalogs disagree/u);
-    await video.selectOptions("DJI O3");
+    expect([...video.element().querySelectorAll("option")].map(({ textContent }) => textContent))
+      .toEqual(["Not sure", "Analog 5.8GHz (BetaFPV)", "DJI O3 (FPV Wiki)"]);
+    await video.selectOptions("DJI O3 (FPV Wiki)");
     const [sent] = await saved(api, screen);
     expect(sent).toMatchObject({
       catalogRef: REF,
@@ -148,7 +154,10 @@ describe("Adding gear", () => {
     const api = reading(reply(wire.read, {
       name: GOGGLES, specs: { kind: GearKind.Goggles, videoSystems: ["analog-5g8"], channels: CHANNELS },
     }));
-    const screen = await read(api);
+    const screen = await search(api, "goggles");
+    expect(screen.getByLabelText("Specs text").element()).toBeInstanceOf(HTMLTextAreaElement);
+    await expect.element(screen.getByLabelText("Name")).not.toBeInTheDocument();
+    await read(api, screen);
     await expect.element(screen.getByLabelText("Name")).toHaveValue(GOGGLES);
     await expect.element(screen.getByLabelText("Name")).toHaveAccessibleDescription(AI_READ);
     await expect.element(screen.getByLabelText("Channels")).toHaveAccessibleDescription(AI_READ);
@@ -174,6 +183,7 @@ describe("Adding gear", () => {
     const screen = await read(api);
     await expect.element(screen.getByText("The AI that reads specs is not available, so type the specs in by hand."))
       .toBeVisible();
+    await expect.element(screen.getByText("Hand entry")).not.toBeInTheDocument();
     await expect.element(screen.getByLabelText("Name")).toHaveValue("");
     await expect.element(screen.getByLabelText("Channels")).toHaveValue("");
     await expect.element(screen.getByLabelText("Channels")).not.toHaveAccessibleDescription(AI_READ);
@@ -237,6 +247,47 @@ describe("Adding gear", () => {
     await expect.element(screen.getByLabelText("Name")).not.toBeInTheDocument();
     await expect.element(screen.getByLabelText("Specs text")).toBeVisible();
     expect(api.sent.filter(({ method }) => method === "POST")).toEqual([]);
+  });
+
+  it("reads the specs as the kind they were sent with, even when Kind changes meanwhile", async () => {
+    const held = gate();
+    const api = reading(heldBy(held, reply(wire.read, { name: GOGGLES, specs: { kind: GearKind.Goggles } })));
+    const screen = await read(api);
+    await expect.element(screen.getByRole("button", { name: "Reading…" })).toBeVisible();
+    await screen.getByLabelText("Kind").selectOptions("Quad");
+    held.release();
+    await expect.element(screen.getByRole("heading", { name: "Goggles", level: 2 })).toBeVisible();
+    await expect.element(screen.getByLabelText("Channels")).toBeVisible();
+    await expect.element(screen.getByLabelText("Size")).not.toBeInTheDocument();
+  });
+
+  it("warns that matches may be missing when a catalog did not answer, naming it", async () => {
+    const api = searching("air75", [disagreeing()], [OTHER_CATALOG, pluginIdSchema.parse("gone")]);
+    const screen = await search(api, "air75");
+    await expect.element(screen.getByText("Partial", { exact: true })).toBeVisible();
+    await expect.element(screen.getByText("FPV Wiki, gone did not answer, so some matches may be missing."))
+      .toBeVisible();
+    await expect.element(screen.getByRole("button", { name: `Use ${AIR75}` })).toBeVisible();
+  });
+
+  it("says the search failed when every catalog failed", async () => {
+    const api = searching("air75", [], [CATALOG, OTHER_CATALOG]);
+    const screen = await search(api, "air75");
+    const alert = screen.getByRole("alert");
+    await expect.element(alert.getByText("Failed", { exact: true })).toBeVisible();
+    await expect.element(alert.getByText("The search failed on BetaFPV, FPV Wiki. Try again in a moment."))
+      .toBeVisible();
+    await expect.element(screen.getByText("No match in the catalog.")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["disabled", { status: wire.plugins.element.shape.status.enum.Disabled }],
+    ["backing off", { backoffUntil: new Date(Date.now() + HOUR_MS) }],
+  ])("says the catalog is unavailable, not missing, when it is %s", async (_state, overrides) => {
+    const screen = await renderApp(gearApi([], [catalogRow(CATALOG, "BetaFPV", overrides)]).client, "/gear");
+    await expect.element(screen.getByText(/^The catalog plugin is not available right now\./u)).toBeVisible();
+    await expect.element(screen.getByText(/No catalog plugin installed/u)).not.toBeInTheDocument();
+    await expect.element(screen.getByLabelText("Search the catalog")).not.toBeInTheDocument();
   });
 
   it("says no catalog is installed when there is none", async () => {

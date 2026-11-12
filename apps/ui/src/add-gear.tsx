@@ -3,12 +3,14 @@ import { ApiErrorKind } from "@fpving/app/errors";
 import { HttpStatus } from "@fpving/app/http-status";
 import { gearItemSchema, SpecSource } from "@fpving/core";
 import type { GearItem } from "@fpving/core";
-import { catalogManifestSchema, GearKind } from "@fpving/plugin-sdk";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { GearKind } from "@fpving/plugin-sdk";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { z } from "zod";
+import { CatalogState, useCatalogs } from "./catalogs.ts";
+import type { NameOf } from "./catalogs.ts";
 import { toFailure, useClient } from "./client.ts";
 import { GEAR_FIELDS, KIND_LABEL, specWords } from "./gear-labels.ts";
 import type { GearField } from "./gear-labels.ts";
@@ -35,6 +37,9 @@ const DISAGREE = "The catalogs disagree. Pick the right value, or keep Not sure.
 const COMMAS = "Separate values with commas.";
 const HAND_ONLY = "The AI that reads specs is not available, so type the specs in by hand.";
 const NO_CATALOG = "No catalog plugin installed. Paste the specs or type them in.";
+const UNAVAILABLE = "The catalog plugin is not available right now. Paste the specs or type them in, or check";
+const FAILED = "Failed";
+const QUIET = { tone: NoticeTone.Status, tag: "", text: "" } as const;
 const COUNT_ERROR = {
   single: "Enter a whole number, at least 1.",
   list: "Enter whole numbers of at least 1, each once.",
@@ -45,6 +50,7 @@ interface Entry {
   readonly raw: string;
   readonly pluginId: string | null;
   readonly ai: boolean;
+  readonly origin: string;
   readonly choices: readonly { readonly raw: string; readonly words: string }[] | null;
 }
 
@@ -58,7 +64,7 @@ export interface Prefill {
   readonly entries: Readonly<Record<string, Entry>>;
 }
 
-const EMPTY: Entry = { raw: "", pluginId: null, ai: false, choices: null };
+const EMPTY: Entry = { raw: "", pluginId: null, ai: false, origin: "", choices: null };
 
 const isScalar = (value: Json): value is string | number => typeof value === "string" || typeof value === "number";
 
@@ -68,8 +74,14 @@ const encode = (value: Json): string => scalars(value).join(SEPARATOR);
 
 const sameKey = (value: Json): string => scalars(value).map(String).sort().join(SEPARATOR);
 
-const distinct = (values: readonly { readonly value: Json }[]): Json[] =>
-  [...new Map(values.map(({ value }) => [sameKey(value), value])).values()];
+const distinct = (values: readonly { readonly value: Json; readonly pluginId: string }[]) => {
+  const byKey = new Map<string, { readonly value: Json; readonly pluginIds: readonly string[] }>();
+  for (const { value, pluginId } of values) {
+    const known = byKey.get(sameKey(value))?.pluginIds ?? [];
+    byKey.set(sameKey(value), { value, pluginIds: [...known, pluginId] });
+  }
+  return [...byKey.values()];
+};
 
 const decode = (field: GearField, raw: string): Json | undefined => {
   const text = raw.trim();
@@ -83,14 +95,19 @@ const decode = (field: GearField, raw: string): Json | undefined => {
 const blank = (kind: GearKind): Prefill =>
   ({ kind, name: "", nameByAi: false, quantity: 1, catalogRef: null, entries: {} });
 
-const fromMatch = (match: Match): Prefill => {
+const fromMatch = (match: Match, nameOf: NameOf): Prefill => {
   const [ref = null] = match.refs;
   const fields = GEAR_FIELDS[match.kind].map((field): [string, Entry] => {
     const values = match.specs[field.name] ?? [];
     const found = distinct(values);
     const pluginId = values.find((value) => value.pluginId === ref?.pluginId)?.pluginId ?? null;
-    const choices = found.map((value) => ({ raw: encode(value), words: specWords(field.name, value).join(" / ") }));
-    const entry = found.length > 1 ? { ...EMPTY, choices } : { ...EMPTY, raw: found.map(encode).join(""), pluginId };
+    const choices = found.map(({ value, pluginIds }) => ({
+      raw: encode(value),
+      words: `${specWords(field.name, value).join(" / ")} (${pluginIds.map(nameOf).join(", ")})`,
+    }));
+    const entry = found.length > 1
+      ? { ...EMPTY, choices }
+      : { ...EMPTY, raw: found.map(({ value }) => encode(value)).join(""), pluginId };
     return [field.name, entry];
   });
   return { ...blank(match.kind), name: match.name, catalogRef: ref, entries: Object.fromEntries(fields) };
@@ -109,23 +126,29 @@ const fromReading = (kind: GearKind, { name, specs }: Reading): Prefill => {
 };
 
 /**
- * What the gear form starts with to edit `item`: its values, each still from the catalog it came from.
+ * What the gear form starts with to edit `item`: its values, each still from the catalog it came from and saying
+ * where it came from.
  *
  * @param item - The item.
+ * @param nameOf - A catalog's display name by its plugin id.
  * @returns The prefill.
  */
-export const fromItem = (item: GearItem): Prefill => ({
+export const fromItem = (item: GearItem, nameOf: NameOf): Prefill => ({
   ...blank(item.kind),
   name: item.name,
   quantity: item.quantity,
   catalogRef: item.catalogRef,
   entries: Object.fromEntries(Object.entries(item.specs).map(([field, spec]) => [
-    field, { ...EMPTY, raw: encode(spec.value), pluginId: spec.source === SpecSource.Catalog ? spec.pluginId : null },
+    field,
+    spec.source === SpecSource.Catalog
+      ? { ...EMPTY, raw: encode(spec.value), pluginId: spec.pluginId, origin: `From ${nameOf(spec.pluginId)}` }
+      : { ...EMPTY, raw: encode(spec.value), origin: "Confirmed by you" },
   ])),
 });
 
 const hintOf = (field: GearField, entry: Entry): string | undefined => {
   const hints = [
+    entry.origin,
     entry.ai ? AI_READ : "",
     entry.choices === null ? "" : DISAGREE,
     field.list && field.words === null ? COMMAS : "",
@@ -270,6 +293,7 @@ export const GearForm = ({ prefill, send, onSaved, onCancel }: {
         <div className="grid gap-4">
           <TextField
             label="Name"
+            autoFocus
             hint={nameByAi ? AI_READ : undefined}
             error={errors.name}
             value={name}
@@ -295,7 +319,7 @@ export const GearForm = ({ prefill, send, onSaved, onCancel }: {
               entry={entry}
               error={error}
               change={(raw) => {
-                setEntries({ ...entries, [field.name]: { ...entry, raw, pluginId: null, ai: false } });
+                setEntries({ ...entries, [field.name]: { ...entry, raw, pluginId: null, ai: false, origin: "" } });
               }}
             />
           ))}
@@ -314,21 +338,36 @@ export const GearForm = ({ prefill, send, onSaved, onCancel }: {
   );
 };
 
-const MatchSpecs = ({ match }: { readonly match: Match }) => (
+const MatchSpecs = ({ match, nameOf }: { readonly match: Match; readonly nameOf: NameOf }) => (
   <ul className="mt-2 flex flex-wrap items-center gap-1">
-    {GEAR_FIELDS[match.kind].flatMap((field) => distinct(match.specs[field.name] ?? []).map((value, index) => (
-      <li key={`${field.name}-${encode(value)}`} className="flex items-center gap-1">
-        {index === 0 ? null : <span className="type-small text-ink-muted">or</span>}
-        {specWords(field.name, value).map((word) => <Badge key={word}>{word}</Badge>)}
-      </li>
-    )))}
+    {GEAR_FIELDS[match.kind].flatMap((field) => {
+      const found = distinct(match.specs[field.name] ?? []);
+      return found.map(({ value, pluginIds }, index) => (
+        <li key={`${field.name}-${encode(value)}`} className="flex items-center gap-1">
+          {index === 0 ? null : <span className="type-small text-ink-muted">or</span>}
+          {specWords(field.name, value).map((word) => <Badge key={word}>{word}</Badge>)}
+          {found.length > 1 && <span className="type-small text-ink-muted">{pluginIds.map(nameOf).join(", ")}</span>}
+        </li>
+      ));
+    })}
   </ul>
 );
 
-const Search = ({ pick }: { readonly pick: (prefill: Prefill) => void }) => {
+const outcomeOf = ({ matches, failedPlugins, catalogs }: Found, nameOf: NameOf) => {
+  if (failedPlugins.length === 0) {
+    return QUIET;
+  }
+  const names = failedPlugins.map(nameOf).join(", ");
+  return matches.length === 0 && failedPlugins.length >= catalogs
+    ? { tone: NoticeTone.Critical, tag: FAILED, text: `The search failed on ${names}. Try again in a moment.` }
+    : { tone: NoticeTone.Warning, tag: "Partial", text: `${names} did not answer, so some matches may be missing.` };
+};
+
+const Search = ({ pick, nameOf }: { readonly pick: (prefill: Prefill) => void; readonly nameOf: NameOf }) => {
   const client = useClient();
   const [query, setQuery] = useState("");
   const search = useMutation({ mutationFn: client.searchCatalog });
+  const { text, ...look } = search.data === undefined ? QUIET : outcomeOf(search.data, nameOf);
   return (
     <Panel title="Find your gear">
       <form
@@ -353,7 +392,12 @@ const Search = ({ pick }: { readonly pick: (prefill: Prefill) => void }) => {
           </Button>
         </div>
       </form>
-      {search.data?.matches.length === 0 && <p className="mt-4 type-body">No match in the catalog.</p>}
+      <div className="has-[p]:mt-4">
+        <Notice {...look}>{text}</Notice>
+      </div>
+      {search.data?.matches.length === 0 && look.tag !== FAILED && (
+        <p className="mt-4 type-body">No match in the catalog.</p>
+      )}
       <ul className="mt-4 grid gap-3">
         {search.data?.matches.map((match) => (
           <li key={`${match.kind}-${match.name}`} className="flex flex-wrap items-start justify-between gap-3">
@@ -361,13 +405,13 @@ const Search = ({ pick }: { readonly pick: (prefill: Prefill) => void }) => {
               <p className="type-body">
                 {match.name} <span className="text-ink-muted">{KIND_LABEL[match.kind]}</span>
               </p>
-              <MatchSpecs match={match} />
+              <MatchSpecs match={match} nameOf={nameOf} />
             </div>
             <Button
               size={ButtonSize.Small}
               aria-label={`Use ${match.name}`}
               onClick={() => {
-                pick(fromMatch(match));
+                pick(fromMatch(match, nameOf));
               }}
             >
               Use this
@@ -383,7 +427,6 @@ const Search = ({ pick }: { readonly pick: (prefill: Prefill) => void }) => {
 };
 
 const kindSchema = z.enum(GearKind);
-const { Loaded } = apiRoutes.listPlugins.schema.response[HttpStatus.Ok].element.shape.status.enum;
 
 const Paste = ({ pick }: { readonly pick: (prefill: Prefill, handOnly?: boolean) => void }) => {
   const client = useClient();
@@ -391,12 +434,12 @@ const Paste = ({ pick }: { readonly pick: (prefill: Prefill, handOnly?: boolean)
   const [text, setText] = useState("");
   const reading = useMutation({
     mutationFn: client.readSpecs,
-    onSuccess: (read) => {
-      pick(fromReading(kind, read));
+    onSuccess: (read, sent) => {
+      pick(fromReading(sent.kind, read));
     },
-    onError: (error) => {
+    onError: (error, sent) => {
       if (toFailure(error).kind === ApiErrorKind.Unavailable) {
-        pick(blank(kind), true);
+        pick(blank(sent.kind), true);
       }
     },
   });
@@ -420,6 +463,7 @@ const Paste = ({ pick }: { readonly pick: (prefill: Prefill, handOnly?: boolean)
         </Select>
         <TextField
           label="Specs text"
+          multiline
           hint="Paste the specs from the store page; the AI reads them and you check them before saving."
           required
           value={text}
@@ -459,29 +503,28 @@ export const AddGear = () => {
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [handOnly, setHandOnly] = useState(false);
   const [said, setSaid] = useState("");
-  const plugins = useQuery({
-    queryKey: QueryKey.Plugins,
-    queryFn: async () => client.listPlugins(),
-    throwOnError: true,
-  }).data;
+  const { state, nameOf } = useCatalogs();
   const pick = (next: Prefill, hand = false) => {
     setPrefill(next);
     setHandOnly(hand);
     setSaid("");
   };
-  const hasCatalog = plugins?.some(({ manifest, status }) =>
-    catalogManifestSchema.safeParse(manifest).success && status === Loaded);
   return (
     <div className="mt-6">
       {prefill === null
         ? (
             <>
-              {hasCatalog === false && (
+              {state === CatalogState.None && (
                 <EmptyState tag={EmptyTag.NoSignal}>
                   {NO_CATALOG} <Link to="/plugins" className={LINK}>Plugins</Link>
                 </EmptyState>
               )}
-              {hasCatalog === true && <Search pick={pick} />}
+              {state === CatalogState.Unavailable && (
+                <EmptyState tag={EmptyTag.NoSignal}>
+                  {UNAVAILABLE} <Link to="/plugins" className={LINK}>Plugins</Link>.
+                </EmptyState>
+              )}
+              {state === CatalogState.Ready && <Search pick={pick} nameOf={nameOf} />}
               <div className="mt-4">
                 <Paste pick={pick} />
               </div>
@@ -490,7 +533,7 @@ export const AddGear = () => {
         : (
             <>
               <div className="has-[p]:mb-4">
-                <Notice tone={NoticeTone.Status} tag="Hand entry">{handOnly ? HAND_ONLY : ""}</Notice>
+                <Notice tone={NoticeTone.Status} tag="">{handOnly ? HAND_ONLY : ""}</Notice>
               </div>
               <GearForm
                 prefill={prefill}
