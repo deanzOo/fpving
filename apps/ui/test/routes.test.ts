@@ -13,6 +13,10 @@ describe("Typed routes", () => {
     expectTypeOf(params).returns.toEqualTypeOf<{ id: string }>();
   });
 
+  it("registers the my gear screen at /gear", () => {
+    expectTypeOf<RegisteredRouter["routesByPath"]>().toHaveProperty("/gear");
+  });
+
   it("types a link's params from its target route", () => {
     expectTypeOf<LinkComponentProps<"a", RegisteredRouter, string, "/products/$id">["params"]>().not.toBeAny();
   });

@@ -92,6 +92,10 @@ export const wire = {
   marked: apiRoutes.markAllAlertsRead.schema.response[HttpStatus.Ok],
   settings: apiRoutes.getSettings.schema.response[HttpStatus.Ok],
   plugins: apiRoutes.listPlugins.schema.response[HttpStatus.Ok],
+  gear: apiRoutes.listGear.schema.response[HttpStatus.Ok],
+  gearItem: apiRoutes.updateGear.schema.response[HttpStatus.Ok],
+  catalog: apiRoutes.searchCatalog.schema.response[HttpStatus.Ok],
+  read: apiRoutes.readSpecs.schema.response[HttpStatus.Ok],
 } as const;
 
 /** A gate an answer can wait on, so a test sees the pending state and then opens it. */
