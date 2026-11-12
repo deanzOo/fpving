@@ -4,10 +4,11 @@ import { HttpStatus } from "@fpving/app/http-status";
 import { SpecSource } from "@fpving/core";
 import { GearKind } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import { at, failWith, gate, heldBy, noContent, reply, wire } from "./support/fake-api.ts";
 import { air75, CATALOG, deansGear, gearApi, lava, owned, sentWith } from "./support/gear.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { expectBadge } from "./support/style.ts";
+import { expectBadge, styleOf } from "./support/style.ts";
 import "../src/styles.css";
 
 const KINDS = ["Radios", "Goggles", "Quads", "Batteries", "Chargers", "Tools"];
@@ -88,6 +89,16 @@ describe("My gear", () => {
     await changed.click();
     await expect.element(changed).toHaveAttribute("aria-expanded", "false");
     await expect.element(screen.getByRole("button", { name: "Keep mine" })).not.toBeInTheDocument();
+  });
+
+  it("draws no outline on the card heading a keyboard resolution moves focus to", async () => {
+    const screen = await openChange(changedApi());
+    screen.getByRole("button", { name: "Keep mine" }).element().focus();
+    await userEvent.keyboard("{Enter}");
+    const heading = screen.getByRole("heading", { name: "BetaFPV Air75 II Freestyle", level: 3 });
+    await expect.element(heading).toHaveFocus();
+    expect(heading.element().matches(":focus-visible")).toBe(true);
+    expect(styleOf(heading).outlineStyle).toBe("none");
   });
 
   it("keeps the user's value when Keep mine is chosen", async () => {
