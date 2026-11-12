@@ -117,15 +117,32 @@ describe("My gear", () => {
   it.each([
     ["Keep mine", "Keeping…", "Use catalog"],
     ["Use catalog", "Updating…", "Keep mine"],
-  ])("marks only %s as pending while it saves", async (action, pendingLabel, other) => {
+  ])("labels only %s as pending and holds both choices while it saves", async (action, pendingLabel, other) => {
     const held = gate();
     const api = changedApi();
     api.on(at(apiRoutes.updateGear, { gearId: "g-quad" }), heldBy(held, reply(wire.gearItem, air75())));
     const screen = await openChange(api);
     await screen.getByRole("button", { name: action }).click();
     await expect.element(screen.getByRole("button", { name: pendingLabel })).toHaveAttribute("aria-disabled", "true");
-    await expect.element(screen.getByRole("button", { name: other })).toHaveAttribute("aria-disabled", "false");
+    const otherButton = screen.getByRole("button", { name: other });
+    await expect.element(otherButton).toHaveAttribute("aria-disabled", "true");
+    await otherButton.click({ force: true });
+    expect(sentWith(api, "PATCH")).toHaveLength(1);
     held.release();
+  });
+
+  it("removes a field the catalog no longer gives when Use catalog is chosen", async () => {
+    const dropped = { "g-quad": [{ field: "videoSystem", saved: "analog-5g8", catalog: null }] };
+    const api = gearApi(deansGear(), undefined, dropped);
+    api.on(at(apiRoutes.updateGear, { gearId: "g-quad" }), reply(wire.gearItem, air75()));
+    const screen = await openChange(api);
+    await expect.element(screen.getByText("You saved Analog 5.8GHz. The catalog no longer gives a value."))
+      .toBeVisible();
+    await screen.getByRole("button", { name: "Use catalog" }).click();
+    await expect.poll(() => sentWith(api, "PATCH")).toHaveLength(1);
+    const { kind, name, quantity, catalogRef, specs: { videoSystem, ...specs } } = air75();
+    expect(videoSystem).toBeDefined();
+    expect(sentWith(api, "PATCH")).toEqual([{ kind, name, quantity, catalogRef, specs }]);
   });
 
   it("takes the catalog's value when Use catalog is chosen", async () => {

@@ -36,13 +36,16 @@ const useGearChanged = () => {
   return async () => queryClient.invalidateQueries({ queryKey: QueryKey.Gear });
 };
 
-const withSpec = (item: GearItem, field: string, spec: SpecValue) => ({
-  kind: item.kind,
-  name: item.name,
-  quantity: item.quantity,
-  catalogRef: item.catalogRef,
-  specs: { ...item.specs, [field]: spec },
-});
+const withSpec = (item: GearItem, field: string, spec: SpecValue | null) => {
+  const others = Object.fromEntries(Object.entries(item.specs).filter(([name]) => name !== field));
+  return {
+    kind: item.kind,
+    name: item.name,
+    quantity: item.quantity,
+    catalogRef: item.catalogRef,
+    specs: spec === null ? others : { ...others, [field]: spec },
+  };
+};
 
 const ChangeDetail = ({ item, catalogRef, field, change, resolved }: {
   readonly item: GearItem;
@@ -54,24 +57,26 @@ const ChangeDetail = ({ item, catalogRef, field, change, resolved }: {
   const client = useClient();
   const changed = useGearChanged();
   const resolving = useMutation({
-    mutationFn: async (spec: SpecValue) => client.updateGear({ gearId: item.id }, withSpec(item, field.name, spec)),
+    mutationFn: async (spec: SpecValue | null) =>
+      client.updateGear({ gearId: item.id }, withSpec(item, field.name, spec)),
     onSuccess: async () => {
       resolved();
       await changed();
     },
   });
-  const sending = resolving.isPending ? resolving.variables.source : null;
+  const keeping = resolving.isPending && resolving.variables?.source === SpecSource.User;
   const words = (value: Change["saved"]) => specWords(field.name, value).join(" / ");
+  const now = change.catalog === null ? "no longer gives a value" : `now says ${words(change.catalog)}`;
   return (
     <div className="mt-3 border-t border-line pt-3">
       <p className="type-body">
-        {`You saved ${words(change.saved)}. The catalog now says ${words(change.catalog)}.`}
+        {`You saved ${words(change.saved)}. The catalog ${now}.`}
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <Button
           size={ButtonSize.Small}
-          pending={sending === SpecSource.User}
-          pendingLabel="Keeping…"
+          pending={resolving.isPending}
+          pendingLabel={keeping ? "Keeping…" : undefined}
           onClick={() => {
             resolving.mutate({ source: SpecSource.User, value: change.saved });
           }}
@@ -80,10 +85,14 @@ const ChangeDetail = ({ item, catalogRef, field, change, resolved }: {
         </Button>
         <Button
           size={ButtonSize.Small}
-          pending={sending === SpecSource.Catalog}
-          pendingLabel="Updating…"
+          pending={resolving.isPending}
+          pendingLabel={keeping ? undefined : "Updating…"}
           onClick={() => {
-            resolving.mutate({ source: SpecSource.Catalog, pluginId: catalogRef.pluginId, value: change.catalog });
+            resolving.mutate(
+              change.catalog === null
+                ? null
+                : { source: SpecSource.Catalog, pluginId: catalogRef.pluginId, value: change.catalog },
+            );
           }}
         >
           Use catalog
