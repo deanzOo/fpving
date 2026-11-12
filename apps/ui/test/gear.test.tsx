@@ -8,7 +8,7 @@ import { userEvent } from "vitest/browser";
 import { at, failWith, gate, heldBy, noContent, reply, wire } from "./support/fake-api.ts";
 import { air75, CATALOG, deansGear, gearApi, lava, owned, sentWith } from "./support/gear.ts";
 import { renderApp } from "./support/render-app.tsx";
-import { expectBadge, styleOf } from "./support/style.ts";
+import { expectBadge, expectFocusedWithoutOutline } from "./support/style.ts";
 import "../src/styles.css";
 
 const KINDS = ["Radios", "Goggles", "Quads", "Batteries", "Chargers", "Tools"];
@@ -96,9 +96,7 @@ describe("My gear", () => {
     screen.getByRole("button", { name: "Keep mine" }).element().focus();
     await userEvent.keyboard("{Enter}");
     const heading = screen.getByRole("heading", { name: "BetaFPV Air75 II Freestyle", level: 3 });
-    await expect.element(heading).toHaveFocus();
-    expect(heading.element().matches(":focus-visible")).toBe(true);
-    expect(styleOf(heading).outlineStyle).toBe("none");
+    await expectFocusedWithoutOutline(heading);
   });
 
   it("keeps the user's value when Keep mine is chosen", async () => {

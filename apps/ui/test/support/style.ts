@@ -11,6 +11,13 @@ export const hasBrackets = (locator: Locator): boolean =>
 export const styleOf = (locator: Locator, pseudo?: string): CSSStyleDeclaration =>
   getComputedStyle(locator.element(), pseudo);
 
+/** That keyboard focus is on `locator`'s element and that it draws no outline there. */
+export const expectFocusedWithoutOutline = async (locator: Locator): Promise<void> => {
+  await expect.element(locator).toHaveFocus();
+  expect(locator.element().matches(":focus-visible")).toBe(true);
+  expect(styleOf(locator).outlineStyle).toBe("none");
+};
+
 /** The value of a design token, such as `--color-ink-muted`, as the document resolves it now. */
 export const token = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
