@@ -70,7 +70,7 @@ export const createAsk = (createMessage: CreateMessage, logger: Logger): Ask => 
   const limit = limitConcurrency(MAX_IN_FLIGHT);
 
   const failed = (method: string, kind: LlmErrorKind, detail: string): Result<never, LlmError> => {
-    logger.warn("LLM judge call failed", { method, kind, detail });
+    logger.warn("Anthropic call failed", { method, kind, detail });
     return err({ kind, detail });
   };
 
