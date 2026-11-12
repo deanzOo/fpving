@@ -9,4 +9,5 @@ export const QueryKey = {
   Candidates: ["candidates"],
   Settings: ["settings"],
   Plugins: ["plugins"],
+  Gear: ["gear"],
 } as const;
