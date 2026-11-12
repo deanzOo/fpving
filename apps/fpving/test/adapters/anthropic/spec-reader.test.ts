@@ -3,7 +3,7 @@ import { LlmErrorKind } from "@fpving/core";
 import { GearKind, RadioFirmware, RcLink } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { MATCHER_MODEL, NO_API_KEY } from "../../../src/adapters/anthropic/llm-judge.ts";
+import { anthropicMessages, MATCHER_MODEL, NO_API_KEY } from "../../../src/adapters/anthropic/llm-judge.ts";
 import type { CreateMessage } from "../../../src/adapters/anthropic/llm-judge.ts";
 import { createSpecReader, keylessSpecReader } from "../../../src/adapters/anthropic/spec-reader.ts";
 import { recordingLogger, textReply } from "./helpers.ts";
@@ -64,11 +64,34 @@ describe("Spec reader", () => {
   });
 
   it("answers malformed output when the reply is not JSON, without leaking the key", async () => {
-    const { reader, logged } = readerReplying("not json");
-    const result = await reader.read(GearKind.Radio, PASTE);
+    const sentHeaders: string[] = [];
+    const message = {
+      id: "msg_1",
+      type: "message",
+      role: "assistant",
+      model: MATCHER_MODEL,
+      content: [{ type: "text", text: "not json" }],
+      stop_reason: "end_turn",
+      stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    };
+    const createMessage = anthropicMessages({
+      apiKey: FAKE_KEY,
+      maxRetries: 0,
+      fetch: (_url, init) => {
+        sentHeaders.push(JSON.stringify([...new Headers(init?.headers)]));
+        const headers = { "content-type": "application/json" };
+        return Promise.resolve(new Response(JSON.stringify(message), { headers }));
+      },
+    });
+    const { logger, logged } = recordingLogger();
+    const result = await createSpecReader({ createMessage, logger }).read(GearKind.Radio, PASTE);
     expect(result).toMatchObject({ ok: false, error: { kind: LlmErrorKind.MalformedOutput } });
+    expect(sentHeaders.join()).toContain(FAKE_KEY);
     expect(logged).toHaveLength(1);
-    expect(JSON.stringify([result, logged])).not.toContain(FAKE_KEY);
+    for (const record of [result, ...logged]) {
+      expect(JSON.stringify(record)).not.toContain(FAKE_KEY);
+    }
   });
 
   it("asks for the name and every spec field of the kind, each nullable", async () => {
