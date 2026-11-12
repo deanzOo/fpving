@@ -43,6 +43,7 @@ export type {
 } from "./products/add.js";
 export { AddErrorKind } from "./products/errors.js";
 export { productDetail, TREND_DAYS, watchlist } from "./products/read.js";
+export { textSchema } from "./text.js";
 export { removeListing } from "./products/remove.js";
 export type { CheapestPrice, ListingHistory, PricedSnapshot, ProductDetail, WatchlistEntry } from "./products/read.js";
 export { normalizeListingUrl } from "./products/normalize-url.js";

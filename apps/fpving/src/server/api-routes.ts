@@ -13,6 +13,7 @@ import {
   productSchema,
   scanRunSchema,
   settingsSchema,
+  textSchema,
   TREND_DAYS,
 } from "@fpving/core";
 import {
@@ -309,7 +310,7 @@ export const apiRoutes = {
       + "A field two catalogs give differently keeps both values. `failedPlugins` lists the catalogs that could not "
       + "answer, `catalogs` how many are loaded.",
     schema: {
-      querystring: z.object({ q: z.string().min(1) }),
+      querystring: z.object({ q: textSchema }),
       response: {
         [Ok]: z.object({
           matches: z.array(catalogMatchSchema),
@@ -327,7 +328,7 @@ export const apiRoutes = {
       + "`unavailable` without an API key or when the AI cannot be reached, 502 `malformed_output` when its answer "
       + "fails validation.",
     schema: {
-      body: z.object({ kind: z.enum(GearKind), text: z.string().min(1) }),
+      body: z.object({ kind: z.enum(GearKind), text: textSchema }),
       response: {
         [Ok]: z.object({ name: z.string().nullable(), specs: gearSpecsSchema }),
         [BadGateway]: apiErrorSchema,

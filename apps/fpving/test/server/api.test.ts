@@ -827,6 +827,11 @@ describe("Gear API", () => {
     expect(response.statusCode).toBe(HttpStatus.BadRequest);
   });
 
+  it("refuses a catalog search for whitespace only", async () => {
+    const response = await api.request("GET", `${apiRoutes.searchCatalog.url}?q=%20%20`);
+    expect(response.statusCode).toBe(HttpStatus.BadRequest);
+  });
+
   it("reads specs from pasted text, answering the name and the specs", async () => {
     const reading = { name: "Pocket", specs: { kind: GearKind.Radio, rcLink: "elrs-2g4" } } as const;
     api.reading.answer = ok(reading);
@@ -854,6 +859,11 @@ describe("Gear API", () => {
 
   it("refuses to read an empty text", async () => {
     const response = await api.request("POST", apiRoutes.readSpecs.url, { kind: GearKind.Radio, text: "" });
+    expect(response.statusCode).toBe(HttpStatus.BadRequest);
+  });
+
+  it("refuses to read a text of whitespace only", async () => {
+    const response = await api.request("POST", apiRoutes.readSpecs.url, { kind: GearKind.Radio, text: " \n\t" });
     expect(response.statusCode).toBe(HttpStatus.BadRequest);
   });
 });
