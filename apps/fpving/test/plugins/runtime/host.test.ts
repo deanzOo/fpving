@@ -146,6 +146,18 @@ describe("Plugin host loading", () => {
     expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
   });
 
+  it("disables and stops plugins left with no domain of their own", async () => {
+    const rival = { ...OTHER_MANIFEST, domains: MANIFEST.domains };
+    const { host, workers } = await start({ ...both, [OTHER_ENTRY.package]: [readyWith(rival)] });
+    const conflict = (other: string) => ({
+      kind: PluginStatusKind.Disabled,
+      reason: { kind: PluginIssueKind.DomainConflict, detail: `shop.example.com is also declared by ${other}` },
+    });
+    expect(host.plugins().map(({ status }) => status)).toEqual([conflict(OTHER), conflict(SHOP)]);
+    expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
+    expect(host.registry.declaredDomains()).toEqual([]);
+  });
+
   it("starts with no plugins when the list is empty", async () => {
     const { services } = fakeServices();
     const host = await startPluginHost({ entries: [], services, shipTo: "IL", currencyPreference: "USD" });
