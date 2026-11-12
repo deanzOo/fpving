@@ -54,4 +54,11 @@ describe("Catalog entry", () => {
     const entry = { key: "x", name: "X", specs: { kind: "radio", rcLink: "bluetooth" } };
     expect(catalogEntrySchema.safeParse(entry).success).toBe(false);
   });
+
+  it.each([
+    ["an empty key", { key: "", name: "X" }],
+    ["an empty name", { key: "x", name: "" }],
+  ])("rejects an entry with %s", (_, fields) => {
+    expect(catalogEntrySchema.safeParse({ ...fields, specs: { kind: "radio" } }).success).toBe(false);
+  });
 });
