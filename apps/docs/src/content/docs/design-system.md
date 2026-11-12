@@ -25,7 +25,7 @@ The primitives live in `apps/ui/src/ui/`. If one nearly fits, extend it instead 
 | --- | --- |
 | `Button` | One action, labelled with its verb. Primary, secondary or ghost, regular or small, with `pending` and `pendingLabel`. |
 | `Confirm` | A button that asks first in a modal dialog, for a destructive step. The only place the danger fill appears. |
-| `TextField` | A labelled single-line input with a hint or an error. `numeric` types in the readout face. |
+| `TextField` | A labelled input with a hint or an error. `numeric` types in the readout face; `multiline` makes it a text box of several lines, for pasted text. |
 | `Select` | A closed set of values, with the same label, hint and error wiring as `TextField`. |
 | `Checkbox` | A toggle with its label to the right. |
 | `Badge` | A short uppercase status: a word, a glyph where it has one, and a tone. |

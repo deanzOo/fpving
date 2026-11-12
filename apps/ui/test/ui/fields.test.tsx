@@ -56,6 +56,19 @@ describe("Text field", () => {
     expect(change).toHaveBeenCalled();
   });
 
+  it("takes several lines of pasted text when multiline, labelled and described like the single line", async () => {
+    const change = vi.fn();
+    const screen = await render(<TextField label="Specs text" hint={HINT} multiline onChange={change} />);
+    const area = screen.getByRole("textbox", { name: "Specs text" });
+    await expect.element(area).toHaveAccessibleDescription(HINT);
+    await expect.element(area).toHaveAttribute("aria-multiline", "true");
+    await userEvent.type(area, "4S{Enter}XT60");
+    expect(area.element()).toBeInstanceOf(HTMLTextAreaElement);
+    await expect.element(area).toHaveValue("4S\nXT60");
+    expect(change).toHaveBeenCalled();
+    expect(Number.parseFloat(styleOf(area).height)).toBeGreaterThan(Number.parseFloat(token("--control-height")));
+  });
+
   it("frames the focused control in reticle brackets", async () => {
     const screen = await render(<TextField label="Store URL" />);
     await userEvent.tab();
