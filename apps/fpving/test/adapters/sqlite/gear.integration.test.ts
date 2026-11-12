@@ -41,10 +41,13 @@ const pack: GearItem = gearItemSchema.parse({
 const insertRaw = (path: string, values: Record<string, string | number | null>): void => {
   const client = new Database(path);
   const columns = Object.keys(values);
-  client.prepare(`insert into gear_items (${columns.join(", ")}) values (${columns.map(() => "?").join(", ")})`).run(
-    ...Object.values(values),
-  );
-  client.close();
+  try {
+    client.prepare(`insert into gear_items (${columns.join(", ")}) values (${columns.map(() => "?").join(", ")})`).run(
+      ...Object.values(values),
+    );
+  } finally {
+    client.close();
+  }
 };
 
 const row = {
