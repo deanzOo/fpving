@@ -245,6 +245,48 @@ Each check creates a fresh store over a fake context whose `http` and `browser` 
 
 A store that throws fails the check with the thrown error. To run the same checks without Vitest, import `checkStorePluginContract` from `@fpving/plugin-sdk/contract/check`: it resolves to the list of failed checks, and nothing it imports loads Vitest.
 
+## Catalog plugins
+
+A catalog plugin bundles known gear for the **My gear** screen. It is a separate kind of plugin: its manifest has `kind: "catalog"` and no `domains` or `capabilities`, and it is listed in `plugins.json` like a store plugin. The manifest is validated by `catalogManifestSchema`, and a catalog is built by `createCatalog(ctx)`; see [ADR 0039](../adr/0039-catalog-plugins/).
+
+```ts
+import { PluginKind } from "@fpving/plugin-sdk";
+import type { CatalogEntry, CatalogPlugin } from "@fpving/plugin-sdk";
+
+const entries: CatalogEntry[] = [
+  {
+    key: "radiomaster-boxer",
+    name: "RadioMaster Boxer",
+    specs: { kind: "radio", rcLink: "elrs-2g4", firmware: "edgetx" },
+  },
+];
+
+const plugin: CatalogPlugin = {
+  manifest: {
+    kind: PluginKind.Catalog,
+    id: "example-catalog",
+    displayName: "Example Catalog",
+    version: "1.0.0",
+    sdkVersion: ">=0.0.0 <1.0.0",
+  },
+  createCatalog: () => ({
+    search: async (text) => ({
+      ok: true,
+      value: entries.filter(({ name }) => name.toLowerCase().includes(text.toLowerCase())),
+    }),
+    get: async (key) => ({ ok: true, value: entries.find((entry) => entry.key === key) ?? null }),
+  }),
+};
+
+export default plugin;
+```
+
+- `search(text)` resolves to the entries whose name matches, and `get(key)` to the entry with that stable `key`, or `null`.
+- Both resolve to a `Result` and never reject. A catalog that cannot answer resolves to `err({ kind: CatalogErrorKind.Failed, detail })`.
+- An entry is `{ key, name, specs }`. `specs` follows `gearSpecsSchema`, whose `kind` is `radio`, `goggles`, `quad`, `battery`, `charger` or `tool`. Every other field is optional, and a field you leave out is unknown, never a default.
+- The context holds only `logger` and `clock`. A catalog gets no `http`, no `browser` and no domains, so it cannot reach the network: bundle the data inside the plugin.
+- The host copies a spec when the user saves an item, so a catalog can change an entry later. The item then shows a Changed warning and the user decides; see [Getting started](../getting-started/#what-exists-today).
+
 ## Distribution
 
 This repository ships no store plugins. Keep yours in your own repository or a local folder and list it in `plugins.json`.
