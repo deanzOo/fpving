@@ -61,7 +61,8 @@ const serve = (services: HostServices, call: CapabilityCall): Promise<Capability
 
 /**
  * Spawns a worker for one plugin entry and talks to it: validates every message it sends, serves its http and browser
- * calls with the real services, writes its logs with `pluginId` added, and enforces the load and call deadlines.
+ * calls with the real services, refuses them from a catalog, writes its logs with `pluginId` added, and enforces the
+ * load and call deadlines.
  *
  * @param options - The spawner, the worker data, the services, the deadlines and the failure callback.
  * @returns The connection.
@@ -73,6 +74,7 @@ export const connect = (options: ConnectionOptions): Connection => {
   let pluginId = "path" in options.data.entry ? options.data.entry.path : options.data.entry.package;
   let stopReason: string | null = null;
   let isLoaded = false;
+  let isCatalog = false;
   const load = Promise.withResolvers<Result<LoadedManifest, PluginIssue>>();
   const reportLoad = (outcome: Result<LoadedManifest, PluginIssue>): boolean => {
     if (isLoaded) {
@@ -113,6 +115,7 @@ export const connect = (options: ConnectionOptions): Connection => {
       case MessageType.Ready:
         if (reportLoad(ok(message.manifest))) {
           pluginId = message.manifest.id;
+          isCatalog = "kind" in message.manifest;
         }
         return;
       case MessageType.LoadFailed:
@@ -125,6 +128,13 @@ export const connect = (options: ConnectionOptions): Connection => {
         return;
       case MessageType.CapabilityCall:
         if (stopReason !== null) {
+          return;
+        }
+        if (isCatalog) {
+          const detail = `a catalog plugin is given no ${message.call.capability}`;
+          services.logger.warn("a plugin capability call was refused", { pluginId, detail });
+          const result = { capability: message.call.capability, value: err({ kind: StoreErrorKind.Network, detail }) };
+          worker.postMessage({ type: MessageType.CapabilityResult, id: message.id, result });
           return;
         }
         void serve(services, message.call).then((result) => result, (error: unknown): CapabilityResult => {

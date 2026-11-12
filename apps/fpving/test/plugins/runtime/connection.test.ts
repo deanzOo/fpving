@@ -1,4 +1,4 @@
-import { err, ok, StoreErrorKind } from "@fpving/plugin-sdk";
+import { err, ok, PluginKind, StoreErrorKind } from "@fpving/plugin-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connect } from "../../../src/plugins/runtime/connection.ts";
 import { CallMethod, Capability, LogMethod, MessageType } from "../../../src/plugins/runtime/protocol.ts";
@@ -45,6 +45,13 @@ const loadedSetup = async () => {
 const UNKNOWN_ID = 9;
 const HALF_DEADLINE = CALL_TIMEOUT_MS / (1 + 1);
 const HTTP_ID = 3;
+const CATALOG_MANIFEST = {
+  kind: PluginKind.Catalog,
+  id: "example-catalog",
+  displayName: "Example Catalog",
+  version: "1.0.0",
+  sdkVersion: MANIFEST.sdkVersion,
+} as const;
 
 describe("Plugin worker connection loading", () => {
   beforeEach(() => {
@@ -215,6 +222,27 @@ describe("Plugin worker connection capabilities", () => {
       result: { capability: Capability.HttpGet, value: err({ kind: StoreErrorKind.Network, detail }) },
     }]);
     expect(mocks.warn).toHaveBeenCalledWith("a plugin capability call failed", { pluginId: MANIFEST.id, detail });
+  });
+
+  it("refuses every capability call from a catalog plugin without reaching the services, and logs it", async () => {
+    const { worker, connection, mocks } = setup();
+    worker.ready(CATALOG_MANIFEST);
+    await connection.loaded;
+    const capabilities = [Capability.HttpGet, Capability.BrowserFetchPage];
+    capabilities.forEach((capability, id) => {
+      worker.send({ type: MessageType.CapabilityCall, id, call: { capability, url: URL_1 } });
+    });
+    await flush();
+    expect(mocks.get).not.toHaveBeenCalled();
+    expect(mocks.fetchPage).not.toHaveBeenCalled();
+    expect(worker.received).toEqual(capabilities.map((capability, id) => {
+      const value = err({ kind: StoreErrorKind.Network, detail: `a catalog plugin is given no ${capability}` });
+      return { type: MessageType.CapabilityResult, id, result: { capability, value } };
+    }));
+    expect(mocks.warn).toHaveBeenCalledWith("a plugin capability call was refused", {
+      pluginId: CATALOG_MANIFEST.id,
+      detail: "a catalog plugin is given no http.get",
+    });
   });
 
   it("does not serve capability calls a stopped worker sent", async () => {
