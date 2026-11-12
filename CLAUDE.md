@@ -47,6 +47,7 @@ Write the missing failing test, scan the codebase for the same bug class, fix ev
   - `Legend single` gives a one-series chart a legend, which the design starts at two series.
   - FAILED also tags a Find matches search that saved nothing and a catalog search where every catalog failed, which are not refusals.
   - No focus outline on `main`, `h1`, `h2` or `h3` when script moves focus there (`tabindex="-1"`). A focused `li` keeps its outline.
+  - The notice that the AI is not available on My gear is the quiet Status form, with no tag.
 - Guide: `apps/docs/src/content/docs/design-system.md`.
 
 ## Worktree and env isolation
