@@ -84,6 +84,15 @@ const expectCallRefusedAfterRestart = async (host: PluginHost, first: FakeWorker
   expect(await waiting).toEqual(err({ kind: StoreErrorKind.Network, detail: "the plugin example-shop is not loaded" }));
 };
 
+const expectAllDisabledAsDuplicates = (host: PluginHost, workers: readonly FakeWorker[], id: string): void => {
+  const reason = { kind: PluginIssueKind.DuplicateId, detail: `2 plugins have the id ${id}` };
+  expect(host.plugins().map(({ status }) => status)).toEqual([
+    { kind: PluginStatusKind.Disabled, reason },
+    { kind: PluginStatusKind.Disabled, reason },
+  ]);
+  expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
+};
+
 const statusesOf = (plugins: readonly PluginState[]) => plugins.map(({ manifest, status }) => ({
   id: manifest?.id,
   status,
@@ -138,12 +147,7 @@ describe("Plugin host loading", () => {
 
   it("disables and stops every plugin that shares an id", async () => {
     const { host, workers } = await start({ ...both, [OTHER_ENTRY.package]: [readyWith(MANIFEST)] });
-    const reason = { kind: PluginIssueKind.DuplicateId, detail: "2 plugins have the id example-shop" };
-    expect(host.plugins().map(({ status }) => status)).toEqual([
-      { kind: PluginStatusKind.Disabled, reason },
-      { kind: PluginStatusKind.Disabled, reason },
-    ]);
-    expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
+    expectAllDisabledAsDuplicates(host, workers, MANIFEST.id);
   });
 
   it("disables and stops plugins left with no domain of their own", async () => {
@@ -467,12 +471,7 @@ describe("Plugin host catalog plugins", () => {
       [SHOP_ENTRY.path]: [readyWith(other)],
       [CATALOG_ENTRY.package]: [readyWith(CATALOG_MANIFEST)],
     });
-    const reason = { kind: PluginIssueKind.DuplicateId, detail: "2 plugins have the id example-catalog" };
-    expect(host.plugins().map(({ status }) => status)).toEqual([
-      { kind: PluginStatusKind.Disabled, reason },
-      { kind: PluginStatusKind.Disabled, reason },
-    ]);
-    expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
+    expectAllDisabledAsDuplicates(host, workers, CATALOG_MANIFEST.id);
     expect(host.catalogPlugins()).toEqual([]);
     expect(host.registry.declaredDomains()).toEqual([]);
   });

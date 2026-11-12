@@ -3,14 +3,15 @@ import { LlmErrorKind } from "@fpving/core";
 import { GearKind, RadioFirmware, RcLink } from "@fpving/plugin-sdk";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { anthropicMessages, MATCHER_MODEL, NO_API_KEY } from "../../../src/adapters/anthropic/llm-judge.ts";
+import { MATCHER_MODEL, NO_API_KEY } from "../../../src/adapters/anthropic/llm-judge.ts";
 import type { CreateMessage } from "../../../src/adapters/anthropic/llm-judge.ts";
 import { createSpecReader, keylessSpecReader } from "../../../src/adapters/anthropic/spec-reader.ts";
-import { recordingLogger, textReply } from "./helpers.ts";
+import { keyedMessages, recordingLogger, textReply } from "./helpers.ts";
 
 const FAKE_KEY = "test-key-not-a-real-secret";
 const PASTE = "RadioMaster Boxer, ExpressLRS 2.4GHz built in, runs EdgeTX";
 const CELLS = 4;
+const OK = 200;
 
 const readerReplying = (text: string) => {
   const requests: MessageCreateParamsNonStreaming[] = [];
@@ -64,7 +65,6 @@ describe("Spec reader", () => {
   });
 
   it("answers malformed output when the reply is not JSON, without leaking the key", async () => {
-    const sentHeaders: string[] = [];
     const message = {
       id: "msg_1",
       type: "message",
@@ -75,15 +75,7 @@ describe("Spec reader", () => {
       stop_sequence: null,
       usage: { input_tokens: 1, output_tokens: 1 },
     };
-    const createMessage = anthropicMessages({
-      apiKey: FAKE_KEY,
-      maxRetries: 0,
-      fetch: (_url, init) => {
-        sentHeaders.push(JSON.stringify([...new Headers(init?.headers)]));
-        const headers = { "content-type": "application/json" };
-        return Promise.resolve(new Response(JSON.stringify(message), { headers }));
-      },
-    });
+    const { createMessage, sentHeaders } = keyedMessages(FAKE_KEY, OK, message);
     const { logger, logged } = recordingLogger();
     const result = await createSpecReader({ createMessage, logger }).read(GearKind.Radio, PASTE);
     expect(result).toMatchObject({ ok: false, error: { kind: LlmErrorKind.MalformedOutput } });

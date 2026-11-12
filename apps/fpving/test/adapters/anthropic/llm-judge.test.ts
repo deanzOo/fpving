@@ -13,7 +13,7 @@ import {
   NO_API_KEY,
 } from "../../../src/adapters/anthropic/llm-judge.ts";
 import type { CreateMessage, MessageReply } from "../../../src/adapters/anthropic/llm-judge.ts";
-import { recordingLogger, textReply } from "./helpers.ts";
+import { keyedMessages, recordingLogger, textReply } from "./helpers.ts";
 
 const FAKE_KEY = "test-key-not-a-real-secret";
 const SOURCE = "T-Motor F60 Pro V 2207 1950KV";
@@ -162,17 +162,8 @@ describe("Anthropic LLM judge", () => {
   });
 
   it("calls the real client without ever logging the api key", async () => {
-    const sentHeaders: string[] = [];
     const body = { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } };
-    const createMessage = anthropicMessages({
-      apiKey: FAKE_KEY,
-      maxRetries: 0,
-      fetch: (_url, init) => {
-        sentHeaders.push(JSON.stringify([...new Headers(init?.headers)]));
-        const headers = { "content-type": "application/json" };
-        return Promise.resolve(new Response(JSON.stringify(body), { status: Status.Unauthorized, headers }));
-      },
-    });
+    const { createMessage, sentHeaders } = keyedMessages(FAKE_KEY, Status.Unauthorized, body);
     const { logger, logged } = recordingLogger();
     const judge = createAnthropicLlmJudge(createMessage, logger);
     expect(failure(await judge.compare(SOURCE, CANDIDATE))?.detail).toContain("authentication failed");

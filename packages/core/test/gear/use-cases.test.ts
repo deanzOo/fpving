@@ -74,6 +74,7 @@ const draft = (overrides: Partial<GearDraft> = {}): GearDraft => ({
 });
 
 const T1300 = battery("t1300", "Tattu 1300", { cells: CELLS });
+const QUAD = { kind: GearKind.Quad, cells: CELLS };
 
 const seed = async (deps: GearDeps, overrides: Partial<GearDraft> = {}): Promise<GearItem> => {
   const item = gearItemSchema.parse({ ...draft(overrides), id: "seed-1", createdAt: NOW });
@@ -185,16 +186,11 @@ describe("Adding gear", () => {
     }
   });
 
-  it("saves a catalog source as confirmed by the user when the catalog entry is another kind of gear", async () => {
-    const specs = { kind: GearKind.Quad, cells: CELLS };
-    const quad = catalogEntrySchema.parse({ key: "t1300", name: "Tattu 1300", specs });
-    const deps = depsFor(gateway([[ONE, [quad]]]));
-    const added = await addGear(deps, draft());
-    expect(added).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User } } } });
-  });
-
-  it("saves a catalog source as confirmed by the user when the catalog has no such entry", async () => {
-    const deps = depsFor(gateway([[ONE, []]]));
+  it.each([
+    ["has no such entry", []],
+    ["entry is another kind of gear", [catalogEntrySchema.parse({ key: "t1300", name: "Tattu 1300", specs: QUAD })]],
+  ])("saves a catalog source as confirmed by the user when the catalog %s", async (_, entries) => {
+    const deps = depsFor(gateway([[ONE, entries]]));
     const added = await addGear(deps, draft());
     expect(added).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User } } } });
   });
