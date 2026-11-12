@@ -284,7 +284,7 @@ export default plugin;
 - `search(text)` resolves to the entries whose name matches, and `get(key)` to the entry with that stable `key`, or `null`.
 - Both resolve to a `Result` and never reject. A catalog that cannot answer resolves to `err({ kind: CatalogErrorKind.Failed, detail })`.
 - An entry is `{ key, name, specs }`. `specs` follows `gearSpecsSchema`, whose `kind` is `radio`, `goggles`, `quad`, `battery`, `charger` or `tool`. Every other field is optional, and a field you leave out is unknown, never a default.
-- The context holds only `logger` and `clock`. A catalog is given no `http`, no `browser` and no domains, and the host refuses any capability call it sends: bundle the data inside the plugin. Worker threads are not a security boundary ([ADR 0004](../adr/0004-worker-thread-plugin-isolation/)), so install only plugins you trust.
+- The context holds only `logger` and `clock`. A catalog is given no `http`, no `browser` and no domains, and once it has loaded the host refuses any capability call it sends: bundle the data inside the plugin. Worker threads are not a security boundary ([ADR 0004](../adr/0004-worker-thread-plugin-isolation/)), so install only plugins you trust.
 - The host copies a spec when the user saves an item, so a catalog can change an entry later. The item then shows a Changed warning and the user decides; see [Getting started](../getting-started/#what-exists-today).
 
 ## Distribution
