@@ -165,7 +165,7 @@ const verified = async (
   stored: GearItem | null,
 ): Promise<Record<string, SpecValue>> => {
   const entry = await currentEntry(deps, draft.catalogRef);
-  const now = new Map(Object.entries<SpecRawValue>({ ...entry?.specs }));
+  const now = new Map(entry?.specs.kind === draft.kind ? Object.entries<SpecRawValue>({ ...entry.specs }) : []);
   const before = stored?.kind === draft.kind ? stored.specs : {};
   const unchanged = (field: string, value: SpecRawValue): boolean => {
     const saved = before[field];
@@ -204,8 +204,8 @@ const build = (
  *
  * @remarks
  * A field is saved as catalog-sourced only when its draft source is `catalog`, names the item's catalog plugin and its
- * value equals the field's value in the catalog's current entry. Any other field, including every `user` field and
- * every field when the catalog cannot be checked, is saved as confirmed by the user.
+ * value equals the field's value in the catalog's current entry, which must be the same kind of gear. Any other field,
+ * including every `user` field and every field when the catalog cannot be checked, is saved as confirmed by the user.
  *
  * @param deps - The ports to use.
  * @param draft - What the user entered.

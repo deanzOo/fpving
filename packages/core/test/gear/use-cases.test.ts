@@ -185,6 +185,14 @@ describe("Adding gear", () => {
     }
   });
 
+  it("saves a catalog source as confirmed by the user when the catalog entry is another kind of gear", async () => {
+    const specs = { kind: GearKind.Quad, cells: CELLS };
+    const quad = catalogEntrySchema.parse({ key: "t1300", name: "Tattu 1300", specs });
+    const deps = depsFor(gateway([[ONE, [quad]]]));
+    const added = await addGear(deps, draft());
+    expect(added).toMatchObject({ ok: true, value: { specs: { cells: { source: SpecSource.User } } } });
+  });
+
   it("saves a catalog source as confirmed by the user when the catalog has no such entry", async () => {
     const deps = depsFor(gateway([[ONE, []]]));
     const added = await addGear(deps, draft());
