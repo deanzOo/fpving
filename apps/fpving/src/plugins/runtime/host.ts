@@ -29,7 +29,7 @@ import type {
 import { z } from "zod";
 import { checkSdkCompatibility } from "../compatibility.js";
 import type { PluginEntry } from "../config.js";
-import { buildDomainRegistry } from "../registry.js";
+import { buildDomainRegistry, duplicateId } from "../registry.js";
 import type { DomainRegistry } from "../registry.js";
 import { PluginIssueKind, PluginStatusKind } from "../status.js";
 import type { PluginIssue, PluginStatus } from "../status.js";
@@ -241,8 +241,18 @@ export const startPluginHost = async (options: PluginHostOptions): Promise<Plugi
     }
     return slot.startupFailure === null;
   };
-  const compatible = candidates.filter(startedCleanly);
-  const catalogs = new Map(catalogCandidates.filter(startedCleanly).map((slot) => [slot.id, slot]));
+  const cleanStores = candidates.filter(startedCleanly);
+  const cleanCatalogs = catalogCandidates.filter(startedCleanly);
+  const ids = [...cleanStores, ...cleanCatalogs].map(({ id }) => id);
+  const unique = (slot: CatalogSlot): boolean => {
+    const count = ids.filter((id) => id === slot.id).length;
+    if (count > 1) {
+      disable(slot, duplicateId(count, slot.id));
+    }
+    return count === 1;
+  };
+  const compatible = cleanStores.filter(unique);
+  const catalogs = new Map(cleanCatalogs.filter(unique).map((slot) => [slot.id, slot]));
   const { registry, statuses } = buildDomainRegistry(compatible);
   const routes = new Map<PluginId, RoutedSlot>();
   for (const { plugin, status } of statuses) {

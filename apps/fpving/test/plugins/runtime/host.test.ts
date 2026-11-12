@@ -447,6 +447,24 @@ describe("Plugin host catalog plugins", () => {
     expect([workerFor(SHOP_ENTRY.path)?.received, workerFor(CATALOG_ENTRY.package)?.received]).toEqual([[], []]);
   });
 
+  it.each([
+    ["two catalogs", CATALOG_MANIFEST],
+    ["a catalog and a store", { ...MANIFEST, id: CATALOG_MANIFEST.id }],
+  ])("disables and stops every plugin that shares an id across %s", async (_, other) => {
+    const { host, workers } = await startWithCatalog({
+      [SHOP_ENTRY.path]: [readyWith(other)],
+      [CATALOG_ENTRY.package]: [readyWith(CATALOG_MANIFEST)],
+    });
+    const reason = { kind: PluginIssueKind.DuplicateId, detail: "2 plugins have the id example-catalog" };
+    expect(host.plugins().map(({ status }) => status)).toEqual([
+      { kind: PluginStatusKind.Disabled, reason },
+      { kind: PluginStatusKind.Disabled, reason },
+    ]);
+    expect(workers.map((worker) => worker.terminations())).toEqual([1, 1]);
+    expect(host.catalogPlugins()).toEqual([]);
+    expect(host.registry.declaredDomains()).toEqual([]);
+  });
+
   it("disables a catalog plugin whose sdkVersion range excludes the running SDK and does not list it", async () => {
     const future = { ...CATALOG_MANIFEST, sdkVersion: ">=9.0.0 <10.0.0" };
     const { host } = await startWithCatalog({ ...withCatalog, [CATALOG_ENTRY.package]: [readyWith(future)] });

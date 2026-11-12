@@ -20,6 +20,12 @@ export interface RegisteredPlugins<P extends CompatiblePlugin> {
 const sharingId = (plugins: readonly CompatiblePlugin[], id: PluginId): number =>
   plugins.filter((plugin) => plugin.id === id).length;
 
+/** Why a plugin whose id `count` plugins share is disabled. */
+export const duplicateId = (count: number, id: PluginId): PluginIssue => ({
+  kind: PluginIssueKind.DuplicateId,
+  detail: `${String(count)} plugins have the id ${id}`,
+});
+
 const claimDomains = (plugins: readonly CompatiblePlugin[]): Map<string, PluginId[]> => {
   const claims = new Map<string, PluginId[]>();
   for (const { id, domains } of plugins) {
@@ -71,10 +77,7 @@ export const buildDomainRegistry = <P extends CompatiblePlugin>(plugins: readonl
     const count = sharingId(plugins, plugin.id);
     const status: PluginStatus = count === 1
       ? statusOf(plugin, claims)
-      : {
-          kind: PluginStatusKind.Disabled,
-          reason: { kind: PluginIssueKind.DuplicateId, detail: `${String(count)} plugins have the id ${plugin.id}` },
-        };
+      : { kind: PluginStatusKind.Disabled, reason: duplicateId(count, plugin.id) };
     return { plugin, status };
   });
   return {
