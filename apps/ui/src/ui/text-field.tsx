@@ -13,6 +13,12 @@ type TextFieldProps = Shared & (
   | (Omit<ComponentProps<"textarea">, "id"> & { readonly multiline: true })
 );
 
+const native = <T extends { readonly multiline?: boolean }>(props: T): Omit<T, "multiline"> => {
+  const copy: Omit<T, "multiline"> & { multiline?: boolean } = { ...props };
+  delete copy.multiline;
+  return copy;
+};
+
 /**
  * A labelled text input with a hint, or an error that replaces the hint and marks the input invalid. `numeric` types
  * in the readout face; `multiline` makes it a text box of several lines, for pasted text.
@@ -25,17 +31,15 @@ export const TextField = ({ label, hint, error, numeric = false, className = "",
   const { control, description } = useDescription({ hint, error, ...rest });
   const face = `placeholder:text-ink-muted ${numeric ? "type-readout" : "type-body"} ${className}`;
   if (rest.multiline === true) {
-    const { multiline, ...area } = rest;
     return (
       <Field label={label} id={id} description={description}>
-        <textarea {...area} {...control} id={id} aria-multiline={multiline} className={`${AREA} ${face}`} />
+        <textarea {...native(rest)} {...control} id={id} className={`${AREA} ${face}`} />
       </Field>
     );
   }
-  const { multiline, ...input } = rest;
   return (
     <Field label={label} id={id} description={description}>
-      <input {...input} {...control} id={id} aria-multiline={multiline} className={`${CONTROL} ${face}`} />
+      <input {...native(rest)} {...control} id={id} className={`${CONTROL} ${face}`} />
     </Field>
   );
 };

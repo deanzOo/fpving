@@ -56,12 +56,19 @@ describe("Text field", () => {
     expect(change).toHaveBeenCalled();
   });
 
+  it("is a single-line input unless multiline", async () => {
+    const screen = await render(<TextField label="Store URL" multiline={false} />);
+    const input = screen.getByRole("textbox", { name: "Store URL" });
+    expect(input.element()).toBeInstanceOf(HTMLInputElement);
+    await expect.element(input).not.toHaveAttribute("aria-multiline");
+  });
+
   it("takes several lines of pasted text when multiline, labelled and described like the single line", async () => {
     const change = vi.fn();
     const screen = await render(<TextField label="Specs text" hint={HINT} multiline onChange={change} />);
     const area = screen.getByRole("textbox", { name: "Specs text" });
     await expect.element(area).toHaveAccessibleDescription(HINT);
-    await expect.element(area).toHaveAttribute("aria-multiline", "true");
+    await expect.element(area).not.toHaveAttribute("aria-multiline");
     await userEvent.type(area, "4S{Enter}XT60");
     expect(area.element()).toBeInstanceOf(HTMLTextAreaElement);
     await expect.element(area).toHaveValue("4S\nXT60");
