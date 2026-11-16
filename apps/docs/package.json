@@ -9,12 +9,12 @@
     "build": "astro check && astro build"
   },
   "dependencies": {
-    "@astrojs/check": "0.9.10",
-    "@astrojs/starlight": "0.42.6",
-    "astro": "7.3.8",
-    "starlight-typedoc": "0.23.1",
+    "@astrojs/check": "0.9.12",
+    "@astrojs/starlight": "0.42.10",
+    "astro": "7.4.7",
+    "starlight-typedoc": "0.23.2",
     "typedoc": "0.28.20",
-    "typedoc-plugin-markdown": "4.13.1",
+    "typedoc-plugin-markdown": "4.14.1",
     "typescript": "6.0.3"
   }
 }

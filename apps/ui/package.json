@@ -8,17 +8,17 @@
     "build": "vite build"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "4.3.3",
+    "@tailwindcss/vite": "4.3.5",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/three": "0.187.0",
-    "@vitejs/plugin-react": "6.1.2",
-    "@vitest/browser-playwright": "5.0.5",
-    "playwright": "1.64.1",
-    "tailwindcss": "4.3.3",
-    "vite": "8.3.5",
-    "vitest": "5.0.5",
+    "@vitejs/plugin-react": "6.2.1",
+    "@vitest/browser-playwright": "5.1.0",
+    "playwright": "1.65.0",
+    "tailwindcss": "4.3.5",
+    "vite": "8.3.6",
+    "vitest": "5.1.0",
     "vitest-browser-react": "2.3.0"
   },
   "dependencies": {
@@ -27,7 +27,7 @@
     "@fpving/app": "workspace:*",
     "@fpving/core": "workspace:*",
     "@fpving/plugin-sdk": "workspace:*",
-    "@tanstack/react-query": "5.105.0",
+    "@tanstack/react-query": "5.107.1",
     "@tanstack/react-router": "1.170.46",
     "react": "19.3.1",
     "react-dom": "19.3.1",
