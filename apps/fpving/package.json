@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "@types/node-notifier": "8.0.5",
     "drizzle-kit": "0.31.11",
     "vitest": "5.0.5"
